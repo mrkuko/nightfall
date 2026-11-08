@@ -84,6 +84,11 @@ void raster_blit(raster_t *r, const frame_t *f, int x, int y, int z, int flags,
                 for (int sx = 0; sx < scale; sx++) {
                     int pxx = x + dx * scale + sx;
                     if (pxx < 0 || pxx >= r->w) continue;
+                    if (r->mask_on && py < r->mask_floor) {
+                        float mx = ((float)pxx + 0.5f - r->mask_cx) / r->mask_rx;
+                        float my = ((float)py + 0.5f - r->mask_cy) / r->mask_ry;
+                        if (mx * mx + my * my > 1.0f) continue;
+                    }
                     int i = py * r->w + pxx;
                     if (flags & BLIT_NOZ) { r->c[i] = c; continue; }
                     if (zz < r->z[i]) continue;

@@ -143,6 +143,7 @@ enum {
     ST_HANG,        /* hang upside down on a PATH_HANG path (place = path, x = t) for dur seconds */
     ST_HOLLOW,      /* sit in a hollow (place = place): the eyes glow, occasionally the head pokes out */
     ST_CHASE,       /* run after creature `place` (curiosity, not hunting) for at most dur seconds */
+    ST_TUNNEL,      /* (mole) underground to x, then surfaces with a new molehill */
     ST_DESPAWN
 };
 
@@ -185,7 +186,9 @@ typedef struct {
     int        hidden;          /* in a hideout (not drawn) */
     int        place;           /* place it is in (hideout) or -1 */
     int        clip;
-    int        clip_after;      /* 1 + clip to play after the current transition clip (_in/_out), 0 = none */
+    int        clip_after;
+    int        mask_place;      /* 1 + hollow place whose opening masks the creature, 0 = none */
+    int        mask_floor;      /* pixels at y >= this are not masked (climbing in / out); INT16 max = all masked */      /* 1 + clip to play after the current transition clip (_in/_out), 0 = none */
     float      ct;
     int        anim;
     int        intent;
@@ -252,6 +255,8 @@ int   world_add_place(world_t *w, int type, float x, float y, int z, int nav, in
 void  world_places_from_object(world_t *w, int obj);
 void  world_play_object_clip(world_t *w, int obj, const char *clip);
 float world_ground(const world_t *w, float x);
+/* Opening of a hollow (place): centre and radii of the ellipse. */
+void  world_hollow_opening(const world_t *w, int place, float *cx, float *cy, float *rx, float *ry);
 /* Ground y for a creature at depth z: closer rows (higher z) sit lower on the screen. */
 float world_ground_at(const world_t *w, float x, float z);
 /* Links paths that touch and assigns hollows to climbing paths. Call after the scene is built. */

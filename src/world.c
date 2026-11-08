@@ -228,6 +228,16 @@ void world_places_from_object(world_t *w, int oi)
     }
 }
 
+void world_hollow_opening(const world_t *w, int place, float *cx, float *cy, float *rx, float *ry)
+{
+    const place_t *p = &w->place[place];
+    *rx = p->ew > 0 ? (float)p->ew * 0.5f : 3.0f;
+    *ry = p->eh > 0 ? (float)p->eh * 0.5f : 4.0f;
+    *cx = p->has_eye ? p->ex : p->climb_x;
+    /* the eye point sits a little above the centre of the opening */
+    *cy = p->has_eye ? p->ey + *ry * 0.15f : p->y - *ry * 0.6f;
+}
+
 void path_point(const navpath_t *p, float t, float *x, float *y)
 {
     if (t <= 0) { *x = p->x[0]; *y = p->y[0]; return; }
@@ -527,8 +537,16 @@ void world_render(world_t *w, raster_t *r, int debug)
         const actor_t *a = &w->act[i];
         if (!a->alive || a->hidden) continue;
         int fi = clip_frame_at(&a->spr->clips[a->clip], a->ct);
+        if (a->mask_place > 0) {
+            float cx, cy, rx, ry;
+            world_hollow_opening(w, a->mask_place - 1, &cx, &cy, &rx, &ry);
+            r->mask_on = 1;
+            r->mask_cx = cx; r->mask_cy = cy; r->mask_rx = rx; r->mask_ry = ry;
+            r->mask_floor = a->mask_floor;
+        }
         raster_blit(r, &a->spr->frames[fi], (int)floorf(a->x + 0.5f), (int)floorf(a->y + 0.5f),
                     (int)floorf(a->zf + 0.5f), a->facing < 0 ? BLIT_FLIPX : 0, 1, NULL);
+        r->mask_on = 0;
     }
     if (debug) {
         static const rgb_t pc[PL_COUNT] = {

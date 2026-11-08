@@ -676,6 +676,15 @@ static void plan_intent(world_t *w, actor_t *a, int in)
         break;
     case IN_VANISH:
         if (!a->hidden && sprite_clip_index(a->spr, "vanish") >= 0) push_anim(a, A_VANISH, -1.0f);
+        if (a->prof.burrow && a->fear < 0.4f && rng_chance(&w->rng, 0.7f)) {
+            /* mole: digs on underground and surfaces a bit further, leaving a trail of molehills */
+            s = plan_push(a, ST_TUNNEL);
+            if (s) s->x = clampf(a->x + (rng_chance(&w->rng, 0.5f) ? 1.0f : -1.0f) * rng_range(&w->rng, 14, 45),
+                                 8, (float)w->w - 8);
+            push_anim(a, A_APPEAR, -1.0f);
+            push_anim(a, A_SNIFF, rng_range(&w->rng, 1.0f, 3.0f));
+            break;
+        }
         plan_push(a, ST_DESPAWN);
         break;
     case IN_CLIMB: {
@@ -989,6 +998,20 @@ static float clip_speed(const actor_t *a, int anim, float fallback)
     return c->speed > 0 ? c->speed : fallback;
 }
 
+/* A fresh molehill where a mole surfaces (not on top of another one, at most a dozen in a scene). */
+static void add_molehill(world_t *w, actor_t *a)
+{
+    int n = 0;
+    for (int i = 0; i < w->nobj; i++) {
+        if (strcmp(w->obj[i].spr->name, "molehill") != 0) continue;
+        if (fabsf(w->obj[i].x - a->x) < 8.0f) return;
+        n++;
+    }
+    if (n >= 12) return;
+    world_add_object(w, "molehill", a->x, world_ground_at(w, a->x, a->zf) + 1.0f, (int)a->zf + 2,
+                     rng_chance(&w->rng, 0.5f), rng_next(&w->rng) | 1);
+}
+
 /* Returns 1 if the step is finished. */
 static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
 {
@@ -1092,6 +1115,8 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
             a->place = s->place;
             p->occupant = actor_index(w, a);
             set_anim(a, A_HOLLOW);
+            a->mask_place = s->place + 1;
+            a->mask_floor = 32767;
             a->bob = rng_range(&w->rng, 4.0f, 10.0f);     /* countdown until the head pokes out */
             world_log(w, "%s#%u in a hollow", a->spr->name, a->id);
         }
@@ -1108,6 +1133,7 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         if (a->step_t >= s->dur) {
             p->occupant = -1;
             a->place = -1;
+            a->mask_place = 0;
             a->nav = NAV_AIR;
             a->zf = (float)cruise_z(w);
             return 1;
@@ -1154,6 +1180,27 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
             }
             world_stimulus(w, p->x, p->y, 60, ST_NOISE, 0.4f, 0.8f, actor_index(w, a));
         }
+        if (p->type == PL_HOLLOW && a->nav == NAV_CLIMB) {
+            /* climbing into a hollow: it slides up into the opening, only what is inside the
+             * opening (or still below it on the bark) is visible */
+            float cx, cy, rx, ry;
+            world_hollow_opening(w, s->place, &cx, &cy, &rx, &ry);
+            if (first) { a->mask_place = s->place + 1; a->mask_floor = (int)ceilf(cy + ry); a->path = -1; }
+            set_anim(a, A_CLIMB);
+            a->x = approach(a->x, cx, dt * 12.0f);
+            float ty = cy - 18.0f;
+            a->y = approach(a->y, ty, dt * fmaxf(8.0f, a->prof.climb * 0.6f));
+            if (fabsf(a->y - ty) < 0.5f) {
+                a->hidden = 1;
+                a->nav = NAV_HIDDEN;
+                a->place = s->place;
+                a->mask_place = 0;
+                p->occupant = actor_index(w, a);
+                world_log(w, "%s#%u hid", a->spr->name, a->id);
+                return 1;
+            }
+            return 0;
+        }
         /* going inside: the depth drops behind the leaves */
         set_anim(a, a->nav == NAV_CLIMB ? A_CLIMB : A_MOVE);
         a->zf = approach(a->zf, (float)p->z, dt * 14.0f);
@@ -1173,6 +1220,30 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
     }
     case ST_EXIT: {
         place_t *p = &w->place[s->place];
+        if (p->type == PL_HOLLOW && (a->prof.navmask & NAV_CLIMB)) {
+            /* head first out of the opening and down the bark, masked by the opening */
+            float cx, cy, rx, ry;
+            world_hollow_opening(w, s->place, &cx, &cy, &rx, &ry);
+            float floor_y = cy + ry;
+            if (first) {
+                a->hidden = 0;
+                a->nav = NAV_CLIMB;
+                a->x = cx;
+                a->y = cy - 18.0f;
+                a->zf = (float)(p->path >= 0 ? w->path[p->path].z : p->z + 5);
+                a->mask_place = s->place + 1;
+                a->mask_floor = (int)ceilf(floor_y);
+                p->occupant = -1;
+                a->place = -1;
+                world_stimulus(w, p->x, p->y, 60, ST_NOISE, 0.4f, 0.8f, actor_index(w, a));
+            }
+            set_anim(a, A_CLIMB_DOWN);
+            float ty = floor_y + 12.0f;
+            a->x = approach(a->x, p->climb_x, dt * 6.0f);
+            a->y = approach(a->y, ty, dt * fmaxf(8.0f, a->prof.climb * 0.5f));
+            if (fabsf(a->y - ty) < 0.5f) { a->mask_place = 0; return 1; }
+            return 0;
+        }
         if (first) {
             a->hidden = 0;
             a->x = p->type == PL_HOLLOW ? p->climb_x : p->x;
@@ -1194,12 +1265,19 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
     case ST_PEEK: {
         place_t *p = &w->place[s->place];
         place_t *home = a->place >= 0 ? &w->place[a->place] : p;
+        int in_hollow = p->type == PL_HOLLOW;
         if (first) {
             a->hidden = 0;
             a->facing = rng_chance(&w->rng, 0.5f) ? 1 : -1;
             a->x = p->x - (float)(a->prof.head_dx * a->facing);
             a->y = p->y - 1.0f - (float)a->prof.head_dy;
             a->zf = (float)p->z;
+            if (in_hollow) {
+                /* only the head in the opening: in front of the dark inside, behind the rim */
+                a->mask_place = s->place + 1;
+                a->mask_floor = 32767;
+                a->zf = (float)((p->obj >= 0 ? w->obj[p->obj].z : p->z) + 2);
+            }
             if (p->obj >= 0 && p->type == PL_PEEK) {
                 char clip[16];
                 snprintf(clip, sizeof clip, "open%d", p->sub);
@@ -1209,6 +1287,13 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
             world_log(w, "%s#%u peeks out", a->spr->name, a->id);
         }
         (void)home;
+        if (in_hollow) {
+            /* keep the head in the opening when it turns */
+            float cx, cy, rx, ry;
+            world_hollow_opening(w, s->place, &cx, &cy, &rx, &ry);
+            a->x = cx - (float)(a->prof.head_dx * a->facing);
+            a->y = cy + 1.0f - (float)a->prof.head_dy;
+        }
         float t = a->step_t;
         if (t < 0.6f) {
             if (a->anim != A_APPEAR) set_anim(a, A_IDLE);
@@ -1228,6 +1313,7 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
             }
         } else {
             a->hidden = 1;
+            a->mask_place = 0;
             return 1;
         }
         return 0;
@@ -1248,6 +1334,19 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         a->zf = approach(a->zf, o->zf, dt * 14.0f);
         a->y = world_ground_at(w, a->x, a->zf);
         return 0;
+    }
+    case ST_TUNNEL: {
+        if (first) a->hidden = 1;
+        float dx = s->x - a->x;
+        if (fabsf(dx) > 0.5f) {
+            a->x += sgnf(dx) * fminf(fabsf(dx), 9.0f * dt);
+            a->facing = dx < 0 ? -1 : 1;
+            return 0;
+        }
+        a->hidden = 0;
+        a->y = world_ground_at(w, a->x, a->zf);
+        add_molehill(w, a);
+        return 1;
     }
     case ST_DESPAWN:
         if (a->place >= 0) w->place[a->place].occupant = -1;
@@ -1315,6 +1414,10 @@ void actor_update(world_t *w, actor_t *a, float dt)
             a->step_init = 0;
         }
     }
+    /* the hollow mask only belongs to entering / leaving / peeking / sitting in a hollow */
+    if (a->mask_place && (a->step >= a->nplan || (a->plan[a->step].kind != ST_ENTER &&
+        a->plan[a->step].kind != ST_EXIT && a->plan[a->step].kind != ST_PEEK && a->plan[a->step].kind != ST_HOLLOW)))
+        a->mask_place = 0;
     /* on the ground the screen row follows the depth (depth changes walk forward / back) */
     if (a->nav == NAV_GROUND && !a->hidden && a->path < 0)
         a->y = approach(a->y, world_ground_at(w, a->x, a->zf), dt * 30.0f);
@@ -1357,8 +1460,9 @@ int actor_spawn(world_t *w, const char *species, float x, float y, int nav, int 
     a->id = w->next_id++;
     set_anim(a, A_IDLE);
     if (a->prof.burrow) {
-        /* mole: immediately emerges from the ground */
+        /* mole: immediately emerges from the ground, out of a fresh molehill */
         a->intent = IN_EMERGE;
+        if (nav == NAV_GROUND) add_molehill(w, a);
         push_anim(a, A_APPEAR, -1.0f);
     }
     w->population++;

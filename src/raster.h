@@ -18,6 +18,11 @@ typedef struct {
     rgb_t    fog;
     int      fog_near, fog_far;
     float    fog_max;
+    /* optional elliptic mask for the next blits (a creature inside a hollow is seen only through
+     * the opening); pixels at y >= mask_floor are not masked (climbing in / out from below) */
+    int      mask_on;
+    float    mask_cx, mask_cy, mask_rx, mask_ry;
+    int      mask_floor;
 } raster_t;
 
 enum {

@@ -1967,6 +1967,38 @@ static void gen_puddle(sprite_t *s, uint64_t seed)
 }
 
 /* moss cushion with spore capsules */
+/* Molehill: a small mound of fresh dark soil with crumbs, left behind by a mole. */
+static void gen_molehill(sprite_t *s, uint64_t seed)
+{
+    rng_t r = rng_seed(seed);
+    int w = rng_between(&r, 9, 14), h = rng_between(&r, 4, 6);
+    frame_t *f = sprite_add_frame(s, "base", w + 4, h + 1, (w + 4) / 2, h);
+    uint32_t ns = rng_u32(&r);
+    rgb_t soil = vary(mkrgb(66, 48, 34), &r, 0.08f);
+    float cx = (float)(w + 4) / 2.0f;
+    for (int y = 0; y <= h; y++)
+        for (int x = 0; x < w + 4; x++) {
+            float dx = ((float)x + 0.5f - cx) / ((float)w * 0.5f), dy = (float)(h - y) / (float)h;
+            /* a rounded mound with a lumpy outline */
+            float top = 1.0f - dx * dx + (vnoise2((float)x * 0.7f, 0.5f, ns) - 0.5f) * 0.35f;
+            if (dy > top) continue;
+            float lit = clampf(0.55f - dx * 0.25f + (1.0f - dy) * -0.1f + dy * 0.35f, 0.2f, 1.0f);
+            rgb_t c = rgb_scale(soil, 0.45f + lit * 0.6f);
+            float g = hash2f(x, y, ns);
+            if (g > 0.82f) c = rgb_add(c, 10);          /* crumbs */
+            else if (g < 0.12f) c = rgb_add(c, -8);
+            cv_set(f, x, y, c, (int)((top - dy) * 2.0f));
+        }
+    /* loose crumbs around the foot */
+    for (int i = 0; i < 4; i++) {
+        int x = rng_chance(&r, 0.5f) ? rng_between(&r, 0, 2) : rng_between(&r, w + 1, w + 3);
+        cv_set(f, x, h, rgb_scale(soil, 0.8f), 0);
+    }
+    frame_rimlight(f, C_MOON, 0.12f);
+    int16_t z0 = 0;
+    sprite_add_clip(s, "idle", CLIP_LOOP, 1, 0, &z0, 1);
+}
+
 static void gen_moss_patch(sprite_t *s, uint64_t seed)
 {
     rng_t r = rng_seed(seed);
@@ -2302,6 +2334,7 @@ static const genreg_t GENS[] = {
     { "brushwood",      gen_brushwood,      "ground hideout" },
     { "puddle",         gen_puddle,         "ground water" },
     { "moss_patch",     gen_moss_patch,     "ground small" },
+    { "molehill",       gen_molehill,       "ground small" },
     { "cones",          gen_cones,          "ground floor" },
     { "flowers",        gen_flowers,        "plant ground small sway" },
     { "horsetail",      gen_horsetail,      "plant ground foreground sway" },

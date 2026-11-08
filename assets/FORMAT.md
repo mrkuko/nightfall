@@ -157,6 +157,9 @@ prop path.walk0  2 -7  8 -8  14 -8  20 -9 …    # walkway along the top of a br
   The "in the hollow" frames (`in_hollow`, `hollow_peek`) have the anchor exactly between the eyes
   (`frame hol_eyes at 9 7`), so only the eyes glow in the dark and when it pokes out the head sticks out of the opening.
 - `hollow_size` — width and height of the opening in pixels.
+- A creature inside a hollow (peeking, climbing in or out, the owl sitting in it) is **masked by the
+  opening**: only its pixels inside the opening's ellipse are drawn (when climbing in / out also the
+  part still below the opening, on the bark).
 
 ## Biomes (`assets/biomes/*.spr`)
 
