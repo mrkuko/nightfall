@@ -224,8 +224,35 @@ void lib_free(library_t *lib)
 {
     for (int i = 0; i < lib->n; i++) sprite_free(lib->items[i]);
     free(lib->items);
+    for (int i = 0; i < lib->nbiome; i++) sprite_free(lib->biomes[i]);
+    free(lib->biomes);
     free(lib->pals);
     memset(lib, 0, sizeof *lib);
+}
+
+sprite_t *lib_find_biome(const library_t *lib, const char *name)
+{
+    for (int i = 0; i < lib->nbiome; i++)
+        if (strcmp(lib->biomes[i]->name, name) == 0) return lib->biomes[i];
+    return NULL;
+}
+
+/* Adds (or replaces, on reload) a biome. */
+static sprite_t *lib_add_biome(library_t *lib, const char *name)
+{
+    sprite_t *b = sprite_new(name);
+    for (int i = 0; i < lib->nbiome; i++)
+        if (strcmp(lib->biomes[i]->name, name) == 0) {
+            sprite_free(lib->biomes[i]);
+            lib->biomes[i] = b;
+            return b;
+        }
+    if (lib->nbiome == lib->capbiome) {
+        lib->capbiome = lib->capbiome ? lib->capbiome * 2 : 8;
+        lib->biomes = realloc(lib->biomes, sizeof *lib->biomes * (size_t)lib->capbiome);
+    }
+    lib->biomes[lib->nbiome++] = b;
+    return b;
 }
 
 void lib_add(library_t *lib, sprite_t *s)
@@ -273,13 +300,14 @@ static struct palette *lib_palette(library_t *lib, const char *name, int create)
 #define MAX_TOK 64
 
 enum { R_NONE, R_FRAME, R_DEPTH, R_PATCH };
-enum { M_TOP, M_PAL, M_CREATURE };
+enum { M_TOP, M_PAL, M_CREATURE, M_BIOME };
 
 typedef struct {
     library_t     *lib;
     const char    *src;
     int            line;
     sprite_t      *spr;
+    sprite_t      *biome;       /* biome block being read */
     int            mode;
     struct palette local;       /* local palette of the current shape */
     struct palette *pal;        /* palette we are currently writing to */
@@ -453,7 +481,7 @@ static void end_sprite(parser_t *p)
 static void parse_clip(parser_t *p, char **tok, int n)
 {
     /* clip NAME [MODE] [fps=N] [speed=S] : f1 f2*3 ... */
-    if (n < 2) { perr(p, "clip bez mena"); return; }
+    if (n < 2) { perr(p, "clip without a name"); return; }
     int mode = CLIP_LOOP;
     float fps = 8.0f, speed = 0.0f;
     int i = 2;
@@ -534,7 +562,22 @@ static void parse_line(parser_t *p, char *line)
         return;
     }
 
+    if (p->mode == M_BIOME) {
+        if (strcmp(tok[0], "end") == 0) { p->mode = M_TOP; p->biome = NULL; return; }
+        char val[384];
+        join_tokens(val, sizeof val, tok, 1, n);
+        sprite_set_prop(p->biome, tok[0], val);
+        return;
+    }
+
     const char *cmd = tok[0];
+    if (strcmp(cmd, "biome") == 0) {
+        end_sprite(p);
+        if (n < 2) { perr(p, "biome without a name"); return; }
+        p->biome = lib_add_biome(p->lib, tok[1]);
+        p->mode = M_BIOME;
+        return;
+    }
     if (strcmp(cmd, "palette") == 0) {
         if (p->spr) {
             p->pal = &p->local;            /* local palette of the shape */
@@ -547,7 +590,7 @@ static void parse_line(parser_t *p, char *line)
     }
     if (strcmp(cmd, "sprite") == 0) {
         end_sprite(p);
-        if (n < 2) { perr(p, "sprite bez mena"); return; }
+        if (n < 2) { perr(p, "sprite without a name"); return; }
         p->spr = sprite_new(tok[1]);
         snprintf(p->spr->src, sizeof p->spr->src, "%s", p->src);
         memset(&p->local, 0, sizeof p->local);
@@ -572,7 +615,7 @@ static void parse_line(parser_t *p, char *line)
         return;
     }
     if (strcmp(cmd, "frame") == 0) {
-        if (n < 2) { perr(p, "frame bez mena"); return; }
+        if (n < 2) { perr(p, "frame without a name"); return; }
         if (sprite_frame_index(p->spr, tok[1]) >= 0) perr(p, "duplicate frame '%s'", tok[1]);
         int base = -1;
         p->fr_has_anchor = 0;

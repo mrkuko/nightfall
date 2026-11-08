@@ -1,0 +1,133 @@
+# Biomes — recommendation lists (whitelists with weights) for the scene composer.
+#
+#   biome NAME
+#     key value...
+#   end
+#
+# Lists are "name=weight" (no "=" means 1). Only listed items are used; a missing list
+# falls back to "everything allowed". Run with --biome off to ignore biomes entirely.
+#
+#   label         name shown in the HUD
+#   weight        how often the biome is picked with --biome auto (default 1)
+#   trees         trunk generators for the main, middle and (some) background trees
+#   stumps logs   ground wood
+#   bushes        bushes with hideouts
+#   floor         small floor scatter (litter, cones)
+#   fungi         mushrooms
+#   plants        middle undergrowth band;  plants_near: big plants close to the camera;
+#   plants_far    low plants just in front of the creatures
+#   plant_density multiplier of foreground plant density (1 = default)
+#   rocks         multiplier of boulders and stones;  moss: of moss patches
+#   puddles       expected number of puddles (the fraction is a chance)
+#   ground        floor patch types: soil litter needles moss grass stone gravel pebbles mud sand
+#   ground_scale  patch size multiplier (1 = default, 2 = bigger patches)
+#   creatures     who may arrive (the weight multiplies the species' base frequency)
+
+biome oak_wood
+  label       oak wood
+  weight      1.2
+  trees       trunk=4 trunk_old=2 trunk_ivy=2 trunk_beech=2 trunk_birch=1 trunk_dead=1
+  stumps      stump=3 stump_mossy=3 stump_hollow=2 snag=1 rootplate=1
+  logs        log=2 log_mossy=3 log_hollow=2 log_rotten=2
+  bushes      bush=3 bush_wide=2 bush_small=1
+  floor       litter=5 cones=1
+  fungi       mushrooms=3 mushroom_red=1 mushroom_glow=1
+  plants      fern=3 grass=2 grass_tall=1 broadleaf=2 nettle=1 sprouts=1 flowers=1
+  plants_near fern=3 broadleaf=2 nettle=1 grass_tall=1
+  plants_far  grass_low=3 sprouts=2 flowers=1
+  ground      litter=5 soil=3 moss=2 grass=1 pebbles=1
+  creatures   rabbit squirrel=1.3 hedgehog mouse dormouse badger fox boar deer wildcat weasel owl bat moth firefly beetle stag_beetle=1.5 snail slug eyes spirit mole
+end
+
+biome beech_hall
+  label       beech hall
+  trees       trunk_beech=6 trunk=1 trunk_old=1 trunk_dead=1
+  stumps      stump=3 stump_hollow=2 stump_mossy=1 snag=1
+  logs        log=3 log_hollow=2 log_rotten=1
+  bushes      bush_small=3 bush=1
+  floor       litter=6
+  fungi       mushrooms=2 mushroom_glow=1
+  plants      sprouts=3 grass_low=2 fern=1 broadleaf=1
+  plants_near fern=2 broadleaf=1
+  plants_far  sprouts=3 grass_low=2
+  plant_density 0.55
+  ground      litter=6 soil=2 moss=1 pebbles=1
+  ground_scale 1.4
+  creatures   squirrel=1.5 dormouse=1.5 mouse hedgehog deer wildcat badger fox owl=1.5 bat moth firefly beetle stag_beetle slug eyes spirit
+end
+
+biome taiga
+  label       spruce taiga
+  weight      1.2
+  trees       trunk_spruce=5 trunk_pine=2 trunk_dead=1
+  stumps      stump=3 snag=3 stump_hollow=1 rootplate=2
+  logs        log=2 log_mossy=3 log_rotten=1
+  bushes      bush_small=2 bush=1
+  floor       cones=4 litter=1
+  fungi       mushrooms=2 mushroom_red=2 mushroom_glow=1
+  plants      fern=3 horsetail=2 grass_low=2 sprouts=1 grass=1
+  plants_near fern=3 horsetail=2
+  plants_far  grass_low=3 sprouts=1
+  moss        2
+  ground      needles=6 moss=4 soil=1 stone=1
+  creatures   squirrel=1.5 mouse owl=1.5 fox dhole weasel boar deer moth firefly beetle bat eyes spirit slug salamander
+end
+
+biome pine_rocks
+  label       rocky pine wood
+  trees       trunk_pine=5 trunk_dead=2 trunk_spruce=1
+  stumps      snag=3 stump=2 rootplate=1
+  logs        log=2 log_rotten=1
+  bushes      bush_small=2 bush=1
+  floor       cones=3 litter=1
+  fungi       mushrooms=1
+  plants      grass=3 grass_low=3 sprouts=1 flowers=1 fern=1
+  plants_near grass_tall=2 fern=1
+  plants_far  grass_low=3 flowers=1
+  plant_density 0.7
+  rocks       2.5
+  puddles     0
+  ground      stone=4 gravel=3 needles=3 sand=2 grass=1
+  ground_scale 1.2
+  creatures   fox=1.5 weasel=1.5 wildcat=1.5 dhole mouse rabbit deer owl bat moth firefly beetle salamander eyes
+end
+
+biome birch_grove
+  label       birch grove
+  trees       trunk_birch=6 trunk_beech=1 trunk=1 trunk_dead=1
+  stumps      stump_birch=4 stump=2 stump_hollow=1
+  logs        log_birch=4 log=1 log_mossy=1
+  bushes      bush=2 bush_wide=2 bush_small=1
+  floor       litter=3
+  fungi       mushrooms=2 mushroom_red=2
+  plants      grass=3 grass_tall=3 flowers=2 broadleaf=1 fern=1 sprouts=1
+  plants_near grass_tall=3 broadleaf=1 fern=1
+  plants_far  grass_low=2 flowers=2 grass=2
+  plant_density 1.15
+  ground      grass=5 moss=2 soil=2 litter=2
+  creatures   rabbit=1.5 mouse hedgehog deer fox mole=1.5 frog snail moth firefly=1.3 owl bat beetle weasel dormouse eyes
+end
+
+biome swamp
+  label       alder swamp
+  trees       trunk_birch=3 trunk_dead=3 trunk_ivy=1 trunk=1
+  stumps      snag=3 stump_mossy=3 stump_hollow=1
+  logs        log_rotten=3 log_mossy=3 log=1
+  bushes      bush_wide=2 bush=1
+  floor       litter=2
+  fungi       mushroom_glow=2 mushrooms=1
+  plants      horsetail=4 fern=3 grass_tall=3 sprouts=1
+  plants_near horsetail=3 fern=2 grass_tall=2
+  plants_far  grass_low=2 sprouts=1 horsetail=1
+  moss        2.5
+  puddles     2.5
+  ground      mud=5 moss=4 grass=2 soil=1
+  creatures   frog=3 salamander=3 snail=2 slug=2 mouse moth=1.5 firefly=2 bat=1.5 owl beetle eyes spirit=1.5 boar
+end
+
+biome mixed
+  label       mixed forest
+  trees       trunk=2 trunk_beech=2 trunk_spruce=2 trunk_pine=1 trunk_birch=1 trunk_old=1 trunk_ivy=1 trunk_dead=1
+  floor       litter=3 cones=2
+  ground      litter=3 needles=2 soil=2 moss=2 grass=1 pebbles=1 stone=1
+end

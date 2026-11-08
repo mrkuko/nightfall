@@ -29,6 +29,10 @@
 
 /* --- environment ----------------------------------------------------- */
 
+/* Floor patch types (the ground strip in front of the scene, coloured by the biome). */
+enum { GT_SOIL, GT_LITTER, GT_NEEDLES, GT_MOSS, GT_GRASS, GT_STONE, GT_GRAVEL, GT_PEBBLES, GT_MUD, GT_SAND, GT_COUNT };
+extern const char *const GROUND_NAMES[GT_COUNT];
+
 typedef struct {
     sprite_t *spr;
     float  x, y;          /* anchor position in raster pixels */
@@ -198,6 +202,9 @@ typedef struct {
     int        w, h;            /* raster dimensions */
     float      ground[1024];    /* ground height for x (y of the feet) */
     int        ground_z;        /* base depth of the creature lane on the ground */
+    float      ground_mix[GT_COUNT];  /* weights of the floor patch types (biome); all 0 = plain soil */
+    float      ground_scale;    /* patch size multiplier (1 = default) */
+    uint32_t   ground_seed;
     int        fg_z;            /* foreground depth */
     object_t   obj[MAX_OBJ];
     int        nobj;

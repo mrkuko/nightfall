@@ -248,6 +248,128 @@ static int random_place(world_t *w, int typemask, int free_only)
     return n ? c[rng_int(&w->rng, n)] : -1;
 }
 
+/* ------------------------------------------------------------------ */
+/* biomes: recommendation lists (whitelists with weights) from "biome" blocks in assets/biomes/ */
+/* ------------------------------------------------------------------ */
+
+const char *g_biome_arg = "auto";       /* auto | off | NAME (command line, 'B' in the playground) */
+static const sprite_t *g_biome;         /* biome of the current scene, NULL = no recommendations */
+static float g_species_w[NF_COUNT(SPECIES)];
+
+/* Weight of `name` in a list "a=3 b c=0.5" (no "=" means 1); -1 if it is not listed. */
+static float list_weight(const char *list, const char *name)
+{
+    size_t nl = strlen(name);
+    for (const char *s = list; *s;) {
+        while (*s == ' ') s++;
+        const char *e = s;
+        while (*e && *e != ' ' && *e != '=') e++;
+        float wgt = 1.0f;
+        int hit = (size_t)(e - s) == nl && strncmp(s, name, nl) == 0;
+        if (*e == '=') { wgt = (float)atof(e + 1); while (*e && *e != ' ') e++; }
+        if (hit) return wgt;
+        s = e;
+    }
+    return -1.0f;
+}
+
+/* Weighted pick from a list; only names that exist in the library. NULL if none. */
+static const char *pick_list(const library_t *lib, rng_t *r, const char *list)
+{
+    const sprite_t *cand[48];
+    float wt[48], total = 0;
+    int n = 0;
+    char buf[384];
+    snprintf(buf, sizeof buf, "%s", list);
+    for (char *tok = strtok(buf, " "); tok && n < 48; tok = strtok(NULL, " ")) {
+        char *eq = strchr(tok, '=');
+        float wgt = 1.0f;
+        if (eq) { *eq = 0; wgt = (float)atof(eq + 1); }
+        const sprite_t *s = lib_find(lib, tok);
+        if (!s || wgt <= 0) continue;
+        cand[n] = s; wt[n] = wgt; total += wgt; n++;
+    }
+    if (!n) return NULL;
+    float u = rng_range(r, 0, total);
+    for (int i = 0; i < n; i++) { u -= wt[i]; if (u <= 0) return cand[i]->name; }
+    return cand[n - 1]->name;
+}
+
+/* A name from the biome's list `key`; without a biome (or list) uniformly from the defaults. */
+static const char *bpick(const world_t *w, rng_t *r, const char *key, const char *const *def, int ndef)
+{
+    const char *v = g_biome ? sprite_prop(g_biome, key) : NULL;
+    const char *n = v ? pick_list(w->lib, r, v) : NULL;
+    return n ? n : def[rng_int(r, ndef)];
+}
+
+static float bnum(const char *key, float def)
+{
+    const char *v = g_biome ? sprite_prop(g_biome, key) : NULL;
+    return v ? (float)atof(v) : def;
+}
+
+static const char *biome_label(void)
+{
+    if (!g_biome) return "no biome";
+    const char *l = sprite_prop(g_biome, "label");
+    return l ? l : g_biome->name;
+}
+
+static const sprite_t *choose_biome(const library_t *lib, rng_t *r)
+{
+    if (!strcmp(g_biome_arg, "off") || lib->nbiome == 0) return NULL;
+    if (strcmp(g_biome_arg, "auto") != 0) {
+        const sprite_t *b = lib_find_biome(lib, g_biome_arg);
+        if (b) return b;
+    }
+    float total = 0;
+    for (int i = 0; i < lib->nbiome; i++) {
+        const char *v = sprite_prop(lib->biomes[i], "weight");
+        total += v ? (float)atof(v) : 1.0f;
+    }
+    float u = rng_range(r, 0, total);
+    for (int i = 0; i < lib->nbiome; i++) {
+        const char *v = sprite_prop(lib->biomes[i], "weight");
+        u -= v ? (float)atof(v) : 1.0f;
+        if (u <= 0) return lib->biomes[i];
+    }
+    return lib->biomes[lib->nbiome - 1];
+}
+
+/* Applies the biome to the world: creature whitelist and floor patches. */
+static void apply_biome(world_t *w, rng_t *r)
+{
+    const char *cl = g_biome ? sprite_prop(g_biome, "creatures") : NULL;
+    for (size_t i = 0; i < NF_COUNT(SPECIES); i++) {
+        float f = cl ? list_weight(cl, SPECIES[i].name) : 1.0f;
+        g_species_w[i] = f < 0 ? 0 : f;
+    }
+    const char *gl = g_biome ? sprite_prop(g_biome, "ground") : NULL;
+    int any = 0;
+    for (int t = 0; t < GT_COUNT; t++) {
+        float f = gl ? list_weight(gl, GROUND_NAMES[t]) : (rng_chance(r, 0.45f) ? rng_range(r, 0.3f, 1.0f) : 0.0f);
+        w->ground_mix[t] = f < 0 ? 0 : f;
+        any |= w->ground_mix[t] > 0;
+    }
+    if (!any) { w->ground_mix[GT_SOIL] = 1; w->ground_mix[GT_MOSS] = 0.6f; }
+    w->ground_scale = bnum("ground_scale", 1.0f);
+    w->ground_seed = (uint32_t)rng_next(r);
+}
+
+int biome_cycle(const library_t *lib)
+{
+    /* auto -> each biome -> off -> auto */
+    if (!strcmp(g_biome_arg, "auto")) g_biome_arg = lib->nbiome ? lib->biomes[0]->name : "off";
+    else if (!strcmp(g_biome_arg, "off")) g_biome_arg = "auto";
+    else {
+        int i = 0;
+        while (i < lib->nbiome && strcmp(lib->biomes[i]->name, g_biome_arg)) i++;
+        g_biome_arg = i + 1 < lib->nbiome ? lib->biomes[i + 1]->name : "off";
+    }
+    return 0;
+}
+
 /* Director: decides who arrives, when and from where. */
 static int spawn_species(world_t *w, const char *name)
 {
@@ -318,59 +440,37 @@ static void director(world_t *w, float dt)
     if (w->population >= cap) return;
     float total = 0;
     for (size_t i = 0; i < NF_COUNT(SPECIES); i++)
-        if (count_species(w, SPECIES[i].name) < SPECIES[i].max) total += SPECIES[i].weight;
+        if (count_species(w, SPECIES[i].name) < SPECIES[i].max) total += SPECIES[i].weight * g_species_w[i];
+    if (total <= 0) return;
     float r = rng_range(&w->rng, 0, total);
     for (size_t i = 0; i < NF_COUNT(SPECIES); i++) {
-        if (count_species(w, SPECIES[i].name) >= SPECIES[i].max) continue;
-        r -= SPECIES[i].weight;
+        if (count_species(w, SPECIES[i].name) >= SPECIES[i].max || g_species_w[i] <= 0) continue;
+        r -= SPECIES[i].weight * g_species_w[i];
         if (r <= 0) { spawn_species(w, SPECIES[i].name); break; }
     }
 }
 
 /* ------------------------------------------------------------------ */
-/* scene composer: archetype + forest type + mirroring, all from the seed */
+/* scene composer: archetype + biome + mirroring, all from the seed */
 /* ------------------------------------------------------------------ */
 
 enum { AR_LEFT, AR_RIGHT, AR_FRAME, AR_GROVE, AR_CLEARING, AR_THICKET, AR_COUNT };
-enum { FT_DECID, FT_PINE, FT_BIRCH, FT_MIXED, FT_COUNT };
-
 static const char *AR_NAMES[AR_COUNT] = { "giant left", "giant right", "trunk frame", "grove", "clearing", "thicket" };
-static const char *FT_NAMES[FT_COUNT] = { "deciduous", "coniferous", "birch", "mixed" };
 static char g_scene_desc[96];
 
-static const char *pick_trunk(rng_t *r, int ft)
-{
-    float u = rng_float(r);
-    switch (ft) {
-    case FT_PINE:  return u < 0.45f ? "trunk_pine" : u < 0.85f ? "trunk_spruce" : "trunk_dead";
-    case FT_BIRCH: return u < 0.6f ? "trunk_birch" : u < 0.8f ? "trunk_beech" : u < 0.9f ? "trunk" : "trunk_dead";
-    case FT_DECID: return u < 0.3f ? "trunk" : u < 0.5f ? "trunk_beech" : u < 0.62f ? "trunk_old" : u < 0.72f ? "trunk_ivy"
-                        : u < 0.87f ? "trunk_birch" : "trunk_dead";
-    default: {
-        static const char *all[] = { "trunk", "trunk_beech", "trunk_old", "trunk_ivy", "trunk_birch", "trunk_pine",
-                                     "trunk_spruce", "trunk_dead" };
-        return all[rng_int(r, 8)];
-    }
-    }
-}
-
-static const char *pick_stump(rng_t *r, int ft)
-{
-    float u = rng_float(r);
-    switch (ft) {
-    case FT_PINE:  return u < 0.4f ? "stump" : u < 0.65f ? "snag" : u < 0.85f ? "stump_hollow" : "rootplate";
-    case FT_BIRCH: return u < 0.5f ? "stump_birch" : u < 0.75f ? "stump" : u < 0.9f ? "stump_hollow" : "snag";
-    default:       return u < 0.25f ? "stump" : u < 0.45f ? "stump_mossy" : u < 0.62f ? "stump_hollow"
-                        : u < 0.78f ? "snag" : u < 0.9f ? "rootplate" : "stump_birch";
-    }
-}
-
-static const char *pick_log(rng_t *r, int ft)
-{
-    static const char *logs[] = { "log", "log_mossy", "log_hollow", "log_rotten" };
-    if (ft == FT_BIRCH && rng_chance(r, 0.6f)) return "log_birch";
-    return logs[rng_int(r, 4)];
-}
+/* Defaults used without a biome (or when a biome does not have the list): everything is allowed. */
+static const char *ALL_TREES[]  = { "trunk", "trunk_beech", "trunk_old", "trunk_ivy", "trunk_birch", "trunk_pine",
+                                    "trunk_spruce", "trunk_dead" };
+static const char *ALL_STUMPS[] = { "stump", "stump_mossy", "stump_hollow", "snag", "rootplate", "stump_birch" };
+static const char *ALL_LOGS[]   = { "log", "log_mossy", "log_hollow", "log_rotten", "log_birch" };
+static const char *ALL_BUSHES[] = { "bush", "bush_wide", "bush", "bush_small" };
+static const char *ALL_FLOOR[]  = { "litter", "litter", "cones" };
+static const char *ALL_PLANTS[] = { "grass", "grass_tall", "fern", "broadleaf", "grass_low", "sprouts", "nettle", "flowers",
+                                    "horsetail" };
+static const char *ALL_NEAR[]   = { "fern", "broadleaf", "grass_tall", "nettle", "fern", "horsetail" };
+static const char *ALL_FAR[]    = { "grass_low", "sprouts", "flowers", "grass_low", "grass" };
+static const char *ALL_FUNGI[]  = { "mushrooms", "mushrooms", "mushroom_red", "mushroom_glow" };
+#define BPICK(key, def) bpick(w, r, key, def, (int)NF_COUNT(def))
 
 /* Branches on a tree: branch type from the tree's mapping (property "branch"), pointing towards the
  * middle of the screen, spread over the height; extras by species (vine on deciduous, lichen on conifers). */
@@ -438,9 +538,9 @@ static void place_mid_tree(world_t *w, rng_t *r, float x, const char *name, int 
     add_branches(w, r, t, x, z, 0, 2, 0);
 }
 
-static void place_main_trunk(world_t *w, rng_t *r, float x, int ft, int z)
+static void place_main_trunk(world_t *w, rng_t *r, float x, int z)
 {
-    place_trunk_named(w, r, x, pick_trunk(r, ft), z);
+    place_trunk_named(w, r, x, BPICK("trees", ALL_TREES), z);
 }
 
 static int too_close(const float *xs, int n, float x, float d)
@@ -470,15 +570,18 @@ static void build_scene(world_t *w, uint64_t seed)
 {
     rng_t r = rng_seed(seed ^ 0x5eedu);
     int W = w->w;
-    int ar = rng_int(&r, AR_COUNT), ft = rng_int(&r, FT_COUNT);
-    snprintf(g_scene_desc, sizeof g_scene_desc, "%s, %s forest", AR_NAMES[ar], FT_NAMES[ft]);
+    int ar = rng_int(&r, AR_COUNT);
+    g_biome = choose_biome(w->lib, &r);
+    apply_biome(w, &r);
+    snprintf(g_scene_desc, sizeof g_scene_desc, "%s, %s", AR_NAMES[ar], biome_label());
+#define BP(key, def) bpick(w, &r, key, def, (int)NF_COUNT(def))
 #define G(x) world_ground(w, (x))
 #define SD (rng_next(&r) | 1)
 #define FLIP rng_chance(&r, 0.5f)
 
     /* 1. deep background: a dense row of distant trunks in fog + rear bushes */
     for (float x = rng_range(&r, -8, 4); x < (float)W + 10; x += rng_range(&r, 7, 20))
-        world_add_object(w, rng_chance(&r, 0.85f) ? "tree_far" : pick_trunk(&r, ft), x,
+        world_add_object(w, rng_chance(&r, 0.85f) ? "tree_far" : BP("trees", ALL_TREES), x,
                          G(x) - rng_range(&r, 6, 14), rng_between(&r, 22, 48), FLIP, SD);
     for (float x = rng_range(&r, -10, 10); x < (float)W + 20; x += rng_range(&r, 26, 50))
         world_add_object(w, rng_chance(&r, 0.5f) ? "bush_wide" : "bush", x, G(x) - rng_range(&r, 3, 7),
@@ -510,9 +613,9 @@ static void build_scene(world_t *w, uint64_t seed)
         float x = rng_range(&r, 0, (float)W);
         if (too_close(trunks, nt, x, 26) || too_close(mids, nm, x, 16)) continue;
         mids[nm++] = x;
-        place_mid_tree(w, &r, x, pick_trunk(&r, ft), rng_between(&r, 62, 76));
+        place_mid_tree(w, &r, x, BP("trees", ALL_TREES), rng_between(&r, 62, 76));
     }
-    for (int i = 0; i < nt; i++) place_main_trunk(w, &r, trunks[i], ft, rng_between(&r, 88, 92));
+    for (int i = 0; i < nt; i++) place_main_trunk(w, &r, trunks[i], rng_between(&r, 88, 92));
 
     /* 4. overhead: canopies (no sky), moonbeams */
     float cstep = ar == AR_CLEARING ? rng_range(&r, 70, 110) : rng_range(&r, 35, 60);
@@ -526,12 +629,11 @@ static void build_scene(world_t *w, uint64_t seed)
     int nbush = ar == AR_THICKET ? 4 + W / 80 : ar == AR_CLEARING ? 1 + W / 120 : 2 + W / 110;
     float bx[16];
     int nbx = 0;
-    static const char *bushes[] = { "bush", "bush_wide", "bush", "bush_small" };
     for (int tries = 0; tries < 60 && nbx < nbush && nbx < 16; tries++) {
         float x = rng_range(&r, 10, (float)W - 10);
         if (too_close(trunks, nt, x, 18) || too_close(bx, nbx, x, ar == AR_THICKET ? 22 : 34)) continue;
         bx[nbx++] = x;
-        int b = world_add_object(w, bushes[rng_int(&r, 4)], x, G(x) + 1, rng_between(&r, 88, 91), FLIP, SD);
+        int b = world_add_object(w, BP("bushes", ALL_BUSHES), x, G(x) + 1, rng_between(&r, 88, 91), FLIP, SD);
         if (b >= 0) world_places_from_object(w, b);
     }
 
@@ -544,10 +646,11 @@ static void build_scene(world_t *w, uint64_t seed)
     int nstump = ar == AR_CLEARING ? rng_between(&r, 1, 3) : rng_between(&r, 0, 1);
     for (int i = 0; i < nstump; i++) {
         float x = rng_range(&r, 12, (float)W - 12);
-        int o = world_add_object(w, pick_stump(&r, ft), x, G(x) + 2, rng_between(&r, 94, 98), FLIP, SD);
+        int o = world_add_object(w, BP("stumps", ALL_STUMPS), x, G(x) + 2, rng_between(&r, 94, 98), FLIP, SD);
         if (o >= 0) world_places_from_object(w, o);
     }
-    int nboulder = ar == AR_CLEARING ? rng_between(&r, 1, 2) : rng_between(&r, 0, 1);
+    float rocks = bnum("rocks", 1.0f);           /* biome multiplier for boulders and stones */
+    int nboulder = (int)lroundf((float)(ar == AR_CLEARING ? rng_between(&r, 1, 2) : rng_between(&r, 0, 1)) * rocks);
     for (int i = 0; i < nboulder; i++) {
         float x = rng_range(&r, 12, (float)W - 12);
         int o = world_add_object(w, "boulder", x, G(x) + 3, rng_between(&r, 94, 99), FLIP, SD);
@@ -556,7 +659,7 @@ static void build_scene(world_t *w, uint64_t seed)
     int nlog = ar == AR_CLEARING ? rng_between(&r, 1, 2) : rng_between(&r, 0, 1 + (W > 140));
     for (int i = 0; i < nlog; i++) {
         float x = rng_range(&r, (float)W * 0.15f, (float)W * 0.9f);
-        int o = world_add_object(w, pick_log(&r, ft), x, G(x) + 1, rng_between(&r, 95, 99), FLIP, SD);
+        int o = world_add_object(w, BP("logs", ALL_LOGS), x, G(x) + 1, rng_between(&r, 95, 99), FLIP, SD);
         if (o >= 0) world_places_from_object(w, o);
     }
     if (rng_chance(&r, ar == AR_THICKET ? 0.9f : 0.5f)) {
@@ -568,55 +671,52 @@ static void build_scene(world_t *w, uint64_t seed)
     /* 7. ground */
     for (int i = 0; i < W / 26; i++) {
         float x = rng_range(&r, 0, (float)W);
-        const char *n = ft == FT_PINE ? (rng_chance(&r, 0.6f) ? "cones" : "litter") : (rng_chance(&r, 0.8f) ? "litter" : "cones");
-        world_add_object(w, n, x, G(x) + 3, 98, 0, SD);
+        world_add_object(w, BP("floor", ALL_FLOOR), x, G(x) + 3, 98, 0, SD);
     }
-    for (int i = 0; i < 1 + W / 60; i++) {
+    for (int i = 0; i < (int)lroundf((float)(1 + W / 60) * bnum("moss", 1.0f)); i++) {
         float x = rng_range(&r, 0, (float)W);
         world_add_object(w, "moss_patch", x, G(x) + 3, 99, 0, SD);
     }
-    if (rng_chance(&r, ar == AR_CLEARING ? 0.8f : 0.35f)) {
-        float x = rng_range(&r, (float)W * 0.2f, (float)W * 0.9f);
+    /* puddles: expected count (biome "puddles"), the fraction is a chance */
+    float pud = bnum("puddles", ar == AR_CLEARING ? 0.8f : 0.35f);
+    int npud = (int)pud + rng_chance(&r, pud - floorf(pud));
+    for (int i = 0; i < npud; i++) {
+        float x = rng_range(&r, (float)W * 0.1f, (float)W * 0.9f);
         world_add_object(w, "puddle", x, G(x) + 5, 99, 0, SD);
     }
     for (int i = 0; i < rng_between(&r, 1, 4); i++) {
         float x = rng_range(&r, 0, (float)W);
-        float u = rng_float(&r);
-        world_add_object(w, u < 0.2f ? "mushroom_red" : u < 0.35f ? "mushroom_glow" : "mushrooms", x, G(x) + 2, 106, 0, SD);
+        world_add_object(w, BP("fungi", ALL_FUNGI), x, G(x) + 2, 106, 0, SD);
     }
-    for (int i = 0; i < 1 + W / 70; i++) {
+    for (int i = 0; i < (int)lroundf((float)(1 + W / 70) * rocks); i++) {
         float x = rng_range(&r, 0, (float)W);
         world_add_object(w, "stone", x, G(x) + 4, 108, 0, SD);
     }
 
     /* 8. foreground in three depth bands (not everything in one layer), with wider spacing:
      *    far and low (just in front of the creatures) -> middle -> near, big and sparse (closest to the camera) */
-    static const char *fg_decid[] = { "grass", "grass_tall", "fern", "broadleaf", "grass_low", "sprouts", "nettle", "flowers", "fern" };
-    static const char *fg_pine[] = { "grass_low", "fern", "fern", "horsetail", "grass", "sprouts", "grass_tall" };
-    static const char *fg_near[] = { "fern", "broadleaf", "grass_tall", "nettle", "fern", "horsetail" };
-    static const char *fg_far[]  = { "grass_low", "sprouts", "flowers", "grass_low", "grass" };
-    const char *const *fg = ft == FT_PINE ? fg_pine : fg_decid;
-    int nfg = ft == FT_PINE ? (int)NF_COUNT(fg_pine) : (int)NF_COUNT(fg_decid);
-    float step0 = (ar == AR_THICKET ? 5.0f : ar == AR_CLEARING ? 11.0f : 7.0f) * 1.45f;
+    float step0 = (ar == AR_THICKET ? 5.0f : ar == AR_CLEARING ? 11.0f : 7.0f) * 1.45f
+                / fmaxf(0.1f, bnum("plant_density", 1.0f));
     /* far band: low grass and small flowers, slightly in front of the creatures */
     for (float x = rng_range(&r, -4, 8); x < (float)W + 10; x += fg_gap(&r, step0 * 2.4f, step0 * 5.0f))
-        world_add_object(w, fg_far[rng_int(&r, (int)NF_COUNT(fg_far))], x, G(x) + rng_range(&r, 2, 6),
+        world_add_object(w, BP("plants_far", ALL_FAR), x, G(x) + rng_range(&r, 2, 6),
                          fg_z(&r, 112, 4), FLIP, SD);
     /* middle band: the main undergrowth */
     for (float x = rng_range(&r, -6, 6); x < (float)W + 10; x += fg_gap(&r, step0 * 1.9f, step0 * 4.2f))
-        world_add_object(w, fg[rng_int(&r, nfg)], x, G(x) + rng_range(&r, 4, 11), fg_z(&r, w->fg_z - 2, 6), FLIP, SD);
+        world_add_object(w, BP("plants", ALL_PLANTS), x, G(x) + rng_range(&r, 4, 11), fg_z(&r, w->fg_z - 2, 6), FLIP, SD);
     /* near band: big plants, sparse, closest to the camera and lowest on the screen */
     for (float x = rng_range(&r, -10, 20); x < (float)W + 12; x += fg_gap(&r, step0 * 4.0f, step0 * 7.5f))
-        world_add_object(w, fg_near[rng_int(&r, (int)NF_COUNT(fg_near))], x, G(x) + rng_range(&r, 9, 15),
+        world_add_object(w, BP("plants_near", ALL_NEAR), x, G(x) + rng_range(&r, 9, 15),
                          fg_z(&r, w->fg_z + 18, 6), FLIP, SD);
     for (float x = rng_range(&r, 0, 10); x < (float)W; x += fg_gap(&r, 24, 55))
-        world_add_object(w, rng_chance(&r, 0.5f) ? "grass" : "grass_low", x, G(x) + 1, 98, FLIP, SD);
+        world_add_object(w, BP("plants_far", ALL_FAR), x, G(x) + 1, 98, FLIP, SD);
 
     /* 9. ground mist */
     for (float x = rng_range(&r, 0, 30); x < (float)W + 40; x += rng_range(&r, 45, 90))
         world_add_object(w, "mist", x, G(x) + 2, 115, 0, SD);
 
     world_link_paths(w);
+#undef BP
 #undef G
 #undef SD
 #undef FLIP
@@ -813,6 +913,13 @@ int play_run(library_t *lib, const char *assets_dir, uint64_t seed)
             case '+': case '=': speed = fminf(8.0f, speed * 2.0f); break;
             case '-': speed = fmaxf(0.25f, speed * 0.5f); break;
             case 'n': w->next_spawn = 0; director(w, 0); break;
+            case 'B':                       /* next biome: auto -> each biome -> off */
+                biome_cycle(lib);
+                world_free(w);
+                world_init(w, lib, cols, rows * 2, seed);
+                build_scene(w, seed);
+                for (int i = 0; i < 3; i++) director(w, 100.0f);
+                break;
             case 'l':
                 seed = seed * 6364136223846793005ull + 1442695040888963407ull;
                 world_free(w);
@@ -849,7 +956,7 @@ int play_run(library_t *lib, const char *assets_dir, uint64_t seed)
         if (hud) {
             char line[512];
             snprintf(line, sizeof line, " NIGHTFALL playground  seed %llu (%s)  creatures %d  %.2gx%s   "
-                     "q quit  l new scene  h hud  d places/paths  space pause  +/- time  n spawn  r s x o v e g j b c m w p = rabbit squirrel fox owl bat eyes spirit deer boar cat mole weasel dhole ",
+                     "q quit  l new scene  B biome  h hud  d places/paths  space pause  +/- time  n spawn  r s x o v e g j b c m w p = rabbit squirrel fox owl bat eyes spirit deer boar cat mole weasel dhole ",
                      (unsigned long long)seed, g_scene_desc, w->population, (double)speed, paused ? " PAUSED" : "");
             screen_text(&sc, 0, 0, line, UI_DIM, &UI_BG);
             int y = 1;

@@ -5,6 +5,9 @@
 
 /* Foreground tuning, 1.0 = default (set from the command line). */
 extern float g_fg_density, g_fg_spread, g_fg_zspread;
+/* Biome: "auto" (random by seed), "off" (no recommendations) or a biome name. */
+extern const char *g_biome_arg;
+int biome_cycle(const library_t *lib);
 
 int nf_load_library(library_t *lib, const char *assets_dir, uint64_t seed);
 

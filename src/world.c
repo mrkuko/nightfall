@@ -419,6 +419,68 @@ static int object_frame(const world_t *w, const object_t *o)
     return clip_frame_at(&o->spr->clips[o->clip], o->t);
 }
 
+const char *const GROUND_NAMES[GT_COUNT] = {
+    "soil", "litter", "needles", "moss", "grass", "stone", "gravel", "pebbles", "mud", "sand"
+};
+
+/* Three night shades per patch type: base, dark, light. */
+static const uint8_t GROUND_SHADES[GT_COUNT][3][3] = {
+    { { 24, 19, 14 }, { 18, 14, 11 }, { 30, 24, 17 } },   /* soil */
+    { { 38, 23, 12 }, { 27, 16,  9 }, { 48, 30, 14 } },   /* litter: brown leaves */
+    { { 33, 22, 14 }, { 25, 16, 11 }, { 42, 28, 17 } },   /* needles */
+    { { 19, 34, 19 }, { 13, 26, 15 }, { 27, 44, 23 } },   /* moss */
+    { { 21, 36, 17 }, { 15, 28, 13 }, { 30, 47, 22 } },   /* grass */
+    { { 38, 40, 42 }, { 27, 29, 31 }, { 50, 52, 54 } },   /* stone slab */
+    { { 34, 33, 31 }, { 21, 21, 20 }, { 47, 46, 43 } },   /* gravel */
+    { { 24, 20, 15 }, { 18, 15, 12 }, { 52, 51, 48 } },   /* pebbles: soil + light stones */
+    { { 15, 16, 14 }, { 10, 11, 10 }, { 24, 30, 34 } },   /* mud: dark, wet sheen */
+    { { 46, 40, 29 }, { 37, 32, 23 }, { 54, 47, 34 } },   /* sand */
+};
+
+/* Ground strip: noise patches of the biome's floor types. Each type has its own noise field
+ * (plus a bias from its weight); the strongest wins, ragged edges by dithering. Patches grow
+ * towards the bottom (closer to the camera) and are flattened (perspective). Baked once. */
+static void render_ground(world_t *w, raster_t *r)
+{
+    float maxw = 0;
+    for (int t = 0; t < GT_COUNT; t++) maxw = fmaxf(maxw, w->ground_mix[t]);
+    float sc = w->ground_scale > 0 ? w->ground_scale : 1.0f;
+    uint32_t seed = w->ground_seed;
+    for (int x = 0; x < r->w && x < w->w; x++) {
+        int gy = (int)ceilf(w->ground[x]) + 1;
+        int H = r->h - gy;
+        for (int y = gy; y < r->h; y++) {
+            float d = (float)(y - gy);
+            int best = GT_SOIL, second = GT_SOIL;
+            if (maxw > 0) {
+                float p = (1.0f + d * 0.09f) * sc;
+                float u = (float)x / (10.0f * p), v = (float)y / (3.6f * p);
+                float b1 = -1e9f, b2 = -1e9f;
+                for (int t = 0; t < GT_COUNT; t++) {
+                    if (w->ground_mix[t] <= 0) continue;
+                    float n = fbm2(u + (float)t * 17.3f, v + (float)t * 9.1f, 3, seed + (uint32_t)t * 7919u);
+                    float sc_t = n + 0.45f * w->ground_mix[t] / maxw;
+                    if (sc_t > b1) { b2 = b1; second = best; b1 = sc_t; best = t; }
+                    else if (sc_t > b2) { b2 = sc_t; second = t; }
+                }
+                if (b1 - b2 < 0.035f && hash2f(x, y, seed ^ 0x9e37u) < 0.5f) best = second;
+            }
+            /* grain: base / dark / light; gravel and pebbles are coarser */
+            float g = hash2f(x, y, seed + 13u);
+            int k = best == GT_PEBBLES ? (g > 0.86f ? 2 : g > 0.6f ? 1 : 0)
+                  : best == GT_GRAVEL ? (g > 0.66f ? 2 : g > 0.33f ? 1 : 0)
+                  : (g > 0.88f ? 2 : g > 0.68f ? 1 : 0);
+            const uint8_t *s = GROUND_SHADES[best][k];
+            rgb_t c = mkrgb(s[0], s[1], s[2]);
+            /* night: the far edge catches some mist, the bottom fades into darkness */
+            float t = H > 1 ? d / (float)(H - 1) : 0;
+            c = rgb_scale(c, 1.55f - 0.55f * t);
+            if (d < 1.5f) c = rgb_mix(c, mkrgb(20, 26, 26), 0.35f);
+            raster_plot(r, x, y, c, w->ground_z - 20);
+        }
+    }
+}
+
 static void render_static(world_t *w, raster_t *r)
 {
     /* background: almost black blue-green, slightly lighter towards the bottom */
@@ -430,17 +492,7 @@ static void render_static(world_t *w, raster_t *r)
             r->z[y * r->w + x] = Z_EMPTY;
         }
     }
-    /* ground */
-    for (int x = 0; x < r->w && x < w->w; x++) {
-        int gy = (int)ceilf(w->ground[x]) + 1;
-        for (int y = gy; y < r->h; y++) {
-            float n = hash2f(x, y, 7u);
-            float d = (float)(y - gy) / 12.0f;
-            rgb_t c = rgb_mix(mkrgb(20, 18, 14), mkrgb(10, 9, 8), clampf(d, 0, 1));
-            if (n > 0.92f) c = rgb_add(c, 6);
-            raster_plot(r, x, y, c, w->ground_z - 20);
-        }
-    }
+    render_ground(w, r);
     for (int i = 0; i < w->nobj; i++) {
         const object_t *o = &w->obj[i];
         if (!o->is_static) continue;

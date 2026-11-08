@@ -66,6 +66,9 @@ typedef struct {
     /* named palettes (shared between files) */
     int        npal, cappal;
     struct palette *pals;
+    /* biomes: "biome NAME ... end" blocks (recommendation lists as properties) */
+    int        nbiome, capbiome;
+    sprite_t **biomes;
     /* last parser errors */
     char       errors[8][160];
     int        nerrors;
@@ -99,6 +102,7 @@ void      lib_init(library_t *lib);
 void      lib_free(library_t *lib);
 void      lib_add(library_t *lib, sprite_t *s);
 sprite_t *lib_find(const library_t *lib, const char *name);
+sprite_t *lib_find_biome(const library_t *lib, const char *name);
 /* Loads text in the .spr format (may contain several shapes). Returns the error count. */
 int       lib_parse(library_t *lib, const char *text, const char *srcname);
 /* Loads all *.spr in a directory (recursing one level). Returns the file count. */

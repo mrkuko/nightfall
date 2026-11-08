@@ -146,6 +146,29 @@ prop path.walk0  2 -7  8 -8  14 -8  20 -9 …    # walkway along the top of a br
   (`frame hol_eyes at 9 7`), so only the eyes glow in the dark and when it pokes out the head sticks out of the opening.
 - `hollow_size` — width and height of the opening in pixels.
 
+## Biomes (`assets/biomes/*.spr`)
+
+A `biome NAME … end` block (outside any `sprite`) holds recommendation lists for the scene
+composer — whitelists with weights, `name=weight` (no `=` means 1):
+
+```text
+biome taiga
+  label       spruce taiga
+  trees       trunk_spruce=5 trunk_pine=2 trunk_dead=1
+  plants      fern=3 horsetail=2 grass_low=2
+  ground      needles=6 moss=4 soil=1 stone=1
+  creatures   squirrel=1.5 mouse owl=1.5 fox …
+end
+```
+
+Keys: `label weight trees stumps logs bushes floor fungi plants plants_near plants_far
+plant_density rocks moss puddles ground ground_scale creatures` (described in the header of
+`assets/biomes/biomes.spr`). A missing list = everything allowed. `ground` types: `soil litter
+needles moss grass stone gravel pebbles mud sand` — the floor strip is painted with noise patches
+of these. `--biome auto` (default) picks one by the seed and `weight`, `--biome NAME` forces one,
+`--biome off` ignores biomes (everything allowed, a random floor mix), `--biome list` lists them.
+In the playground `B` cycles auto → each biome → off.
+
 ## Procedural shapes
 
 Plants and environment (`grass`, `fern`, `bush`, `trunk`, `roots`, `branch`,
