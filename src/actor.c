@@ -679,8 +679,19 @@ static void plan_intent(world_t *w, actor_t *a, int in)
         if (a->prof.burrow && a->fear < 0.4f && rng_chance(&w->rng, 0.7f)) {
             /* mole: digs on underground and surfaces a bit further, leaving a trail of molehills */
             s = plan_push(a, ST_TUNNEL);
-            if (s) s->x = clampf(a->x + (rng_chance(&w->rng, 0.5f) ? 1.0f : -1.0f) * rng_range(&w->rng, 14, 45),
-                                 8, (float)w->w - 8);
+            if (s) {
+                /* far and varied: usually 25-110 px away, now and then a short hop or most of the screen;
+                 * the surfacing row (depth) is random across the whole ground band */
+                float u = rng_float(&w->rng);
+                float dist = u < 0.15f ? rng_range(&w->rng, 10, 25) : u < 0.85f ? rng_range(&w->rng, 25, 110)
+                                                                              : rng_range(&w->rng, 110, (float)w->w * 0.7f);
+                float dir = rng_chance(&w->rng, 0.5f) ? 1.0f : -1.0f;
+                if (a->x + dir * dist < 8 || a->x + dir * dist > (float)w->w - 8) dir = -dir;
+                s->x = clampf(a->x + dir * dist, 8, (float)w->w - 8);
+                float t = rng_chance(&w->rng, 0.7f) ? rng_range(&w->rng, 0.0f, 1.0f) : -1.0f;
+                s->z = t < 0 ? actor_pick_lane(w, &a->prof)
+                             : w->ground_z + (int)lroundf(t * (float)(w->fg_z + 6 - w->ground_z));
+            }
             push_anim(a, A_APPEAR, -1.0f);
             push_anim(a, A_SNIFF, rng_range(&w->rng, 1.0f, 3.0f));
             break;
@@ -1338,12 +1349,19 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
     case ST_TUNNEL: {
         if (first) a->hidden = 1;
         float dx = s->x - a->x;
-        if (fabsf(dx) > 0.5f) {
-            a->x += sgnf(dx) * fminf(fabsf(dx), 9.0f * dt);
-            a->facing = dx < 0 ? -1 : 1;
+        /* digging speed grows with the distance so that a long tunnel does not take minutes */
+        float spd = 9.0f + fminf(fabsf(s->x - a->x), 120.0f) * 0.08f;
+        a->zf = approach(a->zf, (float)s->z, dt * 10.0f);
+        if (fabsf(dx) > 0.5f || fabsf(a->zf - (float)s->z) > 0.5f) {
+            if (fabsf(dx) > 0.5f) {
+                a->x += sgnf(dx) * fminf(fabsf(dx), spd * dt);
+                a->facing = dx < 0 ? -1 : 1;
+            }
             return 0;
         }
+        a->lane_z = s->z;
         a->hidden = 0;
+        world_log(w, "%s#%u surfaces at x=%d z=%d", a->spr->name, a->id, (int)a->x, s->z);
         a->y = world_ground_at(w, a->x, a->zf);
         add_molehill(w, a);
         return 1;
