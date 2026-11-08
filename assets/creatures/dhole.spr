@@ -910,6 +910,344 @@ frame gal3
 |...........JKKk............J
 |...........JjKk
 
+frame crouch
+|.
+|.
+|.
+|.
+|........................B
+|........................DBg
+|.......................BccFg
+|.......................DCcBb
+|.......................DCcBabb
+|.......................DAABaaab
+|......................baDDaabcab
+|......................daaaabaweb
+|...........bbbbbbbbbbbdaaabaaeeabb
+|.........bbaaabaaaabaadaaccccccaaab
+|....t.ttbaaaaaabaaadaaadaCCcCCcddn
+|...tTtTTdaaaaaaabaadaaaadddddd
+|..tTTTTbaaaaaaaabaadaaaaad
+|.tTTTTTdaaaaaaaabaaadaaddc
+|..TTTTTTdaaaBBaccacccdBBBc
+|.tTTTTT.daaBAABCCcCCCBAABc
+|..TTTT...ddDAABCCCCCCaDAABg
+|..TTTTtt..FdDkkBddd...aDkkjj
+|..TTTTT....JJKKk........KKkj
+|.....Tt.....JDKk.........KkJj
+
+frame sitdown
+|.....................B
+|.....................DBgg
+|.....................ccBg
+|.....................CcBb
+|....................BACcBbbb
+|....................DAAAaaaab
+|...................baDDBabcab
+|...................daaaabawebbb
+|...................daaabaceeaaab
+|..................badacccCccaaan
+|..............bbbbaaddCCcCCcddd
+|............bbaaadaaaaddddd
+|...........baaaabaaaaaab
+|..........baaaaadaaaBBd
+|..........bbbbbaaddBAABg
+|.........baaaaabbaaDAABg
+|........baaaaaaacccDAABg
+|......tbaaaaaaacCCCcDABg
+|......TdaaaaBBBCCCCcDABg
+|....ttTTdaaaDAABCbd.kkkj
+|....TTTTdaaaDAABd...KKkj
+|....TTTTTddddDkk....KKkj
+|....TTTTTTTt..KKk...KKkj
+|.....TT.TTT...DKk....Kkj
+
+frame sniffair1
+|........................BBgg
+|........................DcBg
+|........................DcBbb
+|........................DCcBabb
+|.......................bDAABaabbbb
+|.......................dDDDbbcaaaab
+|......................baaaadaweaaan
+|......................daaaacceeddd
+|.....................badacccCCcb
+|................b.b.baadaaCcCad
+|.........bbbbbbbababaaaadddddd
+|...t.tttbaaaaaabaaadaaaaaab
+|...TtTTTdaaaaaaabaadaaaaad
+|..tTTTTbaaaaaaaabaadaddadc
+|ttTTTTTdaaaaaaaabaaadCCdCc
+|TTTTTTT.daaaaaacccccaCCCCc
+|TTTTTTt.daaaBBcCCCCCccBBCg
+|.TTTTT...daBAABCaCCaCBAABg
+|tTTTT.....dDAABddddddDAABg
+|TTTTTt....FDAA........DABg
+|T.TTT.....jDkk........kkkj
+|..TT......JkKk........KKkj
+|..........JKKk........KKkj
+|..........JKKk........KKkj
+
+frame sniffair2
+|........................Bcgg
+|........................DcBg
+|........................DCcbbb
+|........................DCcBaabbbb
+|.......................bDADabcbaaab
+|.......................daDabaweaanb
+|......................baaaadceeadd
+|......................daaaccCCcd
+|.....................badacCcCCab
+|................b.b.baaddaaaadd
+|.........bbbbbbbababaaaaadddd
+|...t.tttbaaaaaabaaadaaaaaab
+|...TtTTTdaaaaaaabaadaaaaad
+|..tTTTTbaaaaaaaabaadaddadc
+|ttTTTTTdaaaaaaaabaaadCCdCc
+|TTTTTTT.daaaaaacccccaCCCCc
+|TTTTTTt.daaaBBcCCCCCccBBCg
+|.TTTTT...daBAABCaCCaCBAABg
+|tTTTT.....dDAABddddddDAABg
+|TTTTTt....FDAA........DABg
+|T.TTT.....jDkk........kkkj
+|..TT......JkKk........KKkj
+|..........JKKk........KKkj
+|..........JKKk........KKkj
+
+frame lookback
+|.....................BB
+|.....................Dcg
+|....................Bccg
+|...................bDCcg
+|.................bbBACcbg
+|................baaDAABab
+|................dabcDDaab
+|...............bbbaweaaab
+|..............bbaaaeeaaab
+|.............baaaccccaaab
+|.........bbbbdnaaCCCaaad
+|...t.tttbaaaaadddadddddab
+|...TtTTTdaaaaaaabadaaaaab
+|..tTTTTbaaaaaaaabadaaaaabc
+|ttTTTTTdaaaaaaaabaadaaadCc
+|TTTTTTT.daaaaaacccccdddCCc
+|TTTTTTt.daaaBBcCCCCCccBBCg
+|.TTTTT...daBAABCaCCaCBAABg
+|tTTTT.....dDAABddddddDAABg
+|TTTTTt....FDAA........DABg
+|T.TTT.....jDkk........kkkj
+|..TT......JkKk........KKkj
+|..........JKKk........KKkj
+|..........JKKk........KKkj
+
+frame lookback_blink
+|.....................BB
+|.....................Dcg
+|....................Bccg
+|...................bDCcg
+|.................bbBACcbg
+|................baaDAABab
+|................dabcDDaab
+|...............bbbabbaaab
+|..............bbaaaddaaab
+|.............baaaccccaaab
+|.........bbbbdnaaCCCaaad
+|...t.tttbaaaaadddadddddab
+|...TtTTTdaaaaaaabadaaaaab
+|..tTTTTbaaaaaaaabadaaaaabc
+|ttTTTTTdaaaaaaaabaadaaadCc
+|TTTTTTT.daaaaaacccccdddCCc
+|TTTTTTt.daaaBBcCCCCCccBBCg
+|.TTTTT...daBAABCaCCaCBAABg
+|tTTTT.....dDAABddddddDAABg
+|TTTTTt....FDAA........DABg
+|T.TTT.....jDkk........kkkj
+|..TT......JkKk........KKkj
+|..........JKKk........KKkj
+|..........JKKk........KKkj
+
+frame stretchf
+|...t.tt
+|...TtTTt
+|..tTTTT
+|..TTTTt
+|...TTTt
+|...TTTTt
+|..tTTTTt
+|....TTTTt.bbb............B
+|...tTTTTbbaaabb.........BB.g
+|....TTTTdaaaaaab........DcBg
+|.....TTbaaaaaaabbbb.....DCcBg
+|.......daaaaaaabaaabb...DCcBbbb
+|.......daaaaaaabaaaaab..DAcBaaab
+|.......daaaBBBabaaaaabbbDDDBabcab
+|........daaDABdaaaaabaadaaabbabbbbb
+|.........ddDABaaaaabaaadaaadaaddaab
+|.........FfDABccccadaaadaacccccaaan
+|.........FfDABCCdCcadaBBBaCCcCcdddb
+|.........FfDAB...dCcddDAABddddd
+|.........jjkkk.......aDAAABg
+|.........JJKKk.........DAkkjg
+|.........JJKKB..........DKKkj
+|.........JJKk............KKKkj
+|.........JJKk.............KKkJj
+
+frame stretchb
+|.
+|.
+|.........................BB.g
+|.........................Dc.g
+|.........................DcBg
+|.........................DCcBb
+|.........................DCcBabb
+|........................bDAABaaab
+|........................daDDabcab
+|......................bbdaaabaabbbb
+|...............bbbbbbbaadaaadcddaaab
+|...t.ttt..bbbbbaaaaabaaadaccccCcaaab
+|.t.TtTTTttdaaaabaaabaaaaadaCCCCcdddn
+|.TtTTTTTbbaaaaaabaadaaaaaaddddd
+|tTTTTTTTdaaaaaaabaadaaaaad
+|TTTTTTT.daaaaaaabaaadaaadc
+|TTTTTTt.daaaBacccccccdddC
+|.TTTT....daBABCCCCCCCcBBBcg
+|tTTT....gfBAABdCCdCCCcDAABg
+|.T.....gfBAADB.......aDAABg
+|......jjkkAD...........kkkj
+|.....jJkKkD............KKkj
+|....jJkKKk.............KKkjg
+|....JkKKD...............KkJj
+
+frame pcrouch
+|...t.tt
+|...TtTTt
+|..tTTTT
+|..TTTTt
+|...TTTt
+|...TTTTt
+|..tTTTTt..................BBg
+|....TTTTt.bbb.............cBg
+|...tTTTTbbaaabb..........BCcg
+|....TTTTdaaaaaab.........DCcfg
+|.....TTbaaaaaaabbbb.....BACcBbb
+|.......daaaaaaabaaabb...bDAABaab
+|.......daaaaaaabaaaaab.baaDDabcab
+|.......daaaBBBabaaaaabbdaaabbawebbb
+|........daaDABdaaaaabaadaaadaaeeaab
+|.........ddDABaaaaabaaadaacccccaaan
+|.........FfDABccccadaaaadaCCcCcdddb
+|.........FfDABCCdCcadaBBBdddddd
+|.........FfDAB...dCcddDAABd
+|.........jjkkk.......aDAAABg
+|.........JJKKk.........DAkkjg
+|.........JJKKB..........DKKkj
+|.........JJKk............KKKkj
+|.........JJKk.............KKkJj
+
+frame pcrouch2
+|.
+|.......t.ttt
+|.....ttTtTTt
+|.....TTTTTT
+|....tTTTTTTt
+|....TTTTTTT
+|....TTTTTT................BBg
+|....TTTTTbbbbb............cBg
+|.....TTTbaaaaab..........BCcg
+|.....TTbaaaaaaab.........DCcfg
+|......Tdaaaaaaabbbb.....BACcBbb
+|.......daaaaaaabaaabb...bDAABaab
+|.......daaaaaaabaaaaab.baaDDabcab
+|........daaBBBabaaaaabbdaaabbawebbb
+|........ddaDABdaaaaabaadaaadaaeeaab
+|.........FdDABaaaaabaaadaacccccaaan
+|.........FfDABccccadaaaadaCCcCcdddb
+|.........FfDABCCdCcadaBBBdddddd
+|.........FfDAB....CcddDAABd
+|.........jjkkk.......aDAAABg
+|.........JJKKk.........DAkkjg
+|.........JJKKB..........DKKkj
+|.........JJKk............KKKkj
+|.........JJKk.............KKkJj
+
+frame pleap
+|..tt.ttt
+|..TTtTTt
+|.tTTTTT
+|.TTTTTt
+|...TTTt....bbb.............B
+|...TTTTttbbaaab...........BAB
+|...TTTTTbaaaaaabbbbb......DcBg
+|....TTTTdaaaaaaabaaabb...BAcBg
+|.....TTTdaaaaaaabaaaabbbbDccBbb
+|.......TdaaaaaaabaaabaaadDAABaab
+|........daaBBBaaaaabaaabaaDDBaaab
+|........ddBAABccaaadaaadaaaabbcab
+|.......jjBAAABCCcacadaaadaabaaweb
+|......jJkkkDDddCCcCcddBBBacccceeb
+|.....jJkKKk....dddCCcBAABdCCcCcab
+|......kKKK...........aDAABddCCcaab
+|.......KK.............aDAkBg..daaab
+|........................kKkj...ddn
+|........................DKKkj
+|.........................KKkj
+|..........................KkJj
+|............................J
+|.
+|.
+
+frame pland
+|...t.tt
+|...TtTTt
+|..tTTTT
+|..TTTTt
+|...TTTt
+|...TTTTt
+|..tTTTTt
+|....TTTTt.bbb
+|...tTTTTbbaaabb
+|....TTTTdaaaaaab
+|.....TTbaaaaaaabbbb
+|.......daaaaaaabaaabb....BB.g
+|.......daaaaaaabaaaaab...DcBg
+|.......daaaBBBabaaaaabbb.DcBb
+|........daaDABdaaaaabaab.DCcBbb
+|.........ddDABaaaaaadaaabDCcBaab
+|.........FfDABccccabaaaabDADBaaab
+|.........FfDABCCdCcadaBBBaDaaaaab
+|.........FfDAB...dCcddDAABaabbcab
+|.........jjkkk.......aDAAABccaweb
+|.........JJKKk.........DAkkCCceeb
+|.........JJKKB..........DKKkCCcbb
+|.........JJKk............KKKkCcab
+|.........JJKk.............KKkCcdb
+
+frame pland2
+|.......tt
+|......tTTtt
+|....ttTTTTt
+|.....TTTTTt
+|....tTTTT
+|....TTTTTt
+|...tTTTTT
+|....TTTTt.bbb
+|.....TTTbbaaabb
+|.....TTTdaaaaaab
+|......Tbaaaaaaabbbb
+|.......daaaaaaabaaabb....BB.g
+|.......daaaaaaabaaaaab...DcBg
+|.......daaaBBBabaaaaabbb.DcBb
+|........daaDABdaaaaabaab.DCcBbb
+|.........ddDABaaaaaadaaabDCcBaab
+|.........FfDABccccabaaaabDADBaaab
+|.........FfDABCCdCcadaBBBaDaaaaab
+|.........FfDAB...dCcddDAABaabbcab
+|.........jjkkk.......aDAAABccabab
+|.........JJKKk.........DAkkCCcddb
+|.........JJKKB..........DKKkCCcbb
+|.........JJKk............KKKkCcab
+|.........JJKk.............KKkCcdb
+
 frame walk0
 |.
 |........................B
@@ -1067,20 +1405,34 @@ frame walk5
 |..............Kk..........Jj
 
 
-clip idle loop fps=5 : stand*12 stand_blink stand*6 tilt*6 tilt_blink tilt*3 stand*6 look*6 stand*4
-clip wag loop fps=8 : wag1 wag2 wag1 wag2 wag1 wag2 stand*4 wag_blink wag2 wag1 wag2 stand*6 pant*10 stand*3
-clip pant loop fps=6 : pant*3 stand pant*3 stand_blink pant*4 tilt*4
-clip look loop fps=4 : look*6 tilt*6 tilt_blink tilt*3 look*4
+clip idle loop fps=5 : stand*16 stand_blink stand*12 tilt*6 tilt_blink tilt*2 stand*10 stand_blink stand*8
+clip wag loop fps=8 : wag1 wag2 wag1 wag2 wag1 wag2 stand*8 wag_blink wag2 wag1 wag2 stand*10 pant*12 stand*6
+clip pant loop fps=6 : pant*4 stand pant*4 stand_blink pant*6 stand*4
+clip sniffair loop fps=6 : stand*3 sniffair1 sniffair2 sniffair1 sniffair2 sniffair1*3 sniffair2 sniffair1 stand*6 stand_blink stand*4
+clip lookback loop fps=4 : stand*3 lookback*8 lookback_blink lookback*4 stand*6
+clip look loop fps=4 : look*8 stand*3 stand_blink look*6 stand*3
 clip howl loop fps=3 : sit*3 howl*8 sit_blink sit*3 howl*6 sit*4
 clip alert loop fps=4 : alert*10 stand_blink alert*4
 clip sniff loop fps=7 : sniff sniff2 sniff sniff2 sniff*3 sniff2 stand
 clip eat loop fps=6 : eat0 eat1 eat0 eat1 eat0*2 eat1 eat0 eat1 stand*2 look*3
-clip sit loop fps=3 : sit*10 sit_blink sit*6 sit_tilt*6 sit_blink sit*4
-clip lie loop fps=3 : lie*10 lie_blink lie*6 lie_look*6 lie*4 yawn*3 lie*6
-clip sleep loop fps=2 : lie*3 sleep sleep2 sleep sleep2 sleep sleep2 sleep sleep2 sleep sleep2 lie_blink sleep sleep2
-clip scratch loop fps=10 : sit*3 scratch scratch2 scratch scratch2 scratch scratch2 scratch scratch2 scratch scratch2 sit*4 sit_blink sit*3
-clip shake loop fps=12 : stand*3 shake1 shake2 shake1 shake2 shake1 shake2 shake1 shake2 stand*6 tilt*6 stand*4
-clip play loop fps=6 : bow bow2 bow bow2 bow*3 stand tilt*3 wag1 wag2 wag1 wag2
+clip sit loop fps=3 : sit*12 sit_blink sit*8 sit_tilt*5 sit*6 sit_blink sit*6
+clip sit_in once fps=8 : sitdown sitdown
+clip sit_out once fps=8 : sitdown sitdown
+clip howl_in once fps=8 : sitdown sitdown
+clip howl_out once fps=8 : sitdown sitdown
+clip lie loop fps=3 : lie*12 lie_blink lie*8 lie_look*6 lie*6 yawn*3 lie*8
+clip lie_in once fps=6 : crouch crouch crouch
+clip lie_out once fps=6 : crouch crouch
+clip sleep loop fps=2 : sleep sleep2 sleep sleep2 sleep sleep2 sleep sleep2 sleep sleep2 sleep sleep2 lie_blink sleep sleep2 sleep sleep2
+clip sleep_in once fps=5 : crouch crouch lie lie_blink lie*2 yawn*3 lie lie_blink
+clip sleep_out once fps=5 : lie_blink lie yawn*2 crouch crouch
+clip scratch loop fps=10 : sit*3 scratch scratch2 scratch scratch2 scratch scratch2 scratch scratch2 scratch scratch2 sit*6 sit_blink sit*5
+clip scratch_in once fps=8 : sitdown sitdown
+clip scratch_out once fps=8 : sitdown sitdown
+clip shake loop fps=12 : stand*4 shake1 shake2 shake1 shake2 shake1 shake2 stand*20 stand_blink stand*12
+clip stretch loop fps=4 : stretchf*8 bow stand*3 stretchb*7 stand*3 stand_blink stand*4
+clip play loop fps=6 : bow bow2 bow bow2 bow*3 stand wag1 wag2 wag1 wag2 bow bow2 bow*2 stand*3
+clip pounce loop fps=8 : pcrouch*5 pcrouch2 pcrouch pcrouch2 pcrouch*3 pleap pleap pland*4 pland2 pland*3 stand*3 wag1 wag2 wag1 wag2 stand*4
 clip walk loop fps=9 speed=15 : walk0 walk1 walk2 walk3 walk4 walk5
 clip run loop fps=12 speed=60 : gal0 gal1 gal2 gal3
 
@@ -1088,8 +1440,10 @@ creature
   move ground
   lane 0.3
   speed walk=15 run=60
-  anim idle=idle|wag|pant move=walk run=run look=look|howl alert=alert sniff=sniff eat=eat rest=lie|sleep|sit sit=sit groom=play|scratch|shake
-  intents wander=4 forage=2 sniff=3 look=3 rest=2 groom=4 follow=3 leave=2
+  anim idle=idle|wag|sniffair|lookback|idle|pant move=walk run=run look=look|howl|lookback|look alert=alert sniff=sniff eat=eat rest=sleep|lie|sleep|sit sit=sit groom=scratch|stretch|scratch|stretch|shake play=play|pounce|play
+  intents wander=3 forage=2 sniff=3 look=3 rest=4 groom=2 chase=1.6 follow=2 leave=1
+  rest_time 10 35
+  chases rabbit squirrel mouse frog hedgehog dormouse
   homes edge
   fear 0.25
   curiosity 0.7

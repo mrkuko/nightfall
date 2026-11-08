@@ -94,7 +94,11 @@ walks back to the trunk's depth. Large animals use a negative value (a bit furth
 The intent system asks for logical animations; the profile maps them to clips of the shape.
 Missing ones are replaced sensibly (e.g. `run` -> `move` -> `idle`).
 A logical animation may list **variants** separated by `|` (`groom=play|scratch|shake`,
-`rest=lie|sleep|sit`); each time the creature switches to it, one variant is picked at random.
+`rest=lie|sleep|sit`); each time the creature switches to it, one variant is picked at random
+(repeat a name to make it more likely, max. 6 entries).
+
+**Transitions:** if a clip `X_in` exists it is played once before `X` (lying down), and `X_out`
+once when the creature leaves `X` (getting up). The creature does not move while they play.
 
 | Logical | When |
 |---|---|
@@ -103,15 +107,21 @@ A logical animation may list **variants** separated by `|` (`groom=play|scratch|
 | `look`, `alert`, `sniff` | looking around, alertness, sniffing |
 | `eat`, `groom`, `rest`, `freeze` | eating, grooming, resting, freezing from fear |
 | `climb`, `climb_down`, `cling` | climbing a trunk, a short stop on the bark |
+| `play` | playful moves (play bow, pounce) after a chase or when meeting a packmate |
 | `appear`, `vanish` | appearing / vanishing (eyes in the dark) |
 | `hang`, `land`, `takeoff` | hanging head down, flipping over when landing, taking off (bat) |
 | `hollow`, `hollow_peek` | only the eyes in a hollow / head poking out (owl) |
 
 ## Intents (`intents`)
 
-`wander forage look groom rest hide peek leave climb perch flee follow watch pass hover sniff emerge vanish roost`
+`wander forage look groom rest hide peek leave climb perch flee follow watch pass hover sniff emerge vanish roost chase`
 
 `roost` = settle down: a creature with a `hollow` animation flies into a free visible hollow, a creature with `hang` hangs under a branch (it reserves the spot so that two do not hang in the same place).
+
+`chase` = curiosity, not hunting: a short sprint after a nearby creature from the profile list
+`chases rabbit mouse …`, then `play` and `sniff`. `follow` on the ground = catch up with the
+nearest member of the same species; a `pack N` animal far from the others gets a strong urge to
+follow them, and alone it calls (`look`). `rest_time MIN MAX` = how long a rest lasts (s).
 
 The weight in the profile is the base; the brain multiplies it by drives (hunger -> `forage`,
 fatigue -> `rest`, boredom -> `leave`, fear -> `hide`) and by randomness. Unreachable

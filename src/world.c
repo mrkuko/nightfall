@@ -68,6 +68,7 @@ void world_log(world_t *w, const char *fmt, ...)
         w->nlog = 5;
     }
     snprintf(w->log[w->nlog++], sizeof w->log[0], "%6.1f %.80s", (double)w->t, msg);
+    w->nlog_total++;
 }
 
 /* --- objects --------------------------------------------------------- */

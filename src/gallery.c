@@ -817,18 +817,14 @@ int play_snapshot(library_t *lib, uint64_t seed, int cols, int rows, float secon
                 row[n++] = ramp[clampi((int)(fabsf(v) * 8.0f), 0, 9)];
             }
             row[n] = 0;
-            printf("%5.0fs smer %+.2f sila %.2f |%s|\n", (double)w->t, (double)w->wind_dir, (double)w->wind_str, row);
+            printf("%5.0fs dir %+.2f str %.2f |%s|\n", (double)w->t, (double)w->wind_dir, (double)w->wind_str, row);
             continue;
         }
-        if (w->nlog && strcmp(w->log[w->nlog - 1], "") != 0 && logged != (int)(w->t * 15)) {
-            /* print new log lines */
-            static char lastline[96];
-            if (strcmp(lastline, w->log[w->nlog - 1]) != 0) {
-                printf("%s\n", w->log[w->nlog - 1]);
-                snprintf(lastline, sizeof lastline, "%s", w->log[w->nlog - 1]);
-            }
-            logged = (int)(w->t * 15);
-        }
+        /* print all new log lines (the ring holds the last 6) */
+        unsigned fresh = w->nlog_total - (unsigned)logged;
+        if (fresh > (unsigned)w->nlog) fresh = (unsigned)w->nlog;
+        for (int i = w->nlog - (int)fresh; i < w->nlog; i++) printf("%s\n", w->log[i]);
+        logged = (int)w->nlog_total;
     }
     if (getenv("NF_BENCH")) {
         /* performance: render + conversion to cells + diff, without writing to the terminal */

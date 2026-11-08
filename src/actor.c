@@ -16,12 +16,12 @@
 static const char *ANIM_NAMES[A_COUNT] = {
     "idle", "move", "run", "look", "alert", "eat", "groom", "rest", "freeze", "sniff",
     "climb", "climb_down", "appear", "vanish", "sit",
-    "hang", "land", "takeoff", "hollow", "hollow_peek", "cling"
+    "hang", "land", "takeoff", "hollow", "hollow_peek", "cling", "play"
 };
 
 static const char *INTENT_NAMES[IN_COUNT] = {
     "none", "wander", "forage", "look", "groom", "rest", "hide", "peek", "leave",
-    "climb", "perch", "flee", "follow", "watch", "pass", "hover", "sniff", "emerge", "vanish", "roost"
+    "climb", "perch", "flee", "follow", "watch", "pass", "hover", "sniff", "emerge", "vanish", "roost", "chase"
 };
 
 const char *intent_name(int i) { return (i >= 0 && i < IN_COUNT) ? INTENT_NAMES[i] : "?"; }
@@ -63,7 +63,7 @@ void profile_parse(const sprite_t *s, profile_t *p)
             /* "a|b|c" = variants */
             for (char *tok = strtok(buf, "|"); tok; tok = strtok(NULL, "|")) {
                 int v = sprite_clip_index(s, tok);
-                if (v < 0 || p->nvar[a] >= 4) continue;
+                if (v < 0 || p->nvar[a] >= 6) continue;
                 p->avar[a][p->nvar[a]++] = (int16_t)v;
             }
             if (p->nvar[a]) c = p->avar[a][0];
@@ -101,6 +101,10 @@ void profile_parse(const sprite_t *s, profile_t *p)
     const char *v;
     p->fear = (v = sprite_prop(s, "fear")) ? (float)atof(v) : 0.5f;
     p->curiosity = (v = sprite_prop(s, "curiosity")) ? (float)atof(v) : 0.5f;
+    p->rest_min = 4.0f; p->rest_max = 10.0f;
+    if ((v = sprite_prop(s, "rest_time"))) sscanf(v, "%f %f", &p->rest_min, &p->rest_max);
+    p->pack = sprite_prop(s, "pack") != NULL;
+    if ((v = sprite_prop(s, "chases"))) snprintf(p->chases, sizeof p->chases, " %s ", v);
     p->lane = (v = sprite_prop(s, "lane")) ? (float)atof(v) : 0.15f;
     p->rare = (v = sprite_prop(s, "rare")) ? atoi(v) : 0;
     p->burrow = (v = sprite_prop(s, "burrow")) ? atoi(v) : 0;
@@ -115,6 +119,19 @@ void profile_parse(const sprite_t *s, profile_t *p)
 
 static int actor_index(const world_t *w, const actor_t *a) { return (int)(a - w->act); }
 
+/* Transition clip "<clip>_in" / "<clip>_out" or -1. */
+static int transition_clip(const sprite_t *s, int clip, const char *suffix)
+{
+    char name[NF_NAME + 8];
+    snprintf(name, sizeof name, "%s%s", s->clips[clip].name, suffix);
+    return sprite_clip_index(s, name);
+}
+
+static int clip_is(const actor_t *a, int c)
+{
+    return a->clip == c || a->clip_after == c + 1;
+}
+
 static void set_anim(actor_t *a, int anim)
 {
     int n = a->prof.nvar[anim];
@@ -122,15 +139,26 @@ static void set_anim(actor_t *a, int anim)
     if (n > 1) {
         /* keep the variant that is already playing, otherwise pick one at random */
         for (int k = 0; k < n; k++)
-            if (a->prof.avar[anim][k] == a->clip) { a->anim = anim; return; }
+            if (clip_is(a, a->prof.avar[anim][k])) { a->anim = anim; return; }
         static uint32_t vs = 2463534242u;
         vs ^= vs << 13; vs ^= vs >> 17; vs ^= vs << 5;
         c = a->prof.avar[anim][vs % (uint32_t)n];
     }
     if (c < 0 || c >= a->spr->nclips) c = 0;
-    if (c != a->clip) { a->clip = c; a->ct = 0; }
     a->anim = anim;
+    if (clip_is(a, c)) return;
+    /* transitions: leaving a clip plays its "_out" (getting up), entering one its "_in" (lying down) */
+    int from = a->clip_after ? a->clip_after - 1 : a->clip;
+    int out = from >= 0 && from < a->spr->nclips ? transition_clip(a->spr, from, "_out") : -1;
+    int in = transition_clip(a->spr, c, "_in");
+    if (out >= 0 && a->clip != out) { a->clip = out; a->clip_after = 1 + (in >= 0 ? in : c); }
+    else if (in >= 0) { a->clip = in; a->clip_after = 1 + c; }
+    else { a->clip = c; a->clip_after = 0; }
+    a->ct = 0;
 }
+
+/* While a transition clip plays, the creature does not move. */
+static int in_transition(const actor_t *a) { return a->clip_after != 0; }
 
 static void plan_clear(actor_t *a) { a->nplan = 0; a->step = 0; a->step_t = 0; a->step_init = 0; }
 
@@ -466,6 +494,36 @@ int actor_pick_lane(world_t *w, const profile_t *p)
     return w->ground_z + (int)lroundf(t * (float)(w->fg_z + 6 - w->ground_z));
 }
 
+/* Nearest creature this one chases out of curiosity (on the ground, visible). */
+static int chase_target(world_t *w, actor_t *a, float maxd)
+{
+    if (!a->prof.chases[0]) return -1;
+    int best = -1;
+    float bd = maxd;
+    char key[NF_NAME + 2];
+    for (int i = 0; i < w->nact; i++) {
+        actor_t *o = &w->act[i];
+        if (o == a || !o->alive || o->hidden || o->nav != NAV_GROUND) continue;
+        snprintf(key, sizeof key, " %s ", o->spr->name);
+        if (!strstr(a->prof.chases, key)) continue;
+        float d = fabsf(o->x - a->x);
+        if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+}
+
+/* Distance to the nearest visible member of the same species (1e9 = alone). */
+static float pack_distance(world_t *w, actor_t *a)
+{
+    float bd = 1e9f;
+    for (int i = 0; i < w->nact; i++) {
+        actor_t *o = &w->act[i];
+        if (o == a || !o->alive || o->hidden || o->spr != a->spr) continue;
+        bd = fminf(bd, fabsf(o->x - a->x));
+    }
+    return bd;
+}
+
 static void plan_intent(world_t *w, actor_t *a, int in)
 {
     plan_clear(a);
@@ -522,7 +580,7 @@ static void plan_intent(world_t *w, actor_t *a, int in)
         push_anim(a, A_GROOM, rng_range(&w->rng, 2.0f, 4.5f));
         break;
     case IN_REST:
-        push_anim(a, A_REST, rng_range(&w->rng, 4.0f, 10.0f));
+        push_anim(a, A_REST, rng_range(&w->rng, a->prof.rest_min, a->prof.rest_max));
         a->fatigue = 0;
         break;
     case IN_HIDE:
@@ -671,7 +729,8 @@ static void plan_intent(world_t *w, actor_t *a, int in)
             plan_ground_move(w, a, tx, bd > 50, a->lane_z);
             s = plan_push(a, ST_FACE);
             if (s) s->x = o->x;
-            push_anim(a, rng_chance(&w->rng, 0.5f) ? A_GROOM : A_SNIFF, rng_range(&w->rng, 1.5f, 3.5f));
+            push_anim(a, rng_chance(&w->rng, 0.5f) ? A_PLAY : A_SNIFF, rng_range(&w->rng, 1.5f, 3.5f));
+            if (rng_chance(&w->rng, 0.4f)) push_anim(a, A_IDLE, rng_range(&w->rng, 2.0f, 5.0f));
             break;
         }
         int t = a->prof.attracted_glow ? find_glow_target(w, a) : nearest_mover(w, a, 200);
@@ -731,6 +790,20 @@ static void plan_intent(world_t *w, actor_t *a, int in)
         plan_push(a, ST_DESPAWN);
         break;
     }
+    case IN_CHASE: {
+        /* curiosity, not hunting: a short sprint after a small creature, then a playful pounce */
+        int t = chase_target(w, a, 160);
+        if (t < 0) { plan_intent(w, a, IN_WANDER); return; }
+        a->target = t;
+        world_log(w, "%s#%u eyes %s#%u", a->spr->name, a->id, w->act[t].spr->name, w->act[t].id);
+        push_anim(a, A_ALERT, rng_range(&w->rng, 0.6f, 1.4f));
+        s = plan_push(a, ST_CHASE);
+        if (s) { s->place = t; s->dur = rng_range(&w->rng, 2.5f, 5.0f); }
+        push_anim(a, A_PLAY, rng_range(&w->rng, 1.5f, 3.0f));
+        push_anim(a, A_SNIFF, rng_range(&w->rng, 1.0f, 2.5f));
+        if (rng_chance(&w->rng, 0.5f)) push_anim(a, A_LOOK, rng_range(&w->rng, 1.0f, 2.5f));
+        break;
+    }
     default:
         push_anim(a, A_IDLE, 1.0f);
         break;
@@ -776,13 +849,30 @@ static void choose_intent(world_t *w, actor_t *a)
         if (!g) { score[IN_GROOM] *= 0.2f; score[IN_SNIFF] = 0; }
         if (a->nav == NAV_AIR) score[IN_LOOK] *= 0.2f;
         if (a->nav == NAV_PERCH) { score[IN_LOOK] += 2.0f; score[IN_WANDER] *= 0.3f; }
+        /* curiosity: running after small creatures (only when one is around and it is not tired) */
+        if (!g || chase_target(w, a, 160) < 0) score[IN_CHASE] = 0;
+        else score[IN_CHASE] *= (0.4f + p->curiosity) * (1.2f - a->fatigue);
+        /* a pack animal notices it is far from the others and goes after them; alone it calls */
+        if (p->pack && g) {
+            float d = pack_distance(w, a);
+            if (d >= 1e8f) score[IN_LOOK] += 1.0f;
+            else if (d > 70.0f) score[IN_FOLLOW] += 2.0f + d / 40.0f;
+            else score[IN_FOLLOW] *= 0.3f;
+        }
+        /* variety: the same intent again is less likely */
+        if (a->intent > 0 && a->intent < IN_COUNT && a->intent != IN_HIDE) score[a->intent] *= 0.45f;
     }
+    /* weighted random choice (squared scores keep strong drives dominant) */
     int best = IN_WANDER;
-    float bs = -1;
-    for (int i = 1; i < IN_COUNT; i++) {
-        if (score[i] <= 0) continue;
-        float s = score[i] * rng_range(&w->rng, 0.5f, 1.5f);
-        if (s > bs) { bs = s; best = i; }
+    float total = 0;
+    for (int i = 1; i < IN_COUNT; i++) if (score[i] > 0) total += score[i] * score[i];
+    if (total > 0) {
+        float u = rng_range(&w->rng, 0, total);
+        for (int i = 1; i < IN_COUNT; i++) {
+            if (score[i] <= 0) continue;
+            u -= score[i] * score[i];
+            if (u <= 0) { best = i; break; }
+        }
     }
     if (a->hidden && best == IN_REST) {
         plan_clear(a);
@@ -872,6 +962,7 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
     case ST_RUNTO: {
         int run = s->kind == ST_RUNTO;
         set_anim(a, run ? A_RUN : A_MOVE);
+        if (in_transition(a)) return 0;
         float spd = clip_speed(a, run ? A_RUN : A_MOVE, run ? a->prof.run : a->prof.walk) * a->speed_mul;
         float dx = s->x - a->x;
         if (fabsf(dx) < 0.6f) return 1;
@@ -1104,6 +1195,23 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         }
         return 0;
     }
+    case ST_CHASE: {
+        actor_t *o = s->place >= 0 && s->place < w->nact ? &w->act[s->place] : NULL;
+        if (!o || !o->alive || o->hidden || o->nav != NAV_GROUND || a->step_t > s->dur) return 1;
+        set_anim(a, A_RUN);
+        if (in_transition(a)) return 0;
+        float dx = o->x - a->x;
+        if (fabsf(dx) < 12.0f) return 1;
+        a->facing = dx < 0 ? -1 : 1;
+        float spd = clip_speed(a, A_RUN, a->prof.run) * a->speed_mul * 0.85f;
+        float st = sgnf(dx) * fminf(fabsf(dx), spd * dt);
+        a->x += st;
+        a->moved = st;
+        a->nav = NAV_GROUND;
+        a->zf = approach(a->zf, o->zf, dt * 14.0f);
+        a->y = world_ground_at(w, a->x, a->zf);
+        return 0;
+    }
     case ST_DESPAWN:
         if (a->place >= 0) w->place[a->place].occupant = -1;
         for (int i = 0; i < w->nplace; i++)
@@ -1121,6 +1229,21 @@ void actor_set_intent(world_t *w, actor_t *a, int intent) { plan_intent(w, a, in
 void actor_update(world_t *w, actor_t *a, float dt)
 {
     a->ct += dt;
+    if (a->clip_after && a->ct >= clip_duration(&a->spr->clips[a->clip])) {
+        int next = a->clip_after - 1;
+        a->clip_after = 0;
+        /* an _out followed by the target's _in */
+        const char *nm = a->spr->clips[next].name;
+        size_t nl = strlen(nm);
+        if (nl > 3 && strcmp(nm + nl - 3, "_in") == 0) {
+            char base[NF_NAME];
+            snprintf(base, sizeof base, "%.*s", (int)(strlen(nm) - 3), nm);
+            int b = sprite_clip_index(a->spr, base);
+            if (b >= 0) a->clip_after = 1 + b;
+        }
+        a->clip = next;
+        a->ct = 0;
+    }
     a->intent_age += dt;
     a->moved = 0;
     a->hunger = fminf(1.0f, a->hunger + dt * 0.01f);
@@ -1131,7 +1254,16 @@ void actor_update(world_t *w, actor_t *a, float dt)
 
     /* a predator spreads danger, a firefly spreads light */
     if (!a->hidden) {
-        if (a->prof.scares[0]) world_stimulus(w, a->x, a->y, 90, ST_DANGER, 1.0f, 0.4f, actor_index(w, a));
+        if (a->prof.scares[0]) {
+            /* a predator is frightening by what it does: resting it is barely noticed (the prey lets it
+             * come close), walking a bit more, running / chasing it scares from afar */
+            int fast = a->anim == A_RUN || (a->step < a->nplan &&
+                       (a->plan[a->step].kind == ST_CHASE || a->plan[a->step].kind == ST_RUNTO));
+            int moving = a->anim == A_MOVE;
+            float r = fast ? 110.0f : moving ? 50.0f : 35.0f;
+            float k = fast ? 1.0f : moving ? 0.6f : 0.5f;
+            world_stimulus(w, a->x, a->y, r, ST_DANGER, k, 0.4f, actor_index(w, a));
+        }
         if (sprite_has_tag(a->spr, "glow")) world_stimulus(w, a->x, a->y, 70, ST_GLOW, 0.5f, 0.4f, actor_index(w, a));
     }
 

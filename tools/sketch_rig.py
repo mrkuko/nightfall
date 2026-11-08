@@ -707,7 +707,7 @@ end
 OWL_TAIL = '''
 creature
   move air perch
-  speed walk=10 run=40
+  speed walk=30 run=60
   anim idle=idle move=fly run=fly look=look alert=alert rest=sleep hollow=in_hollow hollow_peek=hollow_peek
   intents perch=5 roost=5 look=4 rest=2 leave=1
   homes branch hollow
@@ -880,7 +880,7 @@ clip idle loop fps=4 : perch*16 blink_half blink blink_half perch*10 look_l*8 pe
 clip look loop fps=4 : look_l*8 perch*2 look_r*8 perch*2
 clip alert loop fps=4 : ruffle*3 perch*10
 clip sleep loop fps=2 : sleep*20 blink_half sleep*10
-clip fly loop fps=8 speed=40 : fly0 fly1 fly2 fly1 fly0 fly1 fly2 fly1 fly3*6 fly1
+clip fly loop fps=8 speed=30 : fly0 fly1 fly2 fly1 fly0 fly1 fly2 fly1 fly3*6 fly1
 ''')
     out.append(OWL_TAIL)
 
@@ -2470,21 +2470,82 @@ end
                          hx=27.4, hang=0.1, tail=[(x, y - 0.4) for x, y in tailrun])),
     ]
     poses += gal
+    # transitions: half crouch (stand <-> lie), half sit (stand <-> sit)
+    crouch = shifted(2.6, legs=dict(nf=(23.2, 19.6, 26.2, G), ff=(24.6, 19.6, 27.4, G),
+                                    nh=(12.8, 19.8, 15.0, G), fh=(11.2, 19.8, 13.6, G)),
+                     hx=27.0, hy=11.8, hang=0.15, tail=[(7.6, 15.6), (5.0, 17.2), (4.0, 19.6), (4.8, 21.8)])
+    sitdown = dict(body=[(15.8, 15.2, 6.0, 5.2, -0.45), (12.6, 18.2, 5.2, 4.2, 0.0)],
+                   chest=(20.4, 14.8, 2.8, 3.8, -0.2), bodyextra=[E(17.6, 17.6, 3.0, 2.0, -0.3, 'cCC', 0.3)],
+                   neck=(19.6, 12.6, 22.2, 9.6, 3.3, 2.9), hx=24.2, hy=7.8, hang=0.05,
+                   legs=dict(nf=(21.0, 15.0, 21.8, G), ff=(22.4, 15.0, 23.2, G), nh=(13.6, 19.6, 16.0, G), fh=None),
+                   tail=[(8.0, 18.8), (6.0, 20.6), (6.8, 22.6), (9.6, 23.0)], trad=[2.2, 2.6, 2.4, 2.0])
+    # sniffing the air: head up, the nose twitches
+    sniffair = dict(hx=27.4, hy=6.8, hang=-0.32, neck=(22.4, 11.8, 25.4, 8.0, 3.4, 2.8))
+    # looking back over the shoulder
+    lookback = dict(hx=20.4, hy=7.6, hang=math.pi - 0.25, neck=(21.6, 12.4, 20.8, 9.6, 3.4, 3.0),
+                    ear=(1.0, -3.0, 3.6, 2.1), earlean=0.6)
+    # stretches: front (bow, eyes closed) and back (hind legs stretched out behind)
+    stretchb = shifted(0.8, body=[(18.4, 14.6, 7.4, 4.4, 0.06), (12.6, 15.2, 4.6, 4.4, 0.0)],
+                       legs=dict(nf=(23.8, 18.4, 25.0, G), ff=(25.2, 18.4, 26.4, G),
+                                 nh=(12.4, 18.2, 6.6, G), fh=(10.8, 18.2, 5.4, G - 0.6)),
+                       hx=28.6, hy=9.6, hang=0.12, eye=0, tail=[(7.8, 13.6), (5.0, 14.0), (2.8, 15.2), (1.4, 16.8)])
+    # pounce (playful, like a fox on a mouse): crouch -> leap -> nose down
+    pcrouch = dict(bow, ear=(-1.2, -3.4, 3.8, 2.1), earlean=0.2, hy=14.0)
+    pcrouch2 = dict(pcrouch, tail=[(7.4, 9.6), (6.6, 7.0), (7.6, 4.6), (9.4, 3.0)],
+                    body=[(17.0, 14.0, 7.4, 4.2, 0.36), (11.6, 11.4, 4.6, 4.6, 0.0)])
+    pleap = dict(body=[(17.6, 10.6, 7.2, 4.6, 0.3), (12.2, 8.8, 4.6, 4.6, 0.2)],
+                 chest=(23.0, 13.0, 3.0, 3.6, 0.4), bodyextra=[E(17.4, 13.2, 5.6, 1.3, 0.3, 'cCC', 0.3)],
+                 neck=(22.6, 11.2, 25.6, 11.6, 3.2, 2.8), hx=28.2, hy=11.8, hang=0.7,
+                 legs=dict(nf=(23.2, 14.4, 27.2, 19.8), ff=(24.6, 14.4, 28.4, 20.6),
+                           nh=(12.6, 11.6, 7.6, 15.6), fh=(11.0, 11.6, 6.4, 14.6)),
+                 tail=[(7.6, 7.6), (5.2, 5.6), (4.4, 3.2), (5.0, 1.2)], trad=[2.0, 2.8, 3.0, 2.6],
+                 ear=(-1.0, -3.0, 3.6, 2.2), earlean=0.4)
+    pland = dict(bow, hx=28.6, hy=18.4, hang=1.05, neck=(22.6, 16.4, 26.2, 17.6, 3.2, 2.8))
+    pland2 = dict(pland, tail=[(7.4, 9.6), (6.2, 7.0), (6.8, 4.4), (8.4, 2.4)], eye=0)
+    poses += [
+        ('crouch', crouch),
+        ('sitdown', sitdown),
+        ('sniffair1', sniffair),
+        ('sniffair2', dict(sniffair, hang=-0.42, hy=6.4)),
+        ('lookback', lookback),
+        ('lookback_blink', dict(lookback, eye=0)),
+        ('stretchf', dict(bow, eye=0, hy=15.0)),
+        ('stretchb', stretchb),
+        ('pcrouch', pcrouch),
+        ('pcrouch2', pcrouch2),
+        ('pleap', pleap),
+        ('pland', pland),
+        ('pland2', pland2),
+    ]
     clips = """
-clip idle loop fps=5 : stand*12 stand_blink stand*6 tilt*6 tilt_blink tilt*3 stand*6 look*6 stand*4
-clip wag loop fps=8 : wag1 wag2 wag1 wag2 wag1 wag2 stand*4 wag_blink wag2 wag1 wag2 stand*6 pant*10 stand*3
-clip pant loop fps=6 : pant*3 stand pant*3 stand_blink pant*4 tilt*4
-clip look loop fps=4 : look*6 tilt*6 tilt_blink tilt*3 look*4
+clip idle loop fps=5 : stand*16 stand_blink stand*12 tilt*6 tilt_blink tilt*2 stand*10 stand_blink stand*8
+clip wag loop fps=8 : wag1 wag2 wag1 wag2 wag1 wag2 stand*8 wag_blink wag2 wag1 wag2 stand*10 pant*12 stand*6
+clip pant loop fps=6 : pant*4 stand pant*4 stand_blink pant*6 stand*4
+clip sniffair loop fps=6 : stand*3 sniffair1 sniffair2 sniffair1 sniffair2 sniffair1*3 sniffair2 sniffair1 stand*6 stand_blink stand*4
+clip lookback loop fps=4 : stand*3 lookback*8 lookback_blink lookback*4 stand*6
+clip look loop fps=4 : look*8 stand*3 stand_blink look*6 stand*3
 clip howl loop fps=3 : sit*3 howl*8 sit_blink sit*3 howl*6 sit*4
 clip alert loop fps=4 : alert*10 stand_blink alert*4
 clip sniff loop fps=7 : sniff sniff2 sniff sniff2 sniff*3 sniff2 stand
 clip eat loop fps=6 : eat0 eat1 eat0 eat1 eat0*2 eat1 eat0 eat1 stand*2 look*3
-clip sit loop fps=3 : sit*10 sit_blink sit*6 sit_tilt*6 sit_blink sit*4
-clip lie loop fps=3 : lie*10 lie_blink lie*6 lie_look*6 lie*4 yawn*3 lie*6
-clip sleep loop fps=2 : lie*3 sleep sleep2 sleep sleep2 sleep sleep2 sleep sleep2 sleep sleep2 lie_blink sleep sleep2
-clip scratch loop fps=10 : sit*3 scratch scratch2 scratch scratch2 scratch scratch2 scratch scratch2 scratch scratch2 sit*4 sit_blink sit*3
-clip shake loop fps=12 : stand*3 shake1 shake2 shake1 shake2 shake1 shake2 shake1 shake2 stand*6 tilt*6 stand*4
-clip play loop fps=6 : bow bow2 bow bow2 bow*3 stand tilt*3 wag1 wag2 wag1 wag2
+clip sit loop fps=3 : sit*12 sit_blink sit*8 sit_tilt*5 sit*6 sit_blink sit*6
+clip sit_in once fps=8 : sitdown sitdown
+clip sit_out once fps=8 : sitdown sitdown
+clip howl_in once fps=8 : sitdown sitdown
+clip howl_out once fps=8 : sitdown sitdown
+clip lie loop fps=3 : lie*12 lie_blink lie*8 lie_look*6 lie*6 yawn*3 lie*8
+clip lie_in once fps=6 : crouch crouch crouch
+clip lie_out once fps=6 : crouch crouch
+clip sleep loop fps=2 : sleep sleep2 sleep sleep2 sleep sleep2 sleep sleep2 sleep sleep2 sleep sleep2 lie_blink sleep sleep2 sleep sleep2
+clip sleep_in once fps=5 : crouch crouch lie lie_blink lie*2 yawn*3 lie lie_blink
+clip sleep_out once fps=5 : lie_blink lie yawn*2 crouch crouch
+clip scratch loop fps=10 : sit*3 scratch scratch2 scratch scratch2 scratch scratch2 scratch scratch2 scratch scratch2 sit*6 sit_blink sit*5
+clip scratch_in once fps=8 : sitdown sitdown
+clip scratch_out once fps=8 : sitdown sitdown
+clip shake loop fps=12 : stand*4 shake1 shake2 shake1 shake2 shake1 shake2 stand*20 stand_blink stand*12
+clip stretch loop fps=4 : stretchf*8 bow stand*3 stretchb*7 stand*3 stand_blink stand*4
+clip play loop fps=6 : bow bow2 bow bow2 bow*3 stand wag1 wag2 wag1 wag2 bow bow2 bow*2 stand*3
+clip pounce loop fps=8 : pcrouch*5 pcrouch2 pcrouch pcrouch2 pcrouch*3 pleap pleap pland*4 pland2 pland*3 stand*3 wag1 wag2 wag1 wag2 stand*4
 clip walk loop fps=9 speed=15 : walk0 walk1 walk2 walk3 walk4 walk5
 clip run loop fps=12 speed=60 : gal0 gal1 gal2 gal3
 """
@@ -2492,8 +2553,10 @@ clip run loop fps=12 speed=60 : gal0 gal1 gal2 gal3
   move ground
   lane 0.3
   speed walk=15 run=60
-  anim idle=idle|wag|pant move=walk run=run look=look|howl alert=alert sniff=sniff eat=eat rest=lie|sleep|sit sit=sit groom=play|scratch|shake
-  intents wander=4 forage=2 sniff=3 look=3 rest=2 groom=4 follow=3 leave=2
+  anim idle=idle|wag|sniffair|lookback|idle|pant move=walk run=run look=look|howl|lookback|look alert=alert sniff=sniff eat=eat rest=sleep|lie|sleep|sit sit=sit groom=scratch|stretch|scratch|stretch|shake play=play|pounce|play
+  intents wander=3 forage=2 sniff=3 look=3 rest=4 groom=2 chase=1.6 follow=2 leave=1
+  rest_time 10 35
+  chases rabbit squirrel mouse frog hedgehog dormouse
   homes edge
   fear 0.25
   curiosity 0.7

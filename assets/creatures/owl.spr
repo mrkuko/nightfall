@@ -453,12 +453,12 @@ clip idle loop fps=4 : perch*16 blink_half blink blink_half perch*10 look_l*8 pe
 clip look loop fps=4 : look_l*8 perch*2 look_r*8 perch*2
 clip alert loop fps=4 : ruffle*3 perch*10
 clip sleep loop fps=2 : sleep*20 blink_half sleep*10
-clip fly loop fps=8 speed=40 : fly0 fly1 fly2 fly1 fly0 fly1 fly2 fly1 fly3*6 fly1
+clip fly loop fps=8 speed=30 : fly0 fly1 fly2 fly1 fly0 fly1 fly2 fly1 fly3*6 fly1
 
 
 creature
   move air perch
-  speed walk=10 run=40
+  speed walk=30 run=60
   anim idle=idle move=fly run=fly look=look alert=alert rest=sleep hollow=in_hollow hollow_peek=hollow_peek
   intents perch=5 roost=5 look=4 rest=2 leave=1
   homes branch hollow

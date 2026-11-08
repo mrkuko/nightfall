@@ -117,14 +117,14 @@ typedef struct {
 enum {
     A_IDLE, A_MOVE, A_RUN, A_LOOK, A_ALERT, A_EAT, A_GROOM, A_REST, A_FREEZE, A_SNIFF,
     A_CLIMB, A_CLIMB_DOWN, A_APPEAR, A_VANISH, A_SIT,
-    A_HANG, A_LAND, A_TAKEOFF, A_HOLLOW, A_HOLLOW_PEEK, A_CLING, A_COUNT
+    A_HANG, A_LAND, A_TAKEOFF, A_HOLLOW, A_HOLLOW_PEEK, A_CLING, A_PLAY, A_COUNT
 };
 
 /* intents */
 enum {
     IN_NONE, IN_WANDER, IN_FORAGE, IN_LOOK, IN_GROOM, IN_REST, IN_HIDE, IN_PEEK, IN_LEAVE,
     IN_CLIMB, IN_PERCH, IN_FLEE, IN_FOLLOW, IN_WATCH, IN_PASS, IN_HOVER, IN_SNIFF, IN_EMERGE,
-    IN_VANISH, IN_ROOST, IN_COUNT
+    IN_VANISH, IN_ROOST, IN_CHASE, IN_COUNT
 };
 
 /* plan steps */
@@ -142,6 +142,7 @@ enum {
     ST_PATH,        /* move along a path (place = path index) to position x = t */
     ST_HANG,        /* hang upside down on a PATH_HANG path (place = path, x = t) for dur seconds */
     ST_HOLLOW,      /* sit in a hollow (place = place): the eyes glow, occasionally the head pokes out */
+    ST_CHASE,       /* run after creature `place` (curiosity, not hunting) for at most dur seconds */
     ST_DESPAWN
 };
 
@@ -158,7 +159,7 @@ typedef struct {
     float walk, run, climb;
     int   navmask;
     int   anim[A_COUNT];        /* clip index for a logical animation (the first variant) */
-    int16_t avar[A_COUNT][4];   /* variants "groom=scratch|shake|play": one is picked at random */
+    int16_t avar[A_COUNT][6];   /* variants "groom=scratch|shake|play": one is picked at random */
     uint8_t nvar[A_COUNT];
     float iw[IN_COUNT];         /* intent weights */
     int   homes;                /* bit mask of place types (1 << PL_*) */
@@ -169,6 +170,9 @@ typedef struct {
     char  scares[128];
     int   attracted_glow;
     int   head_dx, head_dy;     /* head point relative to the anchor (peeking) */
+    float rest_min, rest_max;   /* how long a rest lasts (s) */
+    int   pack;                 /* lives in a pack: looks for the others */
+    char  chases[128];          /* " rabbit mouse " — runs after them out of curiosity */
 } profile_t;
 
 typedef struct {
@@ -181,6 +185,7 @@ typedef struct {
     int        hidden;          /* in a hideout (not drawn) */
     int        place;           /* place it is in (hideout) or -1 */
     int        clip;
+    int        clip_after;      /* 1 + clip to play after the current transition clip (_in/_out), 0 = none */
     float      ct;
     int        anim;
     int        intent;
@@ -229,6 +234,7 @@ typedef struct {
     /* event log for the HUD */
     char       log[6][96];
     int        nlog;
+    unsigned   nlog_total;      /* lines logged so far (for printing all of them) */
     /* baked static layer (background, ground, static objects) */
     raster_t   bake;
     int        bake_ok;
