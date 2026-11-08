@@ -503,6 +503,7 @@ clip trot loop fps=12 speed=60 : trot0 trot1 trot2 trot3
 
 creature
   move ground
+  lane 0.3
   speed walk=14 run=60
   anim idle=idle move=walk run=trot look=look alert=alert eat=sniff sniff=sniff rest=sit sit=sit
   intents wander=5 sniff=4 look=3 rest=2 leave=3

@@ -342,6 +342,7 @@ clip run loop fps=14 speed=40 : walk0 walk1 walk2 walk3 walk4 walk5
 
 creature
   move ground
+  lane 0.05
   speed walk=11 run=40
   anim idle=idle move=walk run=run eat=root sniff=root alert=alert look=alert
   intents forage=7 wander=3 look=2 leave=3

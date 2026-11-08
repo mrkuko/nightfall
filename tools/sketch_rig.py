@@ -199,6 +199,7 @@ end
 RABBIT_TAIL = '''
 creature
   move ground
+  lane 0.45
   speed walk=16 run=46
   anim idle=idle move=hop run=run look=look alert=alert eat=eat groom=groom rest=rest freeze=freeze sniff=sniff
   intents forage=5 wander=3 look=3 groom=2 rest=1 hide=2 leave=1
@@ -356,6 +357,7 @@ end
 SQUIRREL_TAIL = '''
 creature
   move ground climb
+  lane 0.2
   speed walk=20 run=55 climb=30
   anim idle=idle move=run run=run look=look eat=eat climb=climb climb_down=climb_down alert=alert groom=flick
   intents forage=4 wander=3 climb=5 look=3 rest=1 hide=2 leave=2
@@ -502,6 +504,7 @@ end
 FOX_TAIL = '''
 creature
   move ground
+  lane 0.3
   speed walk=14 run=60
   anim idle=idle move=walk run=trot look=look alert=alert eat=sniff sniff=sniff rest=sit sit=sit
   intents wander=5 sniff=4 look=3 rest=2 leave=3
@@ -830,6 +833,7 @@ end
 HEDGEHOG_TAIL = '''
 creature
   move ground
+  lane 0.55
   speed walk=7 run=14
   anim idle=idle move=walk run=walk look=sniff eat=sniff freeze=curl alert=curl sniff=sniff
   intents forage=6 wander=4 rest=1 leave=2
@@ -921,6 +925,7 @@ end
 MOUSE_TAIL = '''
 creature
   move ground
+  lane 0.6
   speed walk=14 run=48
   anim idle=idle move=run run=run look=sniff eat=eat sniff=sniff groom=groom freeze=sit
   intents forage=6 wander=4 hide=3 leave=2
@@ -1007,6 +1012,7 @@ end
 FROG_TAIL = '''
 creature
   move ground
+  lane 0.65
   speed walk=10 run=26
   anim idle=idle move=hop run=hop look=idle eat=croak
   intents wander=3 rest=4 leave=1
@@ -1111,6 +1117,7 @@ clip crawl loop fps=2 speed=1.5 : crawl0 crawl1
 clip hide loop fps=1 : hide
 creature
   move ground
+  lane 0.8
   speed walk=1.5 run=1.5
   anim idle=idle move=crawl run=crawl freeze=hide alert=hide
   intents wander=6 rest=2
@@ -1147,6 +1154,7 @@ clip idle loop fps=1 : crawl0
 clip crawl loop fps=8 speed=5 : crawl0 crawl1
 creature
   move ground
+  lane 0.75
   speed walk=5 run=9
   anim idle=idle move=crawl run=crawl
   intents wander=8 leave=1
@@ -1349,6 +1357,7 @@ clip walk loop fps=6 speed=8 : walk0 idle0 walk1 idle1
 clip look loop fps=3 : look_l*4 idle0 look_r*4 idle0
 creature
   move ground
+  lane 0.4
   speed walk=8 run=12
   anim idle=idle move=walk run=walk look=look
   intents wander=4 look=4 hide=2 leave=2
@@ -1548,6 +1557,7 @@ clip run loop fps=13 speed=24 : walk0 walk1 walk2 walk3 walk4 walk5
 """
     profile = """creature
   move ground
+  lane 0.3
   speed walk=9 run=24
   anim idle=idle move=walk run=run look=look eat=dig sniff=sniff alert=look
   intents forage=6 wander=4 sniff=4 rest=1 hide=1 leave=2
@@ -1617,6 +1627,7 @@ clip run loop fps=14 speed=40 : walk0 walk1 walk2 walk3 walk4 walk5
 """
     profile = """creature
   move ground
+  lane 0.05
   speed walk=11 run=40
   anim idle=idle move=walk run=run eat=root sniff=root alert=alert look=alert
   intents forage=7 wander=3 look=2 leave=3
@@ -1703,6 +1714,7 @@ clip run loop fps=14 speed=50 : walk0 walk1 walk2 walk3 walk4 walk5
 """
     profile = """creature
   move ground
+  lane 0.25
   speed walk=12 run=50
   anim idle=idle move=walk run=run look=look alert=stalk rest=sit sit=sit sniff=stalk
   intents wander=4 look=3 rest=3 sniff=2 leave=3
@@ -1802,6 +1814,7 @@ clip run loop fps=12 speed=60 : run0 run1
 clip move loop fps=10 speed=24 : run0 run1
 creature
   move ground
+  lane 0.4
   speed walk=24 run=60
   anim idle=idle move=move run=run look=look alert=look sniff=sniff eat=sniff
   intents wander=5 look=4 forage=2 hide=3 leave=2
@@ -1854,6 +1867,7 @@ end
     out.append("""
 creature
   move ground climb
+  lane 0.2
   speed walk=16 run=40 climb=24
   anim idle=idle move=move run=run look=look eat=eat climb=climb climb_down=climb_down alert=alert groom=flick
   intents forage=4 wander=2 climb=6 look=3 hide=3 leave=2
@@ -1908,6 +1922,7 @@ clip sniff loop fps=7 : sniff emerge2 sniff sniff emerge2
 clip dig loop fps=9 : dig dig2
 creature
   move ground
+  lane 0.95
   burrow 1
   speed walk=0.1 run=0.1
   anim idle=idle appear=appear vanish=vanish look=sniff sniff=sniff eat=dig move=dig
@@ -1973,6 +1988,7 @@ clip walk loop fps=4 speed=3 : walk0 walk1 walk2 walk3
 clip look loop fps=2 : look*6 walk0*2
 creature
   move ground
+  lane 0.7
   speed walk=3 run=5
   anim idle=idle move=walk run=walk look=look
   intents wander=6 look=2 rest=2 leave=2 hide=1
@@ -2011,6 +2027,7 @@ clip idle loop fps=1 : crawl0
 clip crawl loop fps=2 speed=1.2 : crawl0 crawl1
 creature
   move ground
+  lane 0.8
   speed walk=1.2 run=1.2
   anim idle=idle move=crawl run=crawl
   intents wander=6 rest=2 leave=1
@@ -2056,6 +2073,7 @@ clip crawl loop fps=7 speed=4 : crawl0 crawl1
 clip threat loop fps=2 : threat*4 crawl0
 creature
   move ground
+  lane 0.7
   speed walk=4 run=7
   anim idle=idle move=crawl run=crawl alert=threat look=threat
   intents wander=7 look=2 leave=1
@@ -2200,6 +2218,7 @@ clip run loop fps=13 speed=48 : walk0 walk1 walk2 walk3 walk4 walk5
 """
     profile = """creature
   move ground
+  lane -0.1
   speed walk=13 run=48
   anim idle=idle move=walk run=run look=look alert=alert eat=graze sniff=graze
   intents forage=7 look=3 wander=2 leave=3
@@ -2304,6 +2323,7 @@ clip run loop fps=15 speed=60 : walk0 walk1 walk2 walk3 walk4 walk5
 """
     profile = """creature
   move ground
+  lane 0.3
   speed walk=15 run=60
   anim idle=idle move=walk run=run look=look alert=alert sniff=sniff eat=sniff rest=sit sit=sit groom=play
   intents wander=4 sniff=3 look=3 rest=2 groom=4 leave=3

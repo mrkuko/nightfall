@@ -101,6 +101,7 @@ clip hop loop fps=8 speed=20 : sit hop0 hop1 hop0
 
 creature
   move ground
+  lane 0.65
   speed walk=10 run=26
   anim idle=idle move=hop run=hop look=idle eat=croak
   intents wander=3 rest=4 leave=1

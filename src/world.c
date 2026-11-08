@@ -47,6 +47,15 @@ float world_ground(const world_t *w, float x)
     return w->ground[xi];
 }
 
+float world_ground_at(const world_t *w, float x, float z)
+{
+    float off = (z - (float)w->ground_z) * 0.3f;
+    if (off < 0) off = 0;
+    if (off > 14) off = 14;
+    float y = world_ground(w, x) + off;
+    return y > (float)w->h - 2 ? (float)w->h - 2 : y;
+}
+
 void world_log(world_t *w, const char *fmt, ...)
 {
     char msg[96];

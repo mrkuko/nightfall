@@ -49,6 +49,7 @@ clip crawl loop fps=7 speed=4 : crawl0 crawl1
 clip threat loop fps=2 : threat*4 crawl0
 creature
   move ground
+  lane 0.7
   speed walk=4 run=7
   anim idle=idle move=crawl run=crawl alert=threat look=threat
   intents wander=7 look=2 leave=1

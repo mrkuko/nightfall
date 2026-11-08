@@ -483,6 +483,7 @@ clip climb_down loop fps=8 speed=22 : down0 down1 down2
 
 creature
   move ground climb
+  lane 0.2
   speed walk=16 run=40 climb=24
   anim idle=idle move=move run=run look=look eat=eat climb=climb climb_down=climb_down alert=alert groom=flick
   intents forage=4 wander=2 climb=6 look=3 hide=3 leave=2

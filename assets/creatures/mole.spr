@@ -100,6 +100,7 @@ clip sniff loop fps=7 : sniff emerge2 sniff sniff emerge2
 clip dig loop fps=9 : dig dig2
 creature
   move ground
+  lane 0.95
   burrow 1
   speed walk=0.1 run=0.1
   anim idle=idle appear=appear vanish=vanish look=sniff sniff=sniff eat=dig move=dig

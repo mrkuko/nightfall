@@ -93,6 +93,7 @@ void profile_parse(const sprite_t *s, profile_t *p)
     const char *v;
     p->fear = (v = sprite_prop(s, "fear")) ? (float)atof(v) : 0.5f;
     p->curiosity = (v = sprite_prop(s, "curiosity")) ? (float)atof(v) : 0.5f;
+    p->lane = (v = sprite_prop(s, "lane")) ? (float)atof(v) : 0.15f;
     p->rare = (v = sprite_prop(s, "rare")) ? atoi(v) : 0;
     p->burrow = (v = sprite_prop(s, "burrow")) ? atoi(v) : 0;
     if ((v = sprite_prop(s, "scares"))) snprintf(p->scares, sizeof p->scares, " %s ", v);
@@ -277,7 +278,7 @@ static int pick_link(world_t *w, int path, int *other, float *t_here, float *t_o
 static void plan_mount(world_t *w, actor_t *a, int path, int run)
 {
     navpath_t *p = &w->path[path];
-    plan_ground_move(w, a, p->x[0], run, a->lane_z);
+    plan_ground_move(w, a, p->x[0], run, p->z);       /* from a front row it first walks back to the trunk */
     step_t *s = plan_push(a, ST_DEPTH);
     if (s) { s->z = p->z; s->dur = 0.3f; }
 }
@@ -437,6 +438,17 @@ static int nearest_mover(world_t *w, actor_t *a, float maxd)
     return best;
 }
 
+/* Ground rows span from the standard lane (ground_z, where trunks can be climbed)
+ * to just in front of the middle undergrowth band (fg_z + 6). */
+int actor_pick_lane(world_t *w, const profile_t *p)
+{
+    float t;
+    if (rng_chance(&w->rng, 0.12f)) t = p->lane + rng_range(&w->rng, -0.55f, 0.55f);   /* now and then far from its usual row */
+    else t = p->lane + (rng_float(&w->rng) + rng_float(&w->rng) - 1.0f) * 0.3f;
+    t = clampf(t, -0.15f, 1.0f);
+    return w->ground_z + (int)lroundf(t * (float)(w->fg_z + 6 - w->ground_z));
+}
+
 static void plan_intent(world_t *w, actor_t *a, int in)
 {
     plan_clear(a);
@@ -457,6 +469,7 @@ static void plan_intent(world_t *w, actor_t *a, int in)
             if (s) { s->x = a->x; s->y = world_ground(w, a->x); s->z = (int)a->zf; }
         } else {
             float tx = clampf(a->x + rng_range(&w->rng, -70, 70), 12, (float)w->w - 12);
+            if (rng_chance(&w->rng, 0.35f)) a->lane_z = actor_pick_lane(w, &a->prof);
             plan_ground_move(w, a, tx, 0, a->lane_z);
             push_anim(a, A_IDLE, rng_range(&w->rng, 1.0f, 3.0f));
         }
@@ -471,6 +484,7 @@ static void plan_intent(world_t *w, actor_t *a, int in)
         break;
     case IN_FORAGE: {
         float tx = clampf(a->x + rng_range(&w->rng, -60, 60), 12, (float)w->w - 12);
+        if (ground && rng_chance(&w->rng, 0.3f)) a->lane_z = actor_pick_lane(w, &a->prof);
         plan_ground_move(w, a, tx, 0, a->lane_z);
         push_anim(a, A_SNIFF, rng_range(&w->rng, 0.8f, 1.8f));
         push_anim(a, A_EAT, rng_range(&w->rng, 2.5f, 6.0f));
@@ -830,8 +844,8 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         a->moved = st;
         a->nav = NAV_GROUND;
         a->path = -1;
-        a->y = world_ground(w, a->x);
         a->zf = approach(a->zf, (float)s->z, dt * 12.0f);
+        a->y = world_ground_at(w, a->x, a->zf);
         return 0;
     }
     case ST_CLIMB: {
@@ -979,7 +993,7 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         a->zf = approach(a->zf, (float)p->z, dt * 14.0f);
         if (a->nav == NAV_GROUND) {
             a->x = approach(a->x, p->x + (float)a->facing * 3.0f, dt * a->prof.walk);
-            a->y = world_ground(w, a->x);
+            a->y = world_ground_at(w, a->x, a->zf);
         }
         if (a->step_t > 0.7f && fabsf(a->zf - (float)p->z) < 0.5f) {
             a->hidden = 1;
@@ -996,7 +1010,7 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         if (first) {
             a->hidden = 0;
             a->x = p->type == PL_HOLLOW ? p->climb_x : p->x;
-            a->y = p->type == PL_HOLLOW ? p->y : world_ground(w, p->x);
+            a->y = p->type == PL_HOLLOW ? p->y : world_ground_at(w, p->x, (float)p->z);
             a->zf = (float)p->z;
             a->nav = p->type == PL_HOLLOW ? NAV_CLIMB : NAV_GROUND;
             p->occupant = -1;
@@ -1093,6 +1107,9 @@ void actor_update(world_t *w, actor_t *a, float dt)
             a->step_init = 0;
         }
     }
+    /* on the ground the screen row follows the depth (depth changes walk forward / back) */
+    if (a->nav == NAV_GROUND && !a->hidden && a->path < 0)
+        a->y = approach(a->y, world_ground_at(w, a->x, a->zf), dt * 30.0f);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1121,6 +1138,7 @@ int actor_spawn(world_t *w, const char *species, float x, float y, int nav, int 
     a->zf = (float)lane_z;
     a->lane_z = lane_z;
     a->nav = nav;
+    if (nav == NAV_GROUND) a->y = world_ground_at(w, x, (float)lane_z);
     a->place = -1;
     a->target = -1;
     a->path = -1;

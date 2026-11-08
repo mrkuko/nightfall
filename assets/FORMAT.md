@@ -52,6 +52,7 @@ prop something value      # an arbitrary property
 
 creature                  # CREATURE PROFILE for the intent system
   move ground climb       # ground climb air perch hidden
+  lane 0.2                # preferred ground row: 0 = standard lane by the trunks, 1 = front row near the camera
   speed walk=16 run=46 climb=30
   anim idle=idle move=hop run=run look=look eat=eat ...
   intents forage=5 wander=3 look=3 hide=2 leave=1
@@ -79,6 +80,14 @@ from the `depth` map). The compositor draws with a z-test, so:
   hide it.
 
 In the gallery: `d` = depth view (warm = closer), `o` = grass blades in front of and behind the shape.
+
+## Ground rows (`lane`)
+
+Ground creatures walk in rows of different depth. A closer row (higher z) is also lower on the
+screen, so a creature in the front row walks among the foreground plants. `lane` is the preferred
+row (default 0.15); the brain picks a row around it when wandering or foraging and now and then
+one far from it. Climbing is only possible from the standard lane: a climber in a front row first
+walks back to the trunk's depth. Large animals use a negative value (a bit further away).
 
 ## Logical animations (the `anim` mapping)
 

@@ -30,6 +30,7 @@ clip idle loop fps=1 : crawl0
 clip crawl loop fps=8 speed=5 : crawl0 crawl1
 creature
   move ground
+  lane 0.75
   speed walk=5 run=9
   anim idle=idle move=crawl run=crawl
   intents wander=8 leave=1

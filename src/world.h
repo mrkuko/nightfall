@@ -157,6 +157,7 @@ typedef struct {
     float iw[IN_COUNT];         /* intent weights */
     int   homes;                /* bit mask of place types (1 << PL_*) */
     float fear, curiosity;
+    float lane;                 /* preferred ground row: 0 = standard lane (can climb), 1 = front row near the camera */
     int   rare;
     int   burrow;               /* emerges from the ground in place and vanishes again (mole) */
     char  scares[128];
@@ -236,6 +237,8 @@ int   world_add_place(world_t *w, int type, float x, float y, int z, int nav, in
 void  world_places_from_object(world_t *w, int obj);
 void  world_play_object_clip(world_t *w, int obj, const char *clip);
 float world_ground(const world_t *w, float x);
+/* Ground y for a creature at depth z: closer rows (higher z) sit lower on the screen. */
+float world_ground_at(const world_t *w, float x, float z);
 /* Links paths that touch and assigns hollows to climbing paths. Call after the scene is built. */
 void  world_link_paths(world_t *w);
 void  path_point(const navpath_t *p, float t, float *x, float *y);
@@ -255,5 +258,7 @@ void  actor_update(world_t *w, actor_t *a, float dt);
 void  actor_set_intent(world_t *w, actor_t *a, int intent);
 const char *intent_name(int intent);
 void  profile_parse(const sprite_t *s, profile_t *p);
+/* Picks a ground lane depth around the profile's preferred row (sometimes anywhere). */
+int   actor_pick_lane(world_t *w, const profile_t *p);
 
 #endif

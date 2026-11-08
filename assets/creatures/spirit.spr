@@ -148,6 +148,7 @@ clip walk loop fps=6 speed=8 : walk0 idle0 walk1 idle1
 clip look loop fps=3 : look_l*4 idle0 look_r*4 idle0
 creature
   move ground
+  lane 0.4
   speed walk=8 run=12
   anim idle=idle move=walk run=walk look=look
   intents wander=4 look=4 hide=2 leave=2

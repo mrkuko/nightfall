@@ -257,7 +257,7 @@ static int spawn_species(world_t *w, const char *name)
     profile_parse(s, &p);
     int left = rng_chance(&w->rng, 0.5f);
     float ex = left ? -18.0f : (float)w->w + 18.0f;
-    int lane = w->ground_z + rng_between(&w->rng, 0, 6);
+    int lane = actor_pick_lane(w, &p);    /* each species has its preferred row (profile "lane") */
     int i = -1;
 
     if ((p.navmask & NAV_HIDDEN) && !(p.navmask & NAV_GROUND)) {
@@ -269,7 +269,6 @@ static int spawn_species(world_t *w, const char *name)
         float x = rng_range(&w->rng, 20, (float)w->w - 20);
         return actor_spawn(w, name, x, world_ground(w, x), NAV_GROUND, lane);
     }
-    if (sprite_has_tag(s, "large")) lane = w->ground_z - 4;   /* large animals a bit further away */
     if (p.navmask & NAV_AIR) {
         float y = rng_range(&w->rng, (float)w->h * 0.1f, (float)w->h * 0.6f);
         int z = w->ground_z + rng_between(&w->rng, 12, 26);   /* they fly in front of the trunks, not through them */
