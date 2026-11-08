@@ -140,4 +140,6 @@ void term_sleep(double sec)
     while (nanosleep(&ts, &ts) != 0 && errno == EINTR && !g_quit_flag) {}
 }
 
+#else
+typedef int nf_term_posix_unused;   /* ISO C: a translation unit must not be empty (Windows uses term_win.c) */
 #endif /* !_WIN32 */

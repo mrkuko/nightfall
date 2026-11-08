@@ -23,13 +23,13 @@ OUT=${3:-dist}
 
 mkdir -p "$OUT" build
 sed "s/\"nightfall [0-9][0-9.]*\"/\"nightfall $VERSION\"/" docs/nightfall.6 | gzip -9nc > build/nightfall.6.gz
-export NF_ARCH NF_VERSION="$VERSION" NF_MAN=build/nightfall.6.gz
+export NF_ARCH NF_VERSION="$VERSION"
 
 for fmt in deb rpm archlinux; do
     if command -v nfpm >/dev/null 2>&1; then
         nfpm package --config packaging/nfpm.yaml --packager "$fmt" --target "$OUT/"
     elif command -v docker >/dev/null 2>&1; then
-        docker run --rm -v "$PWD:/w" -w /w -e NF_ARCH -e NF_VERSION -e NF_MAN \
+        docker run --rm -v "$PWD:/w" -w /w -e NF_ARCH -e NF_VERSION \
             goreleaser/nfpm:v2.48.0 package --config packaging/nfpm.yaml --packager "$fmt" --target "$OUT/"
     else
         echo "need nfpm or docker (https://nfpm.goreleaser.com)" >&2

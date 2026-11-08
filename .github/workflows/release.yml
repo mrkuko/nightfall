@@ -12,16 +12,15 @@ permissions:
 jobs:
   linux:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - { runner: ubuntu-latest,    arch: x86_64 }
           - { runner: ubuntu-24.04-arm, arch: aarch64 }
     runs-on: ${{ matrix.runner }}
-    container: alpine:3.20          # musl -> one fully static binary for every distro
     steps:
       - uses: actions/checkout@v4
-      - run: apk add --no-cache build-base
-      - name: Build
+      - name: Build (static, runs on any distro)
         run: make VERSION=${GITHUB_REF_NAME#v} LDFLAGS=-static
       - name: Package
         run: |
@@ -43,6 +42,7 @@ jobs:
     # .deb, .rpm and Arch packages from the static binary (nfpm in its official Docker image)
     needs: linux
     strategy:
+      fail-fast: false
       matrix:
         include:
           - { runner: ubuntu-latest,    arch: x86_64,  nfarch: amd64 }

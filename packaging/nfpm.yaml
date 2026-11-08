@@ -1,6 +1,6 @@
 # nfpm definition: builds .deb (Debian, Ubuntu), .rpm (Fedora, openSUSE) and Arch packages
 # from the same files. Run it through `sh packaging/build-packages.sh` (it sets NF_ARCH = amd64 | arm64,
-# NF_VERSION = x.y.z and NF_MAN = the gzipped manual page).
+# NF_VERSION = x.y.z and writes the gzipped manual page to build/nightfall.6.gz).
 name: nightfall
 arch: ${NF_ARCH}
 platform: linux
@@ -21,7 +21,7 @@ contents:
     dst: /usr/bin/nightfall
     file_info:
       mode: 0755
-  - src: ${NF_MAN}                  # docs/nightfall.6, gzipped by build-packages.sh
+  - src: build/nightfall.6.gz       # docs/nightfall.6, gzipped by build-packages.sh
     dst: /usr/share/man/man6/nightfall.6.gz
   - src: README.md
     dst: /usr/share/doc/nightfall/README.md
