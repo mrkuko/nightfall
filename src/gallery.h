@@ -3,6 +3,9 @@
 
 #include "sprite.h"
 
+/* Foreground tuning, 1.0 = default (set from the command line). */
+extern float g_fg_density, g_fg_spread, g_fg_zspread;
+
 int nf_load_library(library_t *lib, const char *assets_dir, uint64_t seed);
 
 /* Interactive library browser. */

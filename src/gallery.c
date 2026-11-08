@@ -450,6 +450,23 @@ static int too_close(const float *xs, int n, float x, float d)
     return 0;
 }
 
+/* Foreground tuning (--grass-density, --grass-spread, --grass-zspread); 1.0 = default look. */
+float g_fg_density = 1.0f, g_fg_spread = 1.0f, g_fg_zspread = 1.0f;
+
+/* Gap to the next foreground plant: [lo, hi] scaled by 1/density; spread scales the randomness around the mean. */
+static float fg_gap(rng_t *r, float lo, float hi)
+{
+    float mid = (lo + hi) * 0.5f, half = (hi - lo) * 0.5f * g_fg_spread;
+    float g = (mid + rng_range(r, -half, half)) / (g_fg_density > 0.05f ? g_fg_density : 0.05f);
+    return g < 1.5f ? 1.5f : g;
+}
+
+/* Depth of a foreground plant: centre +- half-range, the range scaled by zspread. */
+static int fg_z(rng_t *r, int centre, int half)
+{
+    return centre + rng_between(r, -half, half) * g_fg_zspread;
+}
+
 static void build_scene(world_t *w, uint64_t seed)
 {
     rng_t r = rng_seed(seed ^ 0x5eedu);
@@ -583,17 +600,17 @@ static void build_scene(world_t *w, uint64_t seed)
     int nfg = ft == FT_PINE ? (int)NF_COUNT(fg_pine) : (int)NF_COUNT(fg_decid);
     float step0 = (ar == AR_THICKET ? 5.0f : ar == AR_CLEARING ? 11.0f : 7.0f) * 1.45f;
     /* far band: low grass and small flowers, slightly in front of the creatures */
-    for (float x = rng_range(&r, -4, 8); x < (float)W + 10; x += rng_range(&r, step0 * 1.2f, step0 * 2.6f))
+    for (float x = rng_range(&r, -4, 8); x < (float)W + 10; x += fg_gap(&r, step0 * 2.4f, step0 * 5.0f))
         world_add_object(w, fg_far[rng_int(&r, (int)NF_COUNT(fg_far))], x, G(x) + rng_range(&r, 2, 6),
-                         rng_between(&r, 108, 116), FLIP, SD);
+                         fg_z(&r, 112, 4), FLIP, SD);
     /* middle band: the main undergrowth */
-    for (float x = rng_range(&r, -6, 6); x < (float)W + 10; x += rng_range(&r, step0, step0 * 2.2f))
-        world_add_object(w, fg[rng_int(&r, nfg)], x, G(x) + rng_range(&r, 4, 11), w->fg_z + rng_between(&r, -8, 4), FLIP, SD);
+    for (float x = rng_range(&r, -6, 6); x < (float)W + 10; x += fg_gap(&r, step0 * 1.9f, step0 * 4.2f))
+        world_add_object(w, fg[rng_int(&r, nfg)], x, G(x) + rng_range(&r, 4, 11), fg_z(&r, w->fg_z - 2, 6), FLIP, SD);
     /* near band: big plants, sparse, closest to the camera and lowest on the screen */
-    for (float x = rng_range(&r, -10, 20); x < (float)W + 12; x += rng_range(&r, step0 * 2.6f, step0 * 4.8f))
+    for (float x = rng_range(&r, -10, 20); x < (float)W + 12; x += fg_gap(&r, step0 * 4.0f, step0 * 7.5f))
         world_add_object(w, fg_near[rng_int(&r, (int)NF_COUNT(fg_near))], x, G(x) + rng_range(&r, 9, 15),
-                         w->fg_z + rng_between(&r, 12, 24), FLIP, SD);
-    for (float x = rng_range(&r, 0, 10); x < (float)W; x += rng_range(&r, 12, 30))
+                         fg_z(&r, w->fg_z + 18, 6), FLIP, SD);
+    for (float x = rng_range(&r, 0, 10); x < (float)W; x += fg_gap(&r, 24, 55))
         world_add_object(w, rng_chance(&r, 0.5f) ? "grass" : "grass_low", x, G(x) + 1, 98, FLIP, SD);
 
     /* 9. ground mist */

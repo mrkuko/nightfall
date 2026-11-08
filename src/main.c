@@ -9,6 +9,9 @@
  * Options:
  *   --seed N        seed for procedural shapes and behaviour
  *   --scene-time S  (screensaver) after how many seconds to swap the scene (0 = never, default 600)
+ *   --grass-density F   foreground plant density (1 = default, 2 = twice as dense, 0.5 = sparser)
+ *   --grass-spread F    randomness of the gaps between plants (0 = even, 1 = default, 2 = clumpy)
+ *   --grass-zspread F   spread of foreground depth (0 = one layer, 1 = default, 2 = deeper)
  *   --assets DIR    load assets from a directory (instead of the embedded ones; 'r' = reload)
  *   --filter X      (sheet) only shapes whose name/tag matches X
  *   --depth         (sheet) depth view
@@ -55,11 +58,15 @@ int main(int argc, char **argv)
         else if (!strcmp(a, "--spawn") && i + 1 < argc) { if (nspawn < 16) spawn[nspawn++] = argv[i + 1]; i++; }
         else if (!strcmp(a, "--play")) play = 1;
         else if (!strcmp(a, "--gallery")) gallery = 1;
+        else if (!strcmp(a, "--grass-density") && i + 1 < argc) g_fg_density = (float)atof(argv[++i]);
+        else if (!strcmp(a, "--grass-spread") && i + 1 < argc) g_fg_spread = (float)atof(argv[++i]);
+        else if (!strcmp(a, "--grass-zspread") && i + 1 < argc) g_fg_zspread = (float)atof(argv[++i]);
         else if (!strcmp(a, "--scene-time") && i + 1 < argc) scene_time = (float)atof(argv[++i]);
         else if (!strcmp(a, "-h") || !strcmp(a, "--help")) {
             printf("nightfall [--seed N] [--scene-time S]        screensaver\n"
                    "nightfall --gallery [--assets DIR]            shape library\n"
                    "nightfall --play [--seed N]                   playground with intents\n"
+                   "  foreground (all modes): [--grass-density F] [--grass-spread F] [--grass-zspread F]\n"
                    "nightfall --sheet out.ppm [--filter X] [--depth] [--scale N] [--width PX]\n");
             return 0;
         } else {
