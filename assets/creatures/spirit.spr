@@ -1,0 +1,162 @@
+sprite spirit
+tags creature ground small fantasy rare glow
+anchor 8 15
+palette
+  b 3e6a46 ~8
+  a 2a4e34 ~6
+  d 1a3424 ~4
+  B 4e7a50 ~6 z+1
+  A 2e5638 ~5 z+1
+  D 1a3424 ~3 z+1
+  l 6a9a4a ~6 z+2
+  L 3e6a30 ~4 z+2
+  k 4a3a2a z+2
+  E 9ae8d8 glow
+  q 6ad0b0 glow
+  e 0a1210
+end
+
+frame idle0
+|..........lll
+|.......lllLL
+|.......LLLL
+|.......LL
+|......bkk
+|....bbabbbbb
+|...baaBBBBaab
+|...daBAAAABa
+|....dDAAAAAB
+|...baDEAAAEBq
+|....dDqAAAqBb
+|...bqDDAAADdb
+|....ddaDDDd
+|.....dd..da
+|.....d....a
+|.....a....a
+
+frame idle1
+|.
+|.........llll
+|.......llLLL
+|.......LLL
+|........L
+|.......kkb
+|....b.BBBBbb
+|...baBAAAABb
+|..baaDAAAAABbb
+|..daaDEAAAEBqb
+|..daaDqAAAqBab
+|...dqDDAAADdd
+|....ddaDDDd
+|.....dd..da
+|.....d....a
+|.....a....a
+
+frame blink
+|..........lll
+|.......lllLL
+|.......LLLL
+|.......LL
+|......bkk
+|....bbabbbbb
+|...baaBBBBaab
+|...daBAAAABa
+|....dDAAAAAB
+|...baDdAAAdBq
+|....dDAAAAABb
+|...bqDDAAADdb
+|....ddaDDDd
+|.....dd..da
+|.....d....a
+|.....a....a
+
+frame walk0
+|..........lll
+|.......lllLL
+|.......LLLL
+|.......LL
+|......bkk
+|....bbabbbbb
+|...baaBBBBaab
+|...daBAAAABa
+|....dDAAAAAB
+|...baDEAAAEBq
+|....dDqAAAqBb
+|...bqDDAAADdb
+|....ddaDDDd
+|......dadd
+|......d..a
+|......a..a
+
+frame walk1
+|.
+|........lllll
+|.......lLLL
+|.......LLL
+|........k
+|.....b.bbbb
+|....baBBBBab
+|...baBAAAABb
+|..baaDAAAAABbb
+|..ddaDEAAAEBqb
+|....dDqAAAqBa
+|...bqDDAAADdb
+|....ddaDDDda
+|....dad..dda
+|....d......a
+|....a......a
+
+frame look_l
+|..........lll
+|.......lllLL
+|.......LLLL
+|.......LL
+|......bkk
+|....bbabbbbb
+|...baaBBBBaab
+|...daBAAAABa
+|....dDAAAAAB
+|...baEAAAEABq
+|....dqAAAqABb
+|...bqDDAAADdb
+|....ddaDDDd
+|.....dd..da
+|.....d....a
+|.....a....a
+
+frame look_r
+|..........lll
+|.......lllLL
+|.......LLLL
+|.......LL
+|......bkk
+|....bbabbbbb
+|...baaBBBBaab
+|...daBAAAABa
+|....dDAAAAAB
+|...baDAEAAAEq
+|....dDAqAAAqb
+|...bqDDAAADdb
+|....ddaDDDd
+|.....dd..da
+|.....d....a
+|.....a....a
+
+
+clip idle loop fps=3 : idle0*4 idle1*3 idle0*4 idle1*3 blink idle0*2 look_l*4 idle0 look_r*4
+clip walk loop fps=6 speed=8 : walk0 idle0 walk1 idle1
+clip look loop fps=3 : look_l*4 idle0 look_r*4 idle0
+creature
+  move ground
+  speed walk=8 run=12
+  anim idle=idle move=walk run=walk look=look
+  intents wander=4 look=4 hide=2 leave=2
+  homes bush hollow
+  fear 0.3
+  curiosity 0.9
+  size small
+  rare 1
+  point head 0 -6
+end
+end
+

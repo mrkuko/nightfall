@@ -1,0 +1,112 @@
+# mole — pokes out of the ground, sniffs, vanishes
+sprite mole
+tags creature ground tiny mammal burrow
+anchor 8 10
+palette
+  m 3a2c22 ~6
+  l 2a2018 ~4
+  L 1c1610 ~3
+  b 3a3a40 ~4 z+1
+  a 26262c ~3 z+1
+  d 16161a ~2 z+1
+  p b07a74 z+2
+  q 8a5a56 z+2
+  P c08e86 z+2
+end
+
+frame mound
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|....mmm.mmmm
+|..mmlllmlllm.m
+|...LlllLllllmm
+|..m.LLL.LLLLLm
+
+frame emerge1
+|.
+|.
+|.
+|.
+|.
+|........p
+|.......bb
+|...mmmbaabmmm
+|..mllldddblllm
+|..mmllmLlmmmmm
+|..LmLmLmmLLLLm
+
+frame emerge2
+|.
+|.
+|.
+|........p
+|........p
+|.....bbbbbb
+|.....ddaabb
+|...PPPdddbPPP
+|..mlqPdaadqqlm
+|..mmlmmdmllmmm
+|..L.mLLmLmmLLm
+
+frame sniff
+|.
+|.
+|.
+|.........p
+|........pp
+|.....bbbbbb
+|.....ddaabb
+|...PPPdddbPPP
+|..mlqPdaadqqlm
+|..mmlmmdmllmmm
+|..L.mLLmLmmLLm
+
+frame dig
+|.
+|.
+|.
+|........p
+|........p
+|.....bbbbbb
+|.....ddaabb
+|..PPPadddbaPPP
+|..mqPddaaddqqm
+|..mmlmmdmllmmm
+|..L.mLLmLmmLLm
+
+frame dig2
+|.
+|.
+|.
+|........p
+|........p
+|.....bbbbbb
+|.....ddaabb
+|...mPPdddbPPm
+|..mlqPdaadqPlm
+|..mmlmmdmllmmm
+|..L.mLLmLmmLLm
+
+
+clip idle loop fps=5 : emerge2*6 sniff emerge2 sniff emerge2*4 dig dig2 dig dig2 emerge2*3
+clip appear once fps=5 : mound mound emerge1 emerge2
+clip vanish once fps=5 : emerge2 emerge1 mound mound
+clip sniff loop fps=7 : sniff emerge2 sniff sniff emerge2
+clip dig loop fps=9 : dig dig2
+creature
+  move ground
+  burrow 1
+  speed walk=0.1 run=0.1
+  anim idle=idle appear=appear vanish=vanish look=sniff sniff=sniff eat=dig move=dig
+  intents sniff=4 look=3 vanish=3
+  fear 0.7
+  size tiny
+  point head 0 -4
+end
+end
+

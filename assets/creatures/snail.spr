@@ -1,0 +1,68 @@
+sprite snail
+tags creature ground tiny slow
+anchor 7 7
+palette
+  h 8a6a44 ~5 z+1
+  H 6a4e30 ~4 z+1
+  j 3e2c1a ~3 z+1
+  s 241a10 z+1
+  m 8a8c84 ~4
+  M 6a6c66 ~3
+  K 4a4c48 ~2
+  o 20201e
+end
+
+frame crawl0
+|.
+|....hhhhh
+|...hHHsHHh
+|...jHsHsHhMmo
+|...jHsHsHhMK
+|.mmjHHsHjmMmm
+|mMMMjjjjMMMMm
+|.KKKKKKKKKKKm
+
+frame crawl1
+|.
+|....hhhhh
+|...hHHsHHh
+|...jHsHsHh.Mmo
+|...jHsHsHh.MK
+|mmmjHHsHjmmMmm
+|KMMMjjjjMMMMMm
+|KKKKKKKKKKKKKm
+
+frame look
+|.
+|....hhhhh
+|...hHHsHHh..o
+|...jHsHsHhMm
+|...jHsHsHhMm
+|.mmjHHsHjmMmm
+|mMMMjjjjMMMMm
+|.KKKKKKKKKKKm
+
+frame hide
+|.
+|....hhhhh
+|...hHHsHHh
+|...jHsHsHh
+|...jHsHsHh
+|...jHHsHj
+|..MMjjjjMMM
+|...KKKKKKK
+
+
+clip idle loop fps=2 : crawl0*6 look*4
+clip crawl loop fps=2 speed=1.5 : crawl0 crawl1
+clip hide loop fps=1 : hide
+creature
+  move ground
+  speed walk=1.5 run=1.5
+  anim idle=idle move=crawl run=crawl freeze=hide alert=hide
+  intents wander=6 rest=2
+  fear 0.2
+  size tiny
+end
+end
+

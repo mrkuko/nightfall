@@ -1,0 +1,176 @@
+sprite bat
+tags creature air small mammal
+anchor 10 5
+palette
+  b 3a3438 ~3 z+1
+  a 2a2428 ~2 z+1
+  d 1a1618 z+1
+  m 46383c ~3 z+1
+  e c8a050 glow
+end
+
+frame flap0
+|mm................mm
+|ddmm....b..b....mmdm
+|..mdmmm.b..b.mmmmd
+|....dmamabbamadd
+|......ddbeaedm
+|........daab
+|.........dd
+|.
+|.
+|.
+
+frame flap1
+|.
+|........b..b
+|........b..b
+|.....mmmmbbmmm
+|mmmmmaaabeaeadm.mmm
+|.m.dmddddaabd.dmmmm
+|.........dd
+|.
+|.
+|.
+
+frame flap2
+|.
+|........b..b
+|........b..b
+|........mbbm
+|......mmbeaemm
+|....mmaadaabaamm
+|..mmaddddddddddamm
+|m.mdm..........ddm
+|.md..............dm
+|.
+
+frame hang0 at 6 0
+|.....ddd
+|.....dd
+|.....mm
+|....mbbm
+|....ddbm
+|....baab
+|....daab
+|....mdd
+|.....bb
+|....beae
+|.....bb
+|....b..b
+|....b..b
+|.
+
+frame hang1 at 6 0
+|.....ddd
+|.....dd
+|.....mm
+|....mbbm
+|...madbam
+|...dbaabm
+|...ddaabm
+|....ddd
+|.....bb
+|....beae
+|.....bb
+|....b..b
+|....b..b
+|.
+
+frame hang_l at 6 0
+|.....ddd
+|.....dd
+|.....mm
+|....mbbm
+|....ddbm
+|....baab
+|....daab
+|....mdd
+|....bbb
+|....dee
+|....bdb
+|....b.b
+|......b
+|.
+
+frame hang_r at 6 0
+|.....ddd
+|.....dd
+|.....mm
+|....mbbm
+|....ddbm
+|....baab
+|....daab
+|....mdd
+|.....bbb
+|.....dee
+|.....bdb
+|.....b.b
+|.....b
+|.
+
+frame hang_stretch at 6 0
+|.....ddd
+|.....dd
+|.....mm
+|....mbbm
+|...mddbmm
+|..mabaabam
+|.mdmdaabddm
+|md...ddm..dm
+|d....bb....m
+|....beae
+|.....bb
+|....b..b
+|....b..b
+|.
+
+frame land0 at 6 0
+|.....ddd
+|.....dd
+|....mmmm
+|..mmmbbmmm
+|mmddddbmddmmm
+|d...baab...dm
+|....daab
+|.....ddm
+|.....bb
+|....beae
+|.....bb
+|....b..b
+|....b..b
+|.
+
+frame land1 at 6 0
+|.....ddd
+|.....dd
+|.....mm
+|....mbbm
+|...mddbmm
+|..mdbaabdm
+|.md.daab.dm
+|.....ddm
+|.....bb
+|....beae
+|.....bb
+|....b..b
+|....b..b
+|.
+
+
+clip idle loop fps=12 : flap0 flap1 flap2 flap1
+clip fly loop fps=12 speed=34 : flap0 flap1 flap2 flap1
+clip hang loop fps=4 : hang0*10 hang1*4 hang0*8 hang_l*6 hang0*4 hang_r*6 hang0*6 hang_stretch*3 hang1*3 hang0*4
+clip land once fps=8 : land0 land1 hang_stretch hang0
+clip takeoff once fps=10 : hang0 hang_stretch land1 land0
+creature
+  move air perch
+  speed walk=24 run=40
+  anim idle=idle move=fly run=fly hang=hang land=land takeoff=takeoff
+  intents wander=4 roost=6 leave=2
+  fear 0.2
+  size small
+  rare 1
+end
+end
+

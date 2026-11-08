@@ -1,0 +1,8 @@
+# Private files
+_*
+
+# Build files
+build/
+
+# Release
+nightfall

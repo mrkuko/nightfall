@@ -1,0 +1,87 @@
+# fire salamander — black with yellow spots, slow
+sprite salamander
+tags creature ground tiny amphibian slow
+anchor 10 7
+palette
+  b 3a3634 ~3
+  a 22201e ~2
+  d 121010
+  B 3a3634 z+1
+  A 22201e z+1
+  D 121010 z+1
+  g 1a1816 z-2
+  f 121010 z-2
+  F 0a0808 z-2
+  y d0a020 ~8
+  Y a07818 ~5
+  e 040404
+  w b0b8c0 glow
+end
+
+frame walk0
+|.
+|.
+|.
+|.........bbbbbbb.bb
+|......bbbaayByaabyeb
+|.bbybbaByaadDBdddddb
+|.....ddYBdd.DB
+|........B....g
+
+frame walk1
+|.
+|.
+|.
+|.......bbbbbbb
+|....bbbByaayBybbbybb
+|.bbydddYDBddDaaadaeb
+|.......F.B.BBddd.dd
+|.......g.B.D
+
+frame walk2
+|.
+|.
+|.
+|.....bbbbbb
+|.bbybdaYyaabbbbbbybb
+|......ddBaayByaadaeb
+|........BdddDBdd.dd
+|........B....g
+
+frame walk3
+|.
+|.
+|.
+|.............bbb.bb
+|.bbybbbbbbbbbyaabyeb
+|....dddYyaayBBdddddb
+|......BDdddddDB
+|......D...g.g.B
+
+frame look
+|.
+|.
+|.................bb
+|.........bbbbbbbbyeb
+|......bbbaayByaadddb
+|.bbybbaByaadDBddb
+|.....ddYBdd.DB
+|........B....g
+
+
+clip idle loop fps=2 : walk0*8 look*4
+clip walk loop fps=4 speed=3 : walk0 walk1 walk2 walk3
+clip look loop fps=2 : look*6 walk0*2
+creature
+  move ground
+  speed walk=3 run=5
+  anim idle=idle move=walk run=walk look=look
+  intents wander=6 look=2 rest=2 leave=2 hide=1
+  homes log brushwood
+  fear 0.1
+  curiosity 0.2
+  size tiny
+  point head 6 -2
+end
+end
+

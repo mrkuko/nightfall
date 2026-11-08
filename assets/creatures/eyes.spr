@@ -1,0 +1,51 @@
+sprite eyes
+tags creature hidden eyes tiny
+anchor 4 1
+palette
+  E e8b84a glow
+  G 9ae070 glow
+  e 0a0806 glow
+  h 6a5022 glow
+  x 0a0a0a
+end
+
+frame open at 3 1
+|EE...EE
+|EE...EE
+
+frame look_l at 3 1
+|eE...eE
+|EE...EE
+
+frame look_r at 3 1
+|Ee...Ee
+|EE...EE
+
+frame half at 3 1
+|hh...hh
+|EE...EE
+
+frame closed at 3 1
+|.......
+|hh...hh
+
+frame none at 3 1
+|x......
+|.......
+
+
+clip idle loop fps=6 : open*14 half closed half open*10 look_l*6 open*4 look_r*6 open*4
+clip blink once fps=10 : open half closed half open
+clip appear once fps=6 : none closed half open
+clip vanish once fps=6 : open half closed none
+clip look loop fps=4 : look_l*6 open*2 look_r*6 open*2
+creature
+  move hidden
+  anim idle=idle look=look appear=appear vanish=vanish
+  intents watch=6 follow=3 vanish=2
+  homes bush hollow log
+  size tiny
+  point head 0 0
+end
+end
+

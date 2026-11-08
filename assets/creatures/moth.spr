@@ -1,0 +1,54 @@
+sprite moth
+tags creature air tiny insect
+anchor 6 4
+palette
+  b b8ae98 ~6 z+1
+  a 98907c ~5 z+1
+  d 6a6456 ~3 z+1
+  k 3a3630 z+1
+end
+
+frame flap0
+|...bbbbbb
+|...dabdab
+|...dakkab
+|...ddkkdb
+|.....kk
+|.....kk
+|.
+|.
+
+frame flap1
+|.
+|.
+|.bbbbkkbbbb
+|.daaakkaaab
+|..dddkkddd
+|.....kk
+|.
+|.
+
+frame flap2
+|.
+|.
+|.....kk
+|....bkkb
+|..bbakkabb
+|..dadkkdab
+|...d....d
+|.
+
+
+clip idle loop fps=14 : flap0 flap1 flap2 flap1
+clip fly loop fps=14 speed=12 : flap0 flap1 flap2 flap1
+creature
+  move air
+  speed walk=10 run=18
+  anim idle=idle move=fly run=fly
+  intents wander=6 follow=3 leave=1
+  attracted glow
+  fear 0.1
+  size tiny
+end
+end
+

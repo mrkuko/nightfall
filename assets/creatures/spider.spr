@@ -1,0 +1,201 @@
+# spider on a thread (an object, not a creature with intents)
+sprite spider
+tags detail hanging
+anchor 4 0
+palette
+  t 9aaab0 a=90 glow
+  b 3a3430 z+1
+  a 241e1a z+1
+  d 141010 z+1
+  l 1a1614 z+1
+  e c08040 glow
+end
+
+frame drop0
+|.l....l
+|.ll..ll
+|lllbelll
+|..lbbl
+|.lbaabl
+|ll.dd.ll
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+
+frame drop1
+|.
+|.
+|.
+|.l....l
+|.ll..ll
+|lllbelll
+|..lbbl
+|.lbaabl
+|ll.dd.ll
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+
+frame drop2
+|.
+|.
+|.
+|.
+|.
+|.
+|.l....l
+|.ll..ll
+|lllbelll
+|..lbbl
+|.lbaabl
+|ll.dd.ll
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+
+frame drop3
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.l....l
+|.ll..ll
+|lllbelll
+|..lbbl
+|.lbaabl
+|ll.dd.ll
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+
+frame drop4
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.l....l
+|.ll..ll
+|lllbelll
+|..lbbl
+|.lbaabl
+|ll.dd.ll
+|.
+|.
+|.
+|.
+|.
+|.
+
+frame drop5
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.l....l
+|.ll..ll
+|lllbelll
+|..lbbl
+|.lbaabl
+|ll.dd.ll
+|.
+|.
+|.
+
+frame twitch
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.l....l
+|.ll..ll
+|lllbellll
+|..lbbl
+|.lbaabl
+|ll.dd.ll
+|.
+|.
+|.
+
+
+clip idle loop fps=3 : drop0*12 drop1 drop2 drop3 drop4 drop5*10 twitch drop5*8 twitch drop5*4 drop4 drop3 drop2 drop1
+clip drop once fps=4 : drop0 drop1 drop2 drop3 drop4 drop5
+clip hang loop fps=2 : drop5*6 twitch
+end
+

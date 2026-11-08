@@ -1,0 +1,40 @@
+sprite beetle
+tags creature ground tiny insect
+anchor 4 5
+palette
+  b 3c4a5a ~6 z+1
+  a 263040 ~4 z+1
+  d 141a24 ~2 z+1
+  l 1a1c20
+  w 8aa0b8 glow
+end
+
+frame crawl0
+|.
+|..bbbb
+|.bawaabb
+|.daaaabb
+|..dddd
+|..l.l.l
+
+frame crawl1
+|.
+|..bbbb
+|.bawaabb
+|.daaaabb
+|..dddd
+|...l...l
+
+
+clip idle loop fps=1 : crawl0
+clip crawl loop fps=8 speed=5 : crawl0 crawl1
+creature
+  move ground
+  speed walk=5 run=9
+  anim idle=idle move=crawl run=crawl
+  intents wander=8 leave=1
+  fear 0.1
+  size tiny
+end
+end
+
