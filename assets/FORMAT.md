@@ -186,6 +186,13 @@ of these. `--biome auto` (default) picks one by the seed and `weight`, `--biome 
 `--biome off` ignores biomes (everything allowed, a random floor mix), `--biome list` lists them.
 In the playground `B` cycles auto → each biome → off.
 
+`--spawn-rate NAME=F NAME=F …` (any mode) overrides **spawn chances**. Every species has a chance
+of 0 unless the biome lists it; the biome's chances (base frequency × its multiplier) add up to 1.
+`F` replaces the chance of that species in the same scale — even one the biome does not list — and
+a new arrival is picked by these chances (zero = never). E.g. in a biome without dholes
+`--spawn-rate dhole=0.2` gives them 0.2 next to the biome's 1.0, i.e. about every sixth arrival;
+`rabbit=0` switches rabbits off. E.g. `./nightfall --play --spawn-rate dhole=0.2 rabbit=0`.
+
 ## Procedural shapes
 
 Plants and environment (`grass`, `fern`, `bush`, `trunk`, `roots`, `branch`,

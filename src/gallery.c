@@ -337,6 +337,22 @@ static const sprite_t *choose_biome(const library_t *lib, rng_t *r)
     return lib->biomes[lib->nbiome - 1];
 }
 
+/* --spawn-rate NAME=F: replaces the species' spawn chance (the biome's chances add up to 1) */
+#define MAX_RATE_OVR 16
+static struct { char name[NF_NAME]; float f; } g_rate_ovr[MAX_RATE_OVR];
+static int g_nrate_ovr;
+
+int spawn_rate_set(const char *spec)
+{
+    const char *eq = strchr(spec, '=');
+    if (!eq || eq == spec || g_nrate_ovr >= MAX_RATE_OVR || (size_t)(eq - spec) >= NF_NAME) return -1;
+    memcpy(g_rate_ovr[g_nrate_ovr].name, spec, (size_t)(eq - spec));
+    g_rate_ovr[g_nrate_ovr].name[eq - spec] = 0;
+    g_rate_ovr[g_nrate_ovr].f = (float)atof(eq + 1);
+    g_nrate_ovr++;
+    return 0;
+}
+
 /* Applies the biome to the world: creature whitelist and floor patches. */
 static void apply_biome(world_t *w, rng_t *r)
 {
@@ -345,6 +361,7 @@ static void apply_biome(world_t *w, rng_t *r)
         float f = cl ? list_weight(cl, SPECIES[i].name) : 1.0f;
         g_species_w[i] = f < 0 ? 0 : f;
     }
+
     const char *gl = g_biome ? sprite_prop(g_biome, "ground") : NULL;
     int any = 0;
     for (int t = 0; t < GT_COUNT; t++) {
@@ -447,14 +464,27 @@ static void director(world_t *w, float dt)
     w->next_spawn = rng_range(&w->rng, 2.5f, 8.0f);
     int cap = 5 + w->w / 40;
     if (w->population >= cap) return;
-    float total = 0;
-    for (size_t i = 0; i < NF_COUNT(SPECIES); i++)
-        if (count_species(w, SPECIES[i].name) < SPECIES[i].max) total += SPECIES[i].weight * g_species_w[i];
+    /* Every species has a chance: 0 unless the biome lists it, the biome sets it (base weight × its
+     * multiplier, normalised so that all biome chances add up to 1). --spawn-rate replaces the
+     * chance of a species with F in that same scale; zero chances are ignored. */
+    float base[NF_COUNT(SPECIES)], btotal = 0;
+    for (size_t i = 0; i < NF_COUNT(SPECIES); i++) {
+        base[i] = SPECIES[i].weight * g_species_w[i];
+        btotal += base[i];
+    }
+    float wt[NF_COUNT(SPECIES)], total = 0;
+    for (size_t i = 0; i < NF_COUNT(SPECIES); i++) {
+        float c = btotal > 0 ? base[i] / btotal : 0.0f;
+        for (int k = 0; k < g_nrate_ovr; k++)
+            if (!strcmp(g_rate_ovr[k].name, SPECIES[i].name)) c = fmaxf(0.0f, g_rate_ovr[k].f);
+        wt[i] = count_species(w, SPECIES[i].name) < SPECIES[i].max ? c : 0.0f;
+        total += wt[i];
+    }
     if (total <= 0) return;
     float r = rng_range(&w->rng, 0, total);
     for (size_t i = 0; i < NF_COUNT(SPECIES); i++) {
-        if (count_species(w, SPECIES[i].name) >= SPECIES[i].max || g_species_w[i] <= 0) continue;
-        r -= SPECIES[i].weight * g_species_w[i];
+        if (wt[i] <= 0) continue;
+        r -= wt[i];
         if (r <= 0) { spawn_species(w, SPECIES[i].name); break; }
     }
 }

@@ -9,6 +9,8 @@
  * Options:
  *   --seed N        seed for procedural shapes and behaviour
  *   --scene-time S  (screensaver) after how many seconds to swap the scene (0 = never, default 600)
+ *   --spawn-rate N=F …  overrides the spawn chance of species N in any biome (the biome's chances
+ *                       add up to 1; e.g. --spawn-rate dhole=0.2 rabbit=0; 0 = never)
  *   --biome B           auto (default: random by seed) | off (no recommendations) | NAME | list
  *   --grass-density F   foreground plant density (1 = default, 2 = twice as dense, 0.5 = sparser)
  *   --grass-spread F    randomness of the gaps between plants (0 = even, 1 = default, 2 = clumpy)
@@ -41,7 +43,8 @@ int main(int argc, char **argv)
     const char *sheet = NULL, *filter = NULL, *assets = NULL, *snap = NULL;
     float simtime = 30.0f;
     const char *spawn[16];
-    int nspawn = 0;
+    int nspawn = 0, nrate = 0;
+    const char *rate_names[16];
     int depth = 0, scale = 3, play = 0, gallery = 0, maxw = 360, seed_given = 0;
     float scene_time = 600.0f;
     uint64_t seed = 0;
@@ -59,6 +62,14 @@ int main(int argc, char **argv)
         else if (!strcmp(a, "--spawn") && i + 1 < argc) { if (nspawn < 16) spawn[nspawn++] = argv[i + 1]; i++; }
         else if (!strcmp(a, "--play")) play = 1;
         else if (!strcmp(a, "--gallery")) gallery = 1;
+        else if (!strcmp(a, "--spawn-rate") && i + 1 < argc) {
+            /* --spawn-rate dhole=1 rabbit=0.2 ...: takes every following NAME=F */
+            while (i + 1 < argc && strncmp(argv[i + 1], "--", 2) != 0 && strchr(argv[i + 1], '=')) {
+                i++;
+                if (spawn_rate_set(argv[i]) != 0) { fprintf(stderr, "bad --spawn-rate '%s' (use NAME=F)\n", argv[i]); return 1; }
+                if (nrate < 16) rate_names[nrate++] = argv[i];
+            }
+        }
         else if (!strcmp(a, "--biome") && i + 1 < argc) g_biome_arg = argv[++i];
         else if (!strcmp(a, "--grass-density") && i + 1 < argc) g_fg_density = (float)atof(argv[++i]);
         else if (!strcmp(a, "--grass-spread") && i + 1 < argc) g_fg_spread = (float)atof(argv[++i]);
@@ -68,7 +79,7 @@ int main(int argc, char **argv)
             printf("nightfall [--seed N] [--scene-time S]        screensaver\n"
                    "nightfall --gallery [--assets DIR]            shape library\n"
                    "nightfall --play [--seed N]                   playground with intents\n"
-                   "  biome (all modes): [--biome auto|off|NAME|list]\n"
+                   "  biome (all modes): [--biome auto|off|NAME|list] [--spawn-rate NAME=F NAME=F ...]\n"
                    "  foreground (all modes): [--grass-density F] [--grass-spread F] [--grass-zspread F]\n"
                    "nightfall --sheet out.ppm [--filter X] [--depth] [--scale N] [--width PX]\n");
             return 0;
@@ -92,6 +103,14 @@ int main(int argc, char **argv)
     }
     if (strcmp(g_biome_arg, "auto") && strcmp(g_biome_arg, "off") && !lib_find_biome(&lib, g_biome_arg))
         fprintf(stderr, "nightfall: unknown biome '%s' (see --biome list), using auto\n", g_biome_arg);
+
+    for (int k = 0; k < nrate; k++) {
+        char nm[NF_NAME];
+        snprintf(nm, sizeof nm, "%.*s", (int)(strchr(rate_names[k], '=') - rate_names[k]), rate_names[k]);
+        const sprite_t *sp = lib_find(&lib, nm);
+        if (!sp || !sprite_has_tag(sp, "creature"))
+            fprintf(stderr, "nightfall: --spawn-rate: '%s' is not a creature\n", nm);
+    }
 
     int rc;
     if (sheet) rc = sheet_export(&lib, sheet, filter, depth, scale, maxw);
