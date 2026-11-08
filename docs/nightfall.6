@@ -1,0 +1,108 @@
+.TH NIGHTFALL 6 "2026" "nightfall 1.0.0" "Games Manual"
+.SH NAME
+nightfall \- a living night forest in your terminal
+.SH SYNOPSIS
+.B nightfall
+[\fIoptions\fR]
+.br
+.B nightfall \-\-play
+[\fIoptions\fR]
+.br
+.B nightfall \-\-gallery
+.SH DESCRIPTION
+.B nightfall
+draws a procedural pixel\-art night forest with Unicode half blocks and true colour.
+Every scene is composed from a seed: a biome, an archetype, dozens of generated trees,
+plants and props. Creatures arrive, follow their own intents (forage, climb, hide in bushes
+and hollows, chase, play, sleep) and leave again. Wind travels through the grass in waves.
+.PP
+Without options it runs as a screensaver: any key quits.
+.SH MODES
+.TP
+.B \-\-play
+Playground with a HUD: creature list with their intents, event log and spawn keys.
+.TP
+.BR \-\-gallery
+Browse every shape in the library with its animations and depth map.
+.SH OPTIONS
+.TP
+.BI \-\-seed " N"
+Reproducible scene and behaviour.
+.TP
+.BI \-\-scene\-time " S"
+Compose a new scene every \fIS\fR seconds (0 = never, default 600).
+.TP
+.BR \-\-biome " auto|off|\fINAME\fR|list"
+Biome of the scene. \fBauto\fR picks one by the seed, \fBoff\fR allows everything,
+\fBlist\fR prints the available biomes.
+.TP
+.BI \-\-spawn\-rate " NAME=F " "[NAME=F ...]"
+Override spawn chances. The biome's chances add up to 1; \fIF\fR replaces the chance of
+that species in the same scale (0 = never).
+.TP
+.BI \-\-grass\-density " F" ", \-\-grass\-spread " F ", \-\-grass\-zspread " F
+Foreground plant density, randomness of the gaps between plants, depth spread (default 1).
+.TP
+.BI \-\-assets " DIR"
+Load \fI.spr\fR assets from \fIDIR\fR instead of the built\-in ones.
+.TP
+.BI \-\-sheet " OUT.ppm"
+Export a sprite sheet of the library (\fB\-\-filter\fR, \fB\-\-depth\fR, \fB\-\-scale\fR, \fB\-\-width\fR).
+.TP
+.BI \-\-snap " OUT.ppm"
+Headless simulation (\fB\-\-time\fR, \fB\-\-spawn\fR) and a snapshot.
+.TP
+.BR \-h ", " \-\-help
+Short help.
+.TP
+.BR \-v ", " \-\-version
+Version.
+.SH PLAYGROUND KEYS
+.TP
+.B q
+quit
+.TP
+.B l
+new scene
+.TP
+.B B
+next biome (auto, each biome, off)
+.TP
+.B h
+toggle the HUD
+.TP
+.B d
+show places, paths and links
+.TP
+.B space
+pause
+.TP
+.BR + " / " \-
+simulation speed
+.TP
+.B n
+let the director spawn someone now
+.TP
+.B r s x o v e g j b c m w p
+spawn rabbit, squirrel, fox, owl, bat, eyes, spirit, deer, boar, wildcat, mole, weasel, dhole
+.SH GALLERY KEYS
+.TP
+.BR \(<- " / " \(->
+previous / next shape
+.TP
+.BR \(ua " / " \(da
+previous / next animation clip
+.TP
+.BR space ", " . ", " ,
+pause, step forward, step back
+.TP
+.B z f d o m b p
+zoom, flip, depth view, grass in front of / behind the shape, root motion, background, properties
+.TP
+.B s r
+regenerate a procedural shape, reload assets from disk (with \fB\-\-assets\fR)
+.SH REQUIREMENTS
+A terminal with true colour (24\-bit) and Unicode, e.g. kitty, Alacritty, WezTerm, foot,
+GNOME Terminal, Konsole or Windows Terminal. A font with the \(lqupper half block\(rq glyph.
+.SH SEE ALSO
+The asset format is described in FORMAT.md in the documentation directory.

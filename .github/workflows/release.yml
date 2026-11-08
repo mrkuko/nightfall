@@ -1,0 +1,140 @@
+name: Release
+
+# Push a tag like v0.1.0 to build binaries (Linux, macOS, Windows) and .deb/.rpm/Arch packages and attach them
+# to a GitHub release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    strategy:
+      matrix:
+        include:
+          - { runner: ubuntu-latest,    arch: x86_64 }
+          - { runner: ubuntu-24.04-arm, arch: aarch64 }
+    runs-on: ${{ matrix.runner }}
+    container: alpine:3.20          # musl -> one fully static binary for every distro
+    steps:
+      - uses: actions/checkout@v4
+      - run: apk add --no-cache build-base
+      - name: Build
+        run: make VERSION=${GITHUB_REF_NAME#v} LDFLAGS=-static
+      - name: Package
+        run: |
+          name=nightfall-${GITHUB_REF_NAME#v}-linux-${{ matrix.arch }}
+          mkdir -p $name && cp nightfall README.md docs/nightfall.6 $name/ && cp LICENSE* $name/ 2>/dev/null || true
+          strip $name/nightfall
+          tar czf $name.tar.gz $name
+          cp $name/nightfall nightfall-bin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: '*.tar.gz'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.arch }}
+          path: nightfall-bin
+
+  packages:
+    # .deb, .rpm and Arch packages from the static binary (nfpm in its official Docker image)
+    needs: linux
+    strategy:
+      matrix:
+        include:
+          - { runner: ubuntu-latest,    arch: x86_64,  nfarch: amd64 }
+          - { runner: ubuntu-24.04-arm, arch: aarch64, nfarch: arm64 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bin-${{ matrix.arch }}
+      - name: Build packages
+        run: |
+          mv nightfall-bin nightfall && chmod +x nightfall
+          sh packaging/build-packages.sh "${GITHUB_REF_NAME#v}" ${{ matrix.nfarch }} dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.arch }}
+          path: dist/*
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (universal arm64 + x86_64)
+        run: make VERSION=${GITHUB_REF_NAME#v} CFLAGS="-std=c99 -O2 -arch arm64 -arch x86_64"
+      - name: Package
+        run: |
+          name=nightfall-${GITHUB_REF_NAME#v}-macos-universal
+          mkdir -p $name && cp nightfall README.md docs/nightfall.6 $name/ && (cp LICENSE* $name/ 2>/dev/null || true)
+          tar czf $name.tar.gz $name
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: '*.tar.gz'
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: make zip mingw-w64-x86_64-gcc
+      - name: Build
+        run: make VERSION=${GITHUB_REF_NAME#v} LDFLAGS=-static
+      - name: Package
+        run: |
+          name=nightfall-${GITHUB_REF_NAME#v}-windows-x86_64
+          mkdir -p $name && cp nightfall.exe README.md $name/ && (cp LICENSE* $name/ 2>/dev/null || true)
+          strip $name/nightfall.exe
+          zip -r $name.zip $name
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: '*.zip'
+
+  release:
+    needs: [linux, packages, macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0               # full history and tags for the release notes
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: '{linux-*,packages-*,macos,windows}'     # not the raw bin-* artifacts
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS
+      - name: Release type and notes
+        id: kind
+        run: |
+          # vX.Y.0 = full release (a draft to review before publishing), vX.Y.Z with Z > 0 = nightly build
+          ver=${GITHUB_REF_NAME#v}
+          if [ "${ver##*.}" = 0 ]; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+            echo "name=NIGHTFALL $ver" >> "$GITHUB_OUTPUT"
+          else
+            echo "full=false" >> "$GITHUB_OUTPUT"
+            echo "name=NIGHTFALL $ver (nightly)" >> "$GITHUB_OUTPUT"
+          fi
+          sh .github/scripts/release-notes.sh "$GITHUB_REF_NAME" > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.kind.outputs.name }}
+          body_path: RELEASE_NOTES.md
+          files: dist/*
+          draft: ${{ steps.kind.outputs.full == 'true' }}
+          prerelease: ${{ steps.kind.outputs.full != 'true' }}
+          make_latest: ${{ steps.kind.outputs.full == 'true' }}

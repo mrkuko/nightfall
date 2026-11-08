@@ -1,4 +1,5 @@
-/* embed.c — packs text assets (*.spr) into a C file as strings.
+/* embed.c — packs text assets (*.spr) into a C file as byte arrays (portable: no limits on the
+ * length of string literals).
  * Usage: embed OUT.c file1.spr file2.spr ...
  * Files whose name starts with "palette" go first (the others refer to them). */
 #include <stdio.h>
@@ -15,18 +16,16 @@ static void emit(FILE *out, const char *path, int idx)
 {
     FILE *in = fopen(path, "rb");
     if (!in) { perror(path); exit(1); }
-    fprintf(out, "static const char asset_%d[] =\n\"", idx);
+    fprintf(out, "static const char asset_%d[] = {", idx);
     int c, col = 0;
     while ((c = fgetc(in)) != EOF) {
-        if (c == '\n') { fputs("\\n\"\n\"", out); col = 0; continue; }
         if (c == '\r') continue;
-        if (c == '\\' || c == '"') { fputc('\\', out); fputc(c, out); }
-        else if (c == '?') fputs("\\?", out);          /* no trigraphs */
-        else if (c < 32 || c > 126) fprintf(out, "\\%03o", c & 255);
-        else fputc(c, out);
-        if (++col > 400) { fputs("\"\n\"", out); col = 0; }
+        if (col++ % 24 == 0) fputs("\n   ", out);
+        /* bytes >= 128 (UTF-8) via a cast: works whether char is signed or not */
+        if (c < 128) fprintf(out, " %d,", c);
+        else fprintf(out, " (char)%d,", c);
     }
-    fputs("\";\n\n", out);
+    fputs("\n    0\n};\n\n", out);
     fclose(in);
 }
 

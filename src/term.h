@@ -1,4 +1,4 @@
-/* term.h — POSIX terminal: raw mode, size, keys, output */
+/* term.h — terminal: raw mode, size, keys, output (term.c = POSIX, term_win.c = Windows console) */
 #ifndef NF_TERM_H
 #define NF_TERM_H
 

@@ -1,0 +1,31 @@
+# nfpm definition: builds .deb (Debian, Ubuntu), .rpm (Fedora, openSUSE) and Arch packages
+# from the same files. Run it through `sh packaging/build-packages.sh` (it sets NF_ARCH = amd64 | arm64,
+# NF_VERSION = x.y.z and NF_MAN = the gzipped manual page).
+name: nightfall
+arch: ${NF_ARCH}
+platform: linux
+version: ${NF_VERSION}
+section: games
+priority: optional
+maintainer: mrkuko <emanuelcisar@gmail.com>
+homepage: https://github.com/mrkuko/nightfall
+license: MIT
+description: |
+  A living procedural night forest in your terminal.
+  Procedural pixel-art woodland drawn with Unicode half blocks and true colour; creatures with
+  their own intentions arrive, climb, hide, play, chase and sleep. Runs as a screensaver.
+  A single static binary with all art compiled in.
+
+contents:
+  - src: nightfall
+    dst: /usr/bin/nightfall
+    file_info:
+      mode: 0755
+  - src: ${NF_MAN}                  # docs/nightfall.6, gzipped by build-packages.sh
+    dst: /usr/share/man/man6/nightfall.6.gz
+  - src: README.md
+    dst: /usr/share/doc/nightfall/README.md
+  - src: assets/FORMAT.md
+    dst: /usr/share/doc/nightfall/FORMAT.md
+  - src: LICENSE
+    dst: /usr/share/doc/nightfall/LICENSE

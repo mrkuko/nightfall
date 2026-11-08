@@ -1,5 +1,11 @@
-/* term.c — POSIX implementation of the terminal layer */
+/* term.c — POSIX implementation of the terminal layer (Linux, macOS, BSD; Windows: term_win.c) */
+#ifndef _WIN32
 #define _POSIX_C_SOURCE 200809L
+#if defined(__APPLE__)
+#define _DARWIN_C_SOURCE        /* SIGWINCH, TIOCGWINSZ */
+#elif defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+#define __BSD_VISIBLE 1
+#endif
 #include "term.h"
 
 #include <signal.h>
@@ -133,3 +139,5 @@ void term_sleep(double sec)
     ts.tv_nsec = (long)((sec - (double)ts.tv_sec) * 1e9);
     while (nanosleep(&ts, &ts) != 0 && errno == EINTR && !g_quit_flag) {}
 }
+
+#endif /* !_WIN32 */

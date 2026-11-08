@@ -827,6 +827,56 @@ int saver_run(library_t *lib, uint64_t seed, float scene_time)
 }
 
 /* Without a terminal: simulates T seconds and saves a world snapshot (testing, debugging). */
+/* Headless recording (--record DIR): frames f0000.ppm, f0001.ppm … after the --time warm-up. */
+const char *g_rec_dir, *g_rec_follow;
+float g_rec_secs, g_rec_fps = 12.0f;
+int g_rec_cw, g_rec_ch, g_shot_scale = 4;
+
+static int save_ppm_rect(const raster_t *r, const char *path, int x0, int y0, int cw, int ch, int scale)
+{
+    FILE *fp = fopen(path, "wb");
+    if (!fp) return -1;
+    fprintf(fp, "P6\n%d %d\n255\n", cw * scale, ch * scale);
+    for (int y = 0; y < ch; y++)
+        for (int sy = 0; sy < scale; sy++)
+            for (int x = 0; x < cw; x++) {
+                rgb_t c = r->c[(y0 + y) * r->w + x0 + x];
+                for (int sx = 0; sx < scale; sx++) { fputc(c.r, fp); fputc(c.g, fp); fputc(c.b, fp); }
+            }
+    fclose(fp);
+    return 0;
+}
+
+static void record_frames(world_t *w, raster_t *r)
+{
+    int n = (int)(g_rec_secs * g_rec_fps);
+    float dt = 1.0f / g_rec_fps;
+    int cw = g_rec_cw > 0 && g_rec_cw < r->w ? g_rec_cw : r->w;
+    int ch = g_rec_ch > 0 && g_rec_ch < r->h ? g_rec_ch : r->h;
+    float camx = (float)r->w * 0.5f, camy = (float)r->h * 0.6f;
+    int have_cam = 0;
+    for (int i = 0; i < n; i++) {
+        director(w, dt);
+        world_update(w, dt);
+        world_render(w, r, 0);
+        if (g_rec_follow)
+            for (int k = 0; k < w->nact; k++) {
+                const actor_t *a = &w->act[k];
+                if (!a->alive || a->hidden || strcmp(a->spr->name, g_rec_follow) != 0) continue;
+                float tx = a->x, ty = a->y - (float)ch * 0.18f;
+                if (!have_cam) { camx = tx; camy = ty; have_cam = 1; }
+                camx += (tx - camx) * 0.18f;
+                camy += (ty - camy) * 0.18f;
+                break;
+            }
+        int x0 = clampi((int)lroundf(camx - (float)cw * 0.5f), 0, r->w - cw);
+        int y0 = clampi((int)lroundf(camy - (float)ch * 0.5f), 0, r->h - ch);
+        char path[1024];
+        snprintf(path, sizeof path, "%s/f%04d.ppm", g_rec_dir, i);
+        save_ppm_rect(r, path, x0, y0, cw, ch, g_shot_scale);
+    }
+}
+
 int play_snapshot(library_t *lib, uint64_t seed, int cols, int rows, float seconds, const char *ppm,
                   const char *const *spawn, int nspawn)
 {
@@ -885,8 +935,9 @@ int play_snapshot(library_t *lib, uint64_t seed, int cols, int rows, float secon
                cols, rows, ms, ms * 15.0 / 10.0, cells / frames);
         screen_free(&sc);
     }
+    if (g_rec_dir && g_rec_secs > 0) record_frames(w, &r);
     world_render(w, &r, getenv("NF_DEBUG") != NULL);
-    int rc = ppm ? raster_save_ppm(&r, ppm, 4) : 0;
+    int rc = ppm ? raster_save_ppm(&r, ppm, g_shot_scale) : 0;
     printf("scene: %s | objects %d, places %d, paths %d, links %d, creatures %d\n", g_scene_desc,
            w->nobj, w->nplace, w->npath, w->nlink, w->population);
     for (int i = 0; i < w->nact; i++)

@@ -1,7 +1,7 @@
 /* main.c — NIGHTFALL: entry point
  *
  *   nightfall                     screensaver: same scene as --play, no HUD (any key = quit)
- *   nightfall --gallery           library browser
+ *   nightfall --gallery           library browser: every shape with its animations (also --galery)
  *   nightfall --play              playground: creatures with intents, HUD, spawn keys
  *   nightfall --sheet out.ppm     export the library to an image
  *   nightfall --snap out.ppm      without a terminal: playground simulation (--time s, --spawn species) + snapshot
@@ -29,6 +29,39 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#ifndef NF_VERSION
+#define NF_VERSION "dev"
+#endif
+
+static void usage(void)
+{
+    printf("NIGHTFALL %s — a living night forest in your terminal\n"
+           "\n"
+           "usage:\n"
+           "  nightfall [options]              screensaver (any key quits)\n"
+           "  nightfall --play [options]       playground: HUD, spawn keys, debug view\n"
+           "  nightfall --gallery              browse every shape and its animations\n"
+           "\n"
+           "scene options (screensaver and playground):\n"
+           "  --seed N                         reproducible scene and behaviour\n"
+           "  --scene-time S                   new scene every S seconds (0 = never, default 600)\n"
+           "  --biome auto|off|NAME|list       biome (default: random by seed)\n"
+           "  --spawn-rate NAME=F [NAME=F ...] override spawn chances (biome chances sum to 1)\n"
+           "  --grass-density F                foreground plant density (default 1)\n"
+           "  --grass-spread F                 randomness of the gaps between plants (default 1)\n"
+           "  --grass-zspread F                depth spread of the foreground (default 1)\n"
+           "\n"
+           "authoring:\n"
+           "  --assets DIR                     load .spr assets from DIR instead of the built-in ones\n"
+           "  --sheet OUT.ppm [--filter X] [--depth] [--scale N] [--width PX]   export a sprite sheet\n"
+           "  --snap OUT.ppm [--time S] [--spawn NAME ...] [--shot-scale N]   headless simulation + snapshot\n"
+           "  --record DIR --record-time S [--record-fps F] [--follow NAME] [--crop W H]\n"
+           "                                   with --snap: also write frames f0000.ppm … (for GIFs)\n"
+           "\n"
+           "  -h, --help                       this help\n"
+           "  -v, --version                    version\n", NF_VERSION);
+}
 
 int nf_load_library(library_t *lib, const char *assets_dir, uint64_t seed)
 {
@@ -61,7 +94,8 @@ int main(int argc, char **argv)
         else if (!strcmp(a, "--time") && i + 1 < argc) simtime = (float)atof(argv[++i]);
         else if (!strcmp(a, "--spawn") && i + 1 < argc) { if (nspawn < 16) spawn[nspawn++] = argv[i + 1]; i++; }
         else if (!strcmp(a, "--play")) play = 1;
-        else if (!strcmp(a, "--gallery")) gallery = 1;
+        else if (!strcmp(a, "--gallery") || !strcmp(a, "--galery")) gallery = 1;
+        else if (!strcmp(a, "-v") || !strcmp(a, "--version")) { printf("nightfall %s\n", NF_VERSION); return 0; }
         else if (!strcmp(a, "--spawn-rate") && i + 1 < argc) {
             /* --spawn-rate dhole=1 rabbit=0.2 ...: takes every following NAME=F */
             while (i + 1 < argc && strncmp(argv[i + 1], "--", 2) != 0 && strchr(argv[i + 1], '=')) {
@@ -70,21 +104,22 @@ int main(int argc, char **argv)
                 if (nrate < 16) rate_names[nrate++] = argv[i];
             }
         }
+        else if (!strcmp(a, "--record") && i + 1 < argc) g_rec_dir = argv[++i];
+        else if (!strcmp(a, "--record-time") && i + 1 < argc) g_rec_secs = (float)atof(argv[++i]);
+        else if (!strcmp(a, "--record-fps") && i + 1 < argc) g_rec_fps = (float)atof(argv[++i]);
+        else if (!strcmp(a, "--follow") && i + 1 < argc) g_rec_follow = argv[++i];
+        else if (!strcmp(a, "--crop") && i + 2 < argc) { g_rec_cw = atoi(argv[i + 1]); g_rec_ch = atoi(argv[i + 2]); i += 2; }
+        else if (!strcmp(a, "--shot-scale") && i + 1 < argc) g_shot_scale = clampi(atoi(argv[++i]), 1, 12);
         else if (!strcmp(a, "--biome") && i + 1 < argc) g_biome_arg = argv[++i];
         else if (!strcmp(a, "--grass-density") && i + 1 < argc) g_fg_density = (float)atof(argv[++i]);
         else if (!strcmp(a, "--grass-spread") && i + 1 < argc) g_fg_spread = (float)atof(argv[++i]);
         else if (!strcmp(a, "--grass-zspread") && i + 1 < argc) g_fg_zspread = (float)atof(argv[++i]);
         else if (!strcmp(a, "--scene-time") && i + 1 < argc) scene_time = (float)atof(argv[++i]);
         else if (!strcmp(a, "-h") || !strcmp(a, "--help")) {
-            printf("nightfall [--seed N] [--scene-time S]        screensaver\n"
-                   "nightfall --gallery [--assets DIR]            shape library\n"
-                   "nightfall --play [--seed N]                   playground with intents\n"
-                   "  biome (all modes): [--biome auto|off|NAME|list] [--spawn-rate NAME=F NAME=F ...]\n"
-                   "  foreground (all modes): [--grass-density F] [--grass-spread F] [--grass-zspread F]\n"
-                   "nightfall --sheet out.ppm [--filter X] [--depth] [--scale N] [--width PX]\n");
+            usage();
             return 0;
         } else {
-            fprintf(stderr, "unknown option: %s\n", a);
+            fprintf(stderr, "nightfall: unknown option '%s' (see --help)\n", a);
             return 1;
         }
     }

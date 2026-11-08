@@ -10,6 +10,10 @@ extern const char *g_biome_arg;
 int biome_cycle(const library_t *lib);
 /* "NAME=F": spawn frequency of a species regardless of the biome (F = share of the commonest species). */
 int spawn_rate_set(const char *spec);
+/* Headless capture for docs (--snap + --record): see main.c */
+extern const char *g_rec_dir, *g_rec_follow;
+extern float g_rec_secs, g_rec_fps;
+extern int g_rec_cw, g_rec_ch, g_shot_scale;
 
 int nf_load_library(library_t *lib, const char *assets_dir, uint64_t seed);
 

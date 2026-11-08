@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, cc: gcc }
+          - { os: ubuntu-latest, cc: clang }
+          - { os: macos-latest,  cc: clang }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (strict)
+        run: make CC=${{ matrix.cc }} CFLAGS="-std=c99 -O2 -Wall -Wextra -pedantic -Wno-unused-parameter -Werror"
+      - name: Smoke test
+        run: |
+          ./nightfall --version
+          ./nightfall --biome list
+          ./nightfall --snap /tmp/snap.ppm --seed 1 --time 20 --spawn dhole --spawn squirrel
+          ./nightfall --sheet /tmp/sheet.ppm --filter creature
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: make mingw-w64-x86_64-gcc
+      - name: Build (strict)
+        run: make CFLAGS="-std=c99 -O2 -Wall -Wextra -pedantic -Wno-unused-parameter -Werror"
+      - name: Smoke test
+        run: |
+          ./nightfall.exe --version
+          ./nightfall.exe --snap snap.ppm --seed 1 --time 20
+
+  packages:
+    # builds the .deb / .rpm / Arch packages on every push, so a broken definition shows up early
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make
+      - name: Build packages
+        run: sh packaging/build-packages.sh 0.0.0 amd64 dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: dist/*
