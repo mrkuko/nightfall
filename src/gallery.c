@@ -421,7 +421,16 @@ static int spawn_species(world_t *w, const char *name)
     /* pack (property "pack N"): the other members arrive right behind the leader */
     const char *pk = sprite_prop(s, "pack");
     if (i >= 0 && pk) {
-        int extra = rng_between(&w->rng, 1, atoi(pk) - 1);
+        /* group size 1..N: a lone animal slightly more likely, the full N (if > 3) rare */
+        int N = atoi(pk), size = 1;
+        float wt[16], total = 0;
+        for (int k = 1; k <= N && k < 16; k++) {
+            wt[k] = k == 1 ? 1.2f : (k == N && N > 3) ? 0.15f : 1.0f;
+            total += wt[k];
+        }
+        float u = rng_range(&w->rng, 0, total);
+        for (int k = 1; k <= N && k < 16; k++) { u -= wt[k]; if (u <= 0) { size = k; break; } }
+        int extra = size - 1;
         for (int k = 0; k < extra; k++) {
             float off = (left ? -1.0f : 1.0f) * rng_range(&w->rng, 10, 26) * (float)(k + 1);
             int j = actor_spawn(w, name, ex + off, world_ground(w, ex + off), NAV_GROUND, lane + rng_between(&w->rng, -3, 3));

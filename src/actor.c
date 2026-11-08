@@ -1404,6 +1404,19 @@ void actor_update(world_t *w, actor_t *a, float dt)
         if (sprite_has_tag(a->spr, "glow")) world_stimulus(w, a->x, a->y, 70, ST_GLOW, 0.5f, 0.4f, actor_index(w, a));
     }
 
+    /* curiosity never sleeps completely: even while scratching, resting or sniffing it may notice
+     * a creature it likes to chase and dash after it (about a 25 % chance per few-second activity) */
+    if (a->prof.chases[0] && a->nav == NAV_GROUND && !a->hidden && !in_transition(a) &&
+        a->intent != IN_CHASE && a->intent != IN_FLEE && a->intent != IN_HIDE && a->intent != IN_LEAVE &&
+        a->fear < 0.3f) {
+        int asleep = a->intent == IN_REST;
+        float rate = (asleep ? 0.012f : 0.09f) * (0.5f + a->prof.curiosity);
+        if (rng_float(&w->rng) < rate * dt && chase_target(w, a, (float)w->w) >= 0) {
+            world_log(w, "%s#%u notices something!", a->spr->name, a->id);
+            plan_intent(w, a, IN_CHASE);
+        }
+    }
+
     if (a->step >= a->nplan) choose_intent(w, a);
     if (!a->alive) return;
     if (a->step < a->nplan) {

@@ -2561,7 +2561,7 @@ clip run loop fps=12 speed=60 : gal0 gal1 gal2 gal3
   fear 0.25
   curiosity 0.7
   size medium
-  pack 3
+  pack 4
   scares rabbit squirrel mouse hedgehog frog deer weasel dormouse
   point head 10 -15
 end

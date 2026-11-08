@@ -121,7 +121,9 @@ once when the creature leaves `X` (getting up). The creature does not move while
 `chase` = curiosity, not hunting: a sprint after any visible creature (even across the screen) from the profile list
 `chases rabbit mouse …`, then `play` and `sniff`. `follow` on the ground = catch up with the
 nearest member of the same species; a `pack N` animal far from the others gets a strong urge to
-follow them, and alone it calls (`look`). `frolic` = happy among other animals (2+ creatures within ~90 px): runs into the middle of them, plays and sniffs; the more of them, the more likely. `rest_time MIN MAX` = how long a rest lasts (s).
+follow them, and alone it calls (`look`). `frolic` = happy among other animals (2+ creatures within ~90 px): runs into the middle of them, plays and sniffs; the more of them, the more likely. `rest_time MIN MAX` = how long a rest lasts (s). A creature with `chases` may also break off any calm activity
+(scratching, sniffing, even resting — rarely while asleep) when it notices one of them.
+`pack N` = arrives in a group of 1..N (a lone one slightly more likely, the full N rare when N > 3).
 
 The weight in the profile is the base; the brain multiplies it by drives (hunger -> `forage`,
 fatigue -> `rest`, boredom -> `leave`, fear -> `hide`) and by randomness. Unreachable
