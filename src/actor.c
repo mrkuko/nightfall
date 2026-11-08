@@ -16,7 +16,7 @@
 static const char *ANIM_NAMES[A_COUNT] = {
     "idle", "move", "run", "look", "alert", "eat", "groom", "rest", "freeze", "sniff",
     "climb", "climb_down", "appear", "vanish", "sit",
-    "hang", "land", "takeoff", "hollow", "hollow_peek"
+    "hang", "land", "takeoff", "hollow", "hollow_peek", "cling"
 };
 
 static const char *INTENT_NAMES[IN_COUNT] = {
@@ -59,7 +59,15 @@ void profile_parse(const sprite_t *s, profile_t *p)
     if (idle < 0) idle = 0;
     for (int a = 0; a < A_COUNT; a++) {
         int c = -1;
-        if (sprite_prop_sub(s, "anim", ANIM_NAMES[a], buf, sizeof buf)) c = sprite_clip_index(s, buf);
+        if (sprite_prop_sub(s, "anim", ANIM_NAMES[a], buf, sizeof buf)) {
+            /* "a|b|c" = variants */
+            for (char *tok = strtok(buf, "|"); tok; tok = strtok(NULL, "|")) {
+                int v = sprite_clip_index(s, tok);
+                if (v < 0 || p->nvar[a] >= 4) continue;
+                p->avar[a][p->nvar[a]++] = (int16_t)v;
+            }
+            if (p->nvar[a]) c = p->avar[a][0];
+        }
         if (c < 0) c = sprite_clip_index(s, ANIM_NAMES[a]);
         p->anim[a] = c;
     }
@@ -109,7 +117,16 @@ static int actor_index(const world_t *w, const actor_t *a) { return (int)(a - w-
 
 static void set_anim(actor_t *a, int anim)
 {
+    int n = a->prof.nvar[anim];
     int c = a->prof.anim[anim];
+    if (n > 1) {
+        /* keep the variant that is already playing, otherwise pick one at random */
+        for (int k = 0; k < n; k++)
+            if (a->prof.avar[anim][k] == a->clip) { a->anim = anim; return; }
+        static uint32_t vs = 2463534242u;
+        vs ^= vs << 13; vs ^= vs >> 17; vs ^= vs << 5;
+        c = a->prof.avar[anim][vs % (uint32_t)n];
+    }
     if (c < 0 || c >= a->spr->nclips) c = 0;
     if (c != a->clip) { a->clip = c; a->ct = 0; }
     a->anim = anim;
@@ -636,6 +653,27 @@ static void plan_intent(world_t *w, actor_t *a, int in)
         break;
     }
     case IN_FOLLOW: {
+        if (ground) {
+            /* pack: catch up with the nearest member of the same species, then hang around it */
+            int t = -1;
+            float bd = 1e9f;
+            for (int i = 0; i < w->nact; i++) {
+                actor_t *o = &w->act[i];
+                if (o == a || !o->alive || o->hidden || o->spr != a->spr) continue;
+                float d = fabsf(o->x - a->x);
+                if (d < bd) { bd = d; t = i; }
+            }
+            if (t < 0) { plan_intent(w, a, IN_WANDER); return; }
+            a->target = t;
+            actor_t *o = &w->act[t];
+            float tx = clampf(o->x + (a->x < o->x ? -1.0f : 1.0f) * rng_range(&w->rng, 8, 18), 8, (float)w->w - 8);
+            if (rng_chance(&w->rng, 0.5f)) a->lane_z = o->lane_z + rng_between(&w->rng, -4, 4);
+            plan_ground_move(w, a, tx, bd > 50, a->lane_z);
+            s = plan_push(a, ST_FACE);
+            if (s) s->x = o->x;
+            push_anim(a, rng_chance(&w->rng, 0.5f) ? A_GROOM : A_SNIFF, rng_range(&w->rng, 1.5f, 3.5f));
+            break;
+        }
         int t = a->prof.attracted_glow ? find_glow_target(w, a) : nearest_mover(w, a, 200);
         if (t < 0) { plan_intent(w, a, air ? IN_HOVER : IN_WANDER); return; }
         a->target = t;
@@ -860,7 +898,7 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         }
         float spd = clip_speed(a, dy < 0 ? A_CLIMB : A_CLIMB_DOWN, a->prof.climb) * a->speed_mul;
         /* short stops while climbing */
-        if (fmodf(a->step_t, 2.6f) > 2.2f) { set_anim(a, A_IDLE); return 0; }
+        if (fmodf(a->step_t, 2.6f) > 2.2f) { set_anim(a, A_CLING); return 0; }
         a->y = approach(a->y, s->y, spd * dt);
         return 0;
     }
@@ -886,7 +924,7 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         set_anim(a, anim);
         if (!climb && fabsf(nx - a->x) > 0.05f) a->facing = nx < a->x ? -1 : 1;
         float spd = clip_speed(a, anim, climb ? a->prof.climb : a->prof.walk) * a->speed_mul;
-        if (climb && fmodf(a->step_t, 2.6f) > 2.2f) { set_anim(a, A_IDLE); return 0; }
+        if (climb && fmodf(a->step_t, 2.6f) > 2.2f) { set_anim(a, A_CLING); return 0; }
         a->path_t = approach(a->path_t, target, spd * dt);
         path_point(p, a->path_t, &a->x, &a->y);
         a->nav = climb ? NAV_CLIMB : NAV_PERCH;

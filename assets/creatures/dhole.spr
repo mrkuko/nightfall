@@ -23,6 +23,7 @@ palette
   e 140c08
   w f0f4f8 glow
   n 1a100c
+  r c8605a
 end
 
 frame stand
@@ -363,6 +364,552 @@ frame bow2
 |.........JJKk............KKKkj
 |.........JJKk.............KKkJj
 
+frame wag1
+|.
+|........................B
+|........................cBg
+|.....t.................BCcfg
+|....tTt................DCcBbb
+|...tTTTt...............DCcBaabb
+|..tTTTTt..............bDAABaaab
+|..TTTTT...............daDDabbcab
+|.tTTTTTt..............daaaadawebbb
+|.TTTTTTt........b.b..bdaaabcceeaaab
+|..TTTTTTtbbbbbbbababbddaacccCccaanb
+|..TTTTTTbaaaaaabaaabbaaddaCCCCdddd
+|...TTTTTdaaaaaaabaadaaaaaddddd
+|...TTTTbaaaaaaaabaadaaaadd
+|......TdaaaaaaaabaaadaaaCc
+|........daaaaaacccccaddbCc
+|........daaaBBcCCCCCccBBCg
+|.........daBAABCaCCaCBAABg
+|..........dDAABddddddDAABg
+|..........FDAA........DABg
+|..........jDkk........kkkj
+|..........JkKk........KKkj
+|..........JKKk........KKkj
+|..........JKKk........KKkj
+
+frame wag2
+|.
+|........................B
+|........................cBg
+|.......................BCcfg
+|.......................DCcBbb
+|.......................DCcBaabb
+|ttt...................bDAABaaab
+|.Tt...................daDDabbcab
+|tTTt..................daaaadawebbb
+|.TTTttt.........b.b..bdaaabcceeaaab
+|.TTTTTt..bbbbbbbababbddaacccCccaanb
+|tTTTTTTtbaaaaaabaaabbaaddaCCCCdddd
+|.TTTTTTTdaaaaaaabaadaaaaaddddd
+|..TTTTTbaaaaaaaabaadaaaadd
+|...TT.TdaaaaaaaabaaadaaaCc
+|........daaaaaacccccaddbCc
+|........daaaBBcCCCCCccBBCg
+|.........daBAABCaCCaCBAABg
+|..........dDAABddddddDAABg
+|..........FDAA........DABg
+|..........jDkk........kkkj
+|..........JkKk........KKkj
+|..........JKKk........KKkj
+|..........JKKk........KKkj
+
+frame wag_blink
+|.
+|........................B
+|........................cBg
+|.....t.................BCcfg
+|....tTt................DCcBbb
+|...tTTTt...............DCcBaabb
+|..tTTTTt..............bDAABaaab
+|..TTTTT...............daDDabbcab
+|.tTTTTTt..............daaaadaabbbb
+|.TTTTTTt........b.b..bdaaabccddaaab
+|..TTTTTTtbbbbbbbababbddaacccCccaanb
+|..TTTTTTbaaaaaabaaabbaaddaCCCCdddd
+|...TTTTTdaaaaaaabaadaaaaaddddd
+|...TTTTbaaaaaaaabaadaaaadd
+|......TdaaaaaaaabaaadaaaCc
+|........daaaaaacccccaddbCc
+|........daaaBBcCCCCCccBBCg
+|.........daBAABCaCCaCBAABg
+|..........dDAABddddddDAABg
+|..........FDAA........DABg
+|..........jDkk........kkkj
+|..........JkKk........KKkj
+|..........JKKk........KKkj
+|..........JKKk........KKkj
+
+frame pant
+|.
+|........................B
+|........................cBg
+|.......................BCcfg
+|.......................DCcBbb
+|.......................DCcBaabb
+|......................bDAABaaab
+|......................daDDabbcab
+|......................daaaadawebbb
+|................b.b..bdaaabcceeaaab
+|.........bbbbbbbababbadaacccCccaanb
+|...t.tttbaaaaaabaaabaaaddaCCCCdddd
+|...TtTTTdaaaaaaabaadaaaaaddddd..r
+|..tTTTTbaaaaaaaabaadaaaaad
+|ttTTTTTdaaaaaaaabaaadaaadc
+|TTTTTTT.daaaaaacccccadddCc
+|TTTTTTt.daaaBBcCCCCCccBBCg
+|.TTTTT...daBAABCaCCaCBAABg
+|tTTTT.....dDAABddddddDAABg
+|TTTTTt....FDAA........DABg
+|T.TTT.....jDkk........kkkj
+|..TT......JkKk........KKkj
+|..........JKKk........KKkj
+|..........JKKk........KKkj
+
+frame lie
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|........................B
+|.......................BB.g
+|.......................DcBg
+|.......................DCcBg
+|.......................DCcBbbb
+|.......................DAcBaaab
+|......................bDDDBaaaab
+|......................daaaabbcbb
+|....................bbdaaabaaweabb
+|.........bbbbbbbbbbbaadaacccceeaab
+|........baaaaabaaaadaaadaCCcCCcdan
+|......tbaaaaaaabaaadaaaadddddd..d
+|.....tTdaaaaaaabaaadaaaadd
+|....tTTTdaaaBBBbaaaaddBBBggg
+|....TTTTdaaaDAAkBccacBAAABkkjjjj
+|....TTTTTdddDDkKkkCc.DDAAAKKkkkj
+|.....TT.TTT.T.DKKk.....DDDKKKKkj
+
+frame lie_blink
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|........................B
+|.......................BB.g
+|.......................DcBg
+|.......................DCcBg
+|.......................DCcBbbb
+|.......................DAcBaaab
+|......................bDDDBaaaab
+|......................daaaabbcbb
+|....................bbdaaabaaaaabb
+|.........bbbbbbbbbbbaadaaccccddaab
+|........baaaaabaaaadaaadaCCcCCcdan
+|......tbaaaaaaabaaadaaaadddddd..d
+|.....tTdaaaaaaabaaadaaaadd
+|....tTTTdaaaBBBbaaaaddBBBggg
+|....TTTTdaaaDAAkBccacBAAABkkjjjj
+|....TTTTTdddDDkKkkCc.DDAAAKKkkkj
+|.....TT.TTT.T.DKKk.....DDDKKKKkj
+
+frame lie_look
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.......................BB.g
+|.......................DcBg
+|.......................DCcfg
+|.......................DCcBbb
+|.......................DCcBaabb
+|......................bDDDBacabbb
+|......................daaabbweaaab
+|......................daaadaeeaaab
+|....................bbdaaacccccddn
+|.........bbbbbbbbbbbaadaacCcCCd
+|........baaaaabaaaadaaaddaaadd
+|......tbaaaaaaabaaadaaaaaddd
+|.....tTdaaaaaaabaaadaaaadd
+|....tTTTdaaaBBBbaaaaddBBBggg
+|....TTTTdaaaDAAkBccacBAAABkkjjjj
+|....TTTTTdddDDkKkkCc.DDAAAKKkkkj
+|.....TT.TTT.T.DKKk.....DDDKKKKkj
+
+frame sleep
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|........................B
+|.......................BcB.g
+|........................CcBfg
+|........................DCcBbb
+|.....................bbbDCcBaabb
+|.........bbbbbbbbbbbbaadDDDBaaab
+|........baaaaabaaaadaaadaaaabcbab
+|......tbaaaaaaabaaadaaadaaabaaabb
+|.....tTdaaaaaaabaaadaaadaacccddaabb
+|....tTTTdaaaBBBbaaaadaBBBaCcCCcaaab
+|....TTTTdaaaDAAkBccacBAAABkkdCcdddn
+|....TTTTTdddDDkKkkCc.DDAAAKKkkkj
+|.....TT.TTT.T.DKKk.....DDDKKKKkj
+
+frame sleep2
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|........................B
+|.......................BcB.g
+|........................CcBfg
+|........................DCcBbb
+|...............bbbb..bbbDCcBaabb
+|.........bbbbbbaaaabbaadDDDBaaab
+|........baaaaabaaaadaaadaaaabcbab
+|......tbaaaaaaabaaadaaadaaabaaabb
+|.....tTdaaaaaaabaaadaaadaacccddaabb
+|....tTTTdaaaBBBbaaaadaBBBaCcCCcaaab
+|....TTTTdaaaDAAkBccacBAAABkkdCcdddn
+|....TTTTTdddDDkKkkCc.DDAAAKKkkkj
+|.....TT.TTT.T.DKKk.....DDDKKKKkj
+
+frame yawn
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.......................BB.g
+|.......................DcBg
+|.......................DCcfg
+|.......................DCcBbbb
+|.......................DCcBaaabbb
+|.......................DDDBbcbaaab
+|......................baaabaaaaaan
+|......................daaadaddadd
+|....................bbdaaaccCcdnn
+|.........bbbbbbbbbbbaadaacCcCabr
+|........baaaaabaaaadaaadaaaadd
+|......tbaaaaaaabaaadaaaadddd
+|.....tTdaaaaaaabaaadaaaadd
+|....tTTTdaaaBBBbaaaaddBBBggg
+|....TTTTdaaaDAAkBccacBAAABkkjjjj
+|....TTTTTdddDDkKkkCc.DDAAAKKkkkj
+|.....TT.TTT.T.DKKk.....DDDKKKKkj
+
+frame scratch
+|.
+|...................BB.g
+|...................DcBg
+|...................DcBg
+|...................DCcBbb
+|..................bDCcBaab
+|..................dDADBaaab
+|..................daDaaaaab
+|.................bdaaabbcbab
+|................badaaccaaabb
+|................daadcCCcddabb
+|...........bbbbbaaaddaCCCcaab
+|..........baaaadakkBBdddCcaaab
+|..........daaaadBKKkBfg...ddn
+|..........daaaadkKKABfg
+|..........daaaakKKDABfg
+|.........bbbbbBKKkDABfg
+|........baaaaBAADCDABfg
+|.......baaaaBAAACCDkkjg
+|......tdaaaaDAABaCDKkJj
+|.......TdaaaDDDaabcKkJj
+|.......TddaaaaaddTTKkJj
+|........TTdddddTTTTKkJj
+|..........T.T..T.TTKkJj
+
+frame scratch2
+|.
+|...................BB.g
+|...................DcBg
+|...................DcBg
+|...................DCcBbb
+|..................bDCcBaab
+|..................dDADBaaab
+|..................daDaaaaab
+|.................bdaaabbcbab
+|................badaaccaaabb
+|................daadcCCcddabb
+|...........bbbbbaaaddaCCCcaab
+|..........baaaadaaaBBdddCcaaab
+|..........daaaadakBABfg...ddn
+|..........daaaadkKkABfg
+|..........daaaakKKDABfg
+|.........bbbbbBKKkDABfg
+|........baaaaBAKKCDABfg
+|.......baaaaBAAACCDkkjg
+|......tdaaaaDAABaCDKkJj
+|.......TdaaaDDDaabcKkJj
+|.......TddaaaaaddTTKkJj
+|........TTdddddTTTTKkJj
+|..........T.T..T.TTKkJj
+
+frame howl
+|................BBB.g
+|.................ccBbbbbbb
+|.................DCcBabaaab
+|.................DCcBbcaan
+|.................DAABaaaab
+|................baDDdcdddb
+|................daaadCCcab
+|................daacccCaa
+|................bdaCCcaab
+|................dddaaadd
+|...............baaaddd
+|...........bbbbdaaaaab
+|..........baaaadaaaBBg
+|..........daaaadaaBABfg
+|..........daaaaadaDABfg
+|..........daaaaacdDABfg
+|.........bbbbbbbCCDABfg
+|........baaaaaaaCCDABfg
+|.......baaaaaaaaCCDkkjg
+|......tdaaaaaaaaaCDKkJj
+|.......TdaaaaaaaabcKkJj
+|.......TddaaaaaddTTKkJj
+|........TTdddddTTTTKkJj
+|..........T.T..T.TTKkJj
+
+frame shake1
+|..........................B
+|.........................BAB
+|.........................DcBg
+|.....tt.................BccBg
+|....tTt.................DCcBb
+|...tTTTt...............bDCcBabb
+|..tTTTTt..............baDDDBaab
+|..TTTTT...............daaaabbcab
+|.tTTTTTt..............daaabaaabb
+|.TTTTTTt..bbbbbb...bbbdaaccccddbb
+|..TTTTTTt.daabbbbbbbaaadaCCcCcaaab
+|..TTTTTTbbaaaaaabaaadaaaddaCCCcaab
+|...TTTTbaaaaaaaabaabaaaaaaddd..ddn
+|....TTTdaaaaaaaabaaadaaadd
+|......TdaaaaaaaaaaaadaddCc
+|.......daaaaaacccccccdCCCc
+|........daaaBBCCCCCCCCBBCg
+|.........daBAABCaCCdCBAABg
+|..........dDAAB.d...dDAABg
+|..........FDAA........DABg
+|..........jDkk........kkkj
+|..........JkKk........KKkj
+|..........JKKk........KKkj
+|..........JKKk........KKkj
+
+frame shake2
+|.
+|......................BB
+|......................cABgg
+|......................DccBg
+|......................DCCcBbbb
+|......................DACcBaaab
+|......................DAAABabcbbbb
+|......................dDDDbbaaaaaab
+|tttt..................daaadacddaan
+|.TTt......bbb.bb...bbbdaacccCCcdd
+|.TTTttt...daabbbbbbbaadaaCCcCCd
+|tTTTTTTtbbaaaaaabaaadaaddaaadd
+|.TTTTTTbaaaaaaaabaabaaaaaddd
+|.TTTTTTdaaaaaaaabaaadaaadd
+|tTTTTTTdaaaaaaaaaaaadaddCc
+|...TT.TdaaaaaacccccccdCCCc
+|........daaaBBCCCCCCCCBBCg
+|.........daBAABCaCCdCBAABg
+|..........dDAABdd....DAABg
+|..........FDAA........DABg
+|..........jDkk........kkkj
+|..........JkKk........KKkj
+|..........JKKk........KKkj
+|..........JKKk........KKkj
+
+frame eat0
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|................b.b
+|.........bbbbbbbababbbbb.B
+|...t.tttbaaaaaabaaaabaaabDBgg
+|...TtTTTdaaaaaaabaabaaaaaccFg
+|..tTTTTbaaaaaaaabaadaaaaaCcBb
+|ttTTTTTdaaaaaaaabaadaaaaBACcabb
+|TTTTTTT.daaaaaacccccddaaDACBaaab
+|TTTTTTt.daaaBBcCCCCCccBBdDDBaaab
+|.TTTTT...daBAABCaCCaCBAABaaaaaaab
+|tTTTT.....dDAABddddddDAABaabbbcab
+|TTTTTt....FDAA........DABacccaweb
+|T.TTT.....jDkk........kkkdCCccee
+|..TT......JkKk........KKkdddCCcb
+|..........JKKk........KKkj.dCCcab
+|..........JKKk........KKkj...dddb
+
+frame eat1
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|................b.b
+|.........bbbbbbbababbbbb.BBg
+|...t.tttbaaaaaabaaaabaaabcBFg
+|...TtTTTdaaaaaaabaabaaaaBCcBg
+|..tTTTTbaaaaaaaabaadaaaaDCcBbb
+|ttTTTTTdaaaaaaaabaadaaaaDAcBaab
+|TTTTTTT.daaaaaacccccddabaDDBaaab
+|TTTTTTt.daaaBBcCCCCCccBBaaaaaaaab
+|.TTTTT...daBAABCaCCaCBAABaabbbcab
+|tTTTT.....dDAABddddddDAABacccabab
+|TTTTTt....FDAA........DABaCCccdd
+|T.TTT.....jDkk........kkkdddCCcab
+|..TT......JkKk........KKkj.ddCcaab
+|..........JKKk........KKkj....daab
+|..........JKKk........KKkj.....ddn
+
+frame gal0
+|.........................BBg
+|.........................cBFg
+|........................BCcBg
+|........................DCcBbb
+|........................DAcBaabb
+|.......................bDDABaaab
+|.......................daaDabbcab
+|......................bdaaabaawebb
+|tttt.tt....bb...bbbb.badaaaccceeaabb
+|.TTTtTTttbbaabbbaaaabaaadacCcCCcaaab
+|.TTTTTTTbaaaaaabaaabaaaaadaaCCCdddn
+|tTTTTTTTdaaaaaaabaadaaaaaadddd
+|.TTTTTTbaaaaaaaabaadaaaaad
+|.TTTTTTdaaaaaaaabaaadddadc
+|tT......daaaaaccbacccCCdCc
+|........daaaBBCCccCCCcBBBc
+|........gdBBAABCCCCCCBAAABB
+|.......jfBAAAD.dddd..aDAAAAk
+|.....jjkkkAAD..........DDDkKkk
+|....jJkKKkDD..............KKKKk
+|....JkKKKD.................FKKkj
+|.....KKK.....................JJj
+|..............................Jj
+|.
+
+frame gal1
+|.
+|.
+|........................BB.g
+|........................Dcgg
+|........................DcBg
+|........................DCcbbb
+|.......................bDCcBaab
+|.......................dDADaaaab
+|......................baaDaabcab
+|.t.ttt..........b.b..bdaaaabaweb
+|.TtTTTt..bbbbbbbababbdadaaccceeabb
+|tTTTTTTtbaaaaaabaaabbaadacCcCccaaab
+|.TTTTTTTdaaaaaaabaadaaaaddaaCCcdaan
+|.TTTTTTbaaaaaaaabaadaaaadddddd..dd
+|tTTTT.TdaaaaaaaabaaadaaaCc
+|TT......daaaaaacccccaddbCc
+|........daaaBBcCCCCCccBBCg
+|.........daBAABCaCCaCBAABg
+|........jfBAAABddddddaDAABg
+|.......jJkAAAD........DAABjj
+|......jJkKkDD..........DkkJJj
+|......JkKKk.............KKkJj
+|.......KKK..............KKkJj
+|.......KK................KKk
+
+frame gal2
+|.
+|.
+|........................B
+|.......................BB.g
+|.......................DcBg
+|.......................DCcbb
+|.......................DCcBabb
+|......................bDAABaaab
+|......................daDDaaaab
+|......................daaabbcbab
+|.tt.ttt...bbbbbbbbbbbbdaaadawebb
+|tTTtTTTttbaaaaabaaabbadacccceeaabb
+|.TTTTTTTbaaaaaaabaadaaadaCCCCcaaab
+|.TTTTTTTdaaaaaaabaadaaaaddddCddddn
+|tTTTTTTTdaaaaaaabaadaaaaad
+|TT.TT...daaaaaaabaaadaaddc
+|Tt......daaaaccccccccddCC
+|.........daaBBBCCCCCCBBBCc
+|..........dBAABCCaCCCDABa
+|..........FfDAABddd.BAABg
+|...........FFDAkk..jkkAF
+|.............JkKkBjJKKk
+|..............JKKkJkKK
+|................KKkKKk
+
+frame gal3
+|.
+|........................BB.g
+|........................Dcgg
+|........................DcBg
+|........................DCcBbb
+|.......................bDCcBaab
+|.......................dDDDaaaab
+|......................baaaabbcbb
+|......................daaaadaweabbb
+|.t.tttt....bbbbbb.bbbbadaaccceeaaab
+|.TtTTTt.tbbaaabaababaaadacCcCCcdaan
+|tTTTTTTtbaaaaaabaaadaaaaddaaaCd.dd
+|.TTTTTTTdaaaaaaabaadaaaaaaddd
+|.TTTTTTbaaaaaaaabaadaaaadd
+|tTTTT..daaaaaaaabaaadaadCc
+|TT......daaaaacccccccddCCc
+|........daaBBBCCCCCCCCBBBg
+|.........ddDAABCaCC.CBAAABg
+|..........FDAAB.ddb...DAkkB
+|..........FfDAB........DKKkj
+|..........Fjkkk..........KKk
+|..........FJKKk...........KJj
+|...........JKKk............J
+|...........JjKk
+
 frame walk0
 |.
 |........................B
@@ -521,20 +1068,28 @@ frame walk5
 
 
 clip idle loop fps=5 : stand*12 stand_blink stand*6 tilt*6 tilt_blink tilt*3 stand*6 look*6 stand*4
+clip wag loop fps=8 : wag1 wag2 wag1 wag2 wag1 wag2 stand*4 wag_blink wag2 wag1 wag2 stand*6 pant*10 stand*3
+clip pant loop fps=6 : pant*3 stand pant*3 stand_blink pant*4 tilt*4
 clip look loop fps=4 : look*6 tilt*6 tilt_blink tilt*3 look*4
+clip howl loop fps=3 : sit*3 howl*8 sit_blink sit*3 howl*6 sit*4
 clip alert loop fps=4 : alert*10 stand_blink alert*4
 clip sniff loop fps=7 : sniff sniff2 sniff sniff2 sniff*3 sniff2 stand
+clip eat loop fps=6 : eat0 eat1 eat0 eat1 eat0*2 eat1 eat0 eat1 stand*2 look*3
 clip sit loop fps=3 : sit*10 sit_blink sit*6 sit_tilt*6 sit_blink sit*4
-clip play loop fps=6 : bow bow2 bow bow2 bow*3 stand tilt*3
+clip lie loop fps=3 : lie*10 lie_blink lie*6 lie_look*6 lie*4 yawn*3 lie*6
+clip sleep loop fps=2 : lie*3 sleep sleep2 sleep sleep2 sleep sleep2 sleep sleep2 sleep sleep2 lie_blink sleep sleep2
+clip scratch loop fps=10 : sit*3 scratch scratch2 scratch scratch2 scratch scratch2 scratch scratch2 scratch scratch2 sit*4 sit_blink sit*3
+clip shake loop fps=12 : stand*3 shake1 shake2 shake1 shake2 shake1 shake2 shake1 shake2 stand*6 tilt*6 stand*4
+clip play loop fps=6 : bow bow2 bow bow2 bow*3 stand tilt*3 wag1 wag2 wag1 wag2
 clip walk loop fps=9 speed=15 : walk0 walk1 walk2 walk3 walk4 walk5
-clip run loop fps=15 speed=60 : walk0 walk1 walk2 walk3 walk4 walk5
+clip run loop fps=12 speed=60 : gal0 gal1 gal2 gal3
 
 creature
   move ground
   lane 0.3
   speed walk=15 run=60
-  anim idle=idle move=walk run=run look=look alert=alert sniff=sniff eat=sniff rest=sit sit=sit groom=play
-  intents wander=4 sniff=3 look=3 rest=2 groom=4 leave=3
+  anim idle=idle|wag|pant move=walk run=run look=look|howl alert=alert sniff=sniff eat=eat rest=lie|sleep|sit sit=sit groom=play|scratch|shake
+  intents wander=4 forage=2 sniff=3 look=3 rest=2 groom=4 follow=3 leave=2
   homes edge
   fear 0.25
   curiosity 0.7

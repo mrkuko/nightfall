@@ -359,7 +359,7 @@ creature
   move ground climb
   lane 0.2
   speed walk=20 run=55 climb=30
-  anim idle=idle move=run run=run look=look eat=eat climb=climb climb_down=climb_down alert=alert groom=flick
+  anim idle=idle move=run run=run look=look eat=eat climb=climb climb_down=climb_down cling=cling alert=alert groom=flick
   intents forage=4 wander=3 climb=5 look=3 rest=1 hide=2 leave=2
   homes hollow branch
   fear 0.5
@@ -429,6 +429,56 @@ def squirrel_run(phase):
                 haunch=(8.6, by + 0.6, 3.0, 2.8), belly=False)
 
 
+def squirrel_back(phase=None, look=0, tail=0.0, stretch=0.0):
+    """Squirrel on a trunk seen from behind (dorsal view), head UP: we see the back, the ears,
+    four limbs spread and gripping the bark, the bushy tail hanging down. phase = climbing gait
+    (diagonal pairs move together), None = clinging still; look = head turned -1 left / 1 right."""
+    cx = 12.0
+    if phase is None:
+        lf = rf = lh = rh = 0.0
+        bob = 0.0
+    else:
+        sw = math.sin(phase)
+        lf, rh = sw, sw                       # left front + right hind reach up together
+        rf, lh = -sw, -sw
+        bob = -abs(math.cos(phase)) * 0.6
+    by = 12.4 + bob - stretch
+    parts = []
+    # tail: hangs below the body, a gentle S that sways with the gait
+    tw = tail + (math.sin(phase) * 0.8 if phase is not None else 0.0)
+    parts += chain([(cx, by + 4.0), (cx + 1.2 + tw * 0.5, by + 7.0), (cx - 0.4 + tw, by + 9.6),
+                    (cx + 0.6 + tw * 1.4, by + 11.4)], [2.2, 2.9, 3.0, 2.2], 'uvx', 0.55)
+    # hind legs (thighs spread sideways, feet gripping)
+    for sd, ph in ((-1.0, lh), (1.0, rh)):
+        hx0, hy0 = cx + sd * 1.8, by + 3.0
+        fx, fy = cx + sd * 4.6, by + 4.6 - ph * 1.6
+        parts.append(C(hx0, hy0, fx, fy, 1.6, 0.9, 'BAD'))
+        parts += [P(round(fx + sd * 0.6), round(fy), 'D'), P(round(fx + sd * 0.6), round(fy) + 1, 'D')]
+    # body: a pear seen from behind, darker stripe along the spine
+    parts.append(E(cx, by, 3.2, 4.8, 0, 'bad', 0.2))
+    parts.append(E(cx, by + 2.4, 3.6, 2.8, 0, 'bad', 0.15))
+    parts.append(C(cx, by - 3.2, cx, by + 3.6, 0.5, 0.5, 'aaa'))
+    # front legs: from the shoulders up and out, paws hooked into the bark
+    for sd, ph in ((-1.0, lf), (1.0, rf)):
+        sx0, sy0 = cx + sd * 1.8, by - 2.6
+        px, py = cx + sd * 4.0, by - 5.0 - ph * 1.6
+        parts.append(C(sx0, sy0, px, py, 1.1, 0.8, 'BAD'))
+        parts.append(P(round(px + sd * 0.5), round(py) - 1, 'D'))
+    # head from behind (round), slightly turned when looking
+    hx, hy = cx + look * 0.8, by - 6.4
+    parts.append(E(hx, hy, 2.6, 2.4, 0, 'bad', 0.1))
+    for sd in (-1.0, 1.0):
+        ex0 = hx + sd * 1.4 + look * 0.3
+        parts.append(C(ex0, hy - 1.4, ex0 + sd * 0.5, hy - 3.8, 0.9, 0.45, 'BAD'))
+        parts.append(P(round(ex0 + sd * 0.5), round(hy - 4.4), 'D'))
+    if look:
+        # profile of the face peeking out to the side: eye + nose
+        ox = round(hx + look * 2.0)
+        parts += [P(ox, round(hy), 'e'), P(ox + (1 if look > 0 else -1), round(hy) + 1, 'n')]
+        parts.append(P(ox, round(hy) - 1, 'w'))
+    return parts
+
+
 SQUIRREL_POSES = [
     ('sit', {}),
     ('sit_blink', dict(eye=0)),
@@ -450,13 +500,16 @@ def squirrel(out):
         emit_frame(out, name, squirrel_parts(pose), 24, 22)
     for i in range(4):
         emit_frame(out, 'run%d' % i, squirrel_parts(squirrel_run(i * math.pi / 2)), 24, 22)
-    # climbing: the running pose rotated head up (-90°) and head down (+90°)
-    for i in range(3):
-        emit_frame(out, 'climb%d' % i, squirrel_parts(squirrel_run(i * 2 * math.pi / 3)), 24, 24,
-                   at=(12, 12), rot=-math.pi / 2, pivot=(12, 15))
-    for i in range(3):
-        emit_frame(out, 'down%d' % i, squirrel_parts(squirrel_run(i * 2 * math.pi / 3)), 24, 24,
-                   at=(12, 12), rot=math.pi / 2, pivot=(12, 15))
+    # climbing: seen from behind, head up; going down head first (the same rotated 180°, tail up)
+    for i in range(4):
+        emit_frame(out, 'climb%d' % i, squirrel_back(i * math.pi / 2), 24, 26, at=(12, 13))
+    for i in range(4):
+        emit_frame(out, 'down%d' % i, squirrel_back(i * math.pi / 2), 24, 26, at=(12, 13),
+                   rot=math.pi, pivot=(12, 13))
+    # clinging to the bark: still, the head turns to the sides, the tail twitches
+    for name, kw in (('cling', {}), ('cling_l', dict(look=-1)), ('cling_r', dict(look=1)),
+                     ('cling_t1', dict(tail=-1.2)), ('cling_t2', dict(tail=1.2)), ('cling_up', dict(stretch=0.8))):
+        emit_frame(out, name, squirrel_back(None, **kw), 24, 26, at=(12, 13))
     out.append('''
 clip idle loop fps=5 : sit*20 sit_blink sit*12 flick1 flick2 flick1 sit*8 look*6 sit*6
 clip eat loop fps=8 : eat eat2 eat eat2 eat eat eat2 eat
@@ -465,8 +518,9 @@ clip alert loop fps=4 : alert*10 sit_blink alert*4
 clip flick once fps=10 : sit flick1 flick2 flick1 flick2 flick1 sit
 clip run loop fps=14 speed=55 : run0 run1 run2 run3
 clip move loop fps=10 speed=24 : run0 run1 run2 run3
-clip climb loop fps=10 speed=30 : climb0 climb1 climb2
-clip climb_down loop fps=8 speed=22 : down0 down1 down2
+clip climb loop fps=10 speed=30 : climb0 climb1 climb2 climb3
+clip climb_down loop fps=8 speed=22 : down0 down1 down2 down3
+clip cling loop fps=5 : cling*4 cling_r*5 cling*2 cling_t1 cling_t2 cling_t1 cling*3 cling_l*5 cling_up*2 cling*2
 ''')
     out.append(SQUIRREL_TAIL)
 
@@ -645,6 +699,8 @@ palette
   K 6a5a3a
   s 2e2820
   h 141210
+  f 5a4e40 ~5 z-2
+  g 3a3228 ~3 z-2
 end
 '''
 
@@ -702,43 +758,69 @@ def owl_parts(pose):
 
 
 def owl_fly(k):
-    """Flight from the front in the same style as the sitting owl: the same head, facial discs, eyes,
-    spotted chest; feathered wings, a lighter underside with dark stripes."""
-    cx = 20.0
-    tips = ((-1.0, 2.0), (0.0, 9.5), (1.0, 17.0))[k]           # wing-tip height: up / middle / down
-    ty, wy = tips[1], tips[0]
+    """Flight from the side (facing right), in the style of the sitting owl: a compact round body,
+    a big round head with the facial disc turned towards the viewer (glowing eyes), a short tail,
+    broad rounded wings with spread primaries and dark bars. k = 0 up, 1 middle, 2 down, 3 glide.
+    The near wing is in front of the body (z+1), the far wing behind it (z-2)."""
+    cx, cy = 15.0, 15.0
     parts = []
-    for sd in (-1.0, 1.0):
-        sx, sy = cx + sd * 3.4, 10.4                           # shoulder
-        ex, ey = cx + sd * 10.5, 9.5 + wy * 3.4                # wrist
-        tx, tyy = cx + sd * 18.5, ty                           # wing tip
-        # upper wing section (wide, lighter underside) + hand (narrower)
-        parts += chain([(sx, sy), (ex, ey)], [3.4, 3.0], 'cCa', 0.15)
-        parts += chain([(ex, ey), (tx, tyy)], [3.0, 1.2], 'cCa', 0.2)
-        # primaries: 4 feathers at the wing tip, spread apart
+    # wing pose: (elbow, tip) relative to the shoulder; the tip trails backwards
+    W = {0: ((-3.0, -6.5), (-8.5, -12.0)),      # up: raised high above the back
+         1: ((-4.5, -2.0), (-11.5, -3.5)),      # middle (upstroke / recovery)
+         2: ((-3.4, 3.4), (-8.6, 7.6)),         # down: below the belly
+         3: ((-4.6, -1.0), (-12.5, -1.0))}[k]   # glide: level, swept back
+    (ex, ey), (tx, ty) = W
+
+    def wing(dx, dy, keys, stripe, far):
+        sx, sy = cx + 1.5 + dx, cy - 2.0 + dy
+        exx, eyy = sx + ex, sy + ey
+        txx, tyy = sx + tx, sy + ty
+        ps = []
+        # broad wing: leading edge (arm + hand) + a wide trailing part back towards the body
+        ps += chain([(sx, sy), (exx, eyy), (txx, tyy)], [2.6, 2.8, 1.4], keys, 0.15)
+        bx, by_ = sx - 3.2, sy + (1.2 if k != 2 else 0.4)
+        ps += chain([(bx, by_), ((exx + bx) / 2 - 0.5, (eyy + by_) / 2 + 0.6), (txx + 1.0, tyy + 0.4)],
+                    [2.4, 2.6, 1.3], keys, 0.2)
+        # primaries: 4 rounded "fingers" at the tip
+        ang = math.atan2(tyy - eyy, txx - exx)
         for i in range(4):
-            fa = math.atan2(tyy - ey, tx - ex) + sd * (0.35 - i * 0.22) * (1 if wy <= 0 else -1)
-            fx0, fy0 = ex + (tx - ex) * (0.55 + i * 0.1), ey + (tyy - ey) * (0.55 + i * 0.1)
-            parts.append(C(fx0, fy0, fx0 + math.cos(fa) * 3.6, fy0 + math.sin(fa) * 3.6, 0.7, 0.4, 'bad'))
-        # dark stripes across the wing
-        for t in (0.3, 0.55, 0.8):
-            px, py = sx + (tx - sx) * t, sy + (tyy - sy) * t
-            parts.append(C(px - 0.6, py - 2.2, px + 0.6, py + 2.2, 0.35, 0.35, 'sss'))
-        # upper edge of the wing darker (coverts)
-        parts.append(C(sx, sy - 2.0, ex, ey - 2.4, 0.9, 0.8, 'bad'))
-    # body and chest as on the sitting owl (narrower, stretched)
-    parts += [E(cx, 13.4, 4.4, 5.6, 0, 'bad', 0.2), E(cx, 14.0, 2.8, 3.8, 0, 'cCC', 0.25)]
-    for (x, y) in ((cx - 1, 12), (cx + 1, 13), (cx - 1, 15), (cx + 1, 16), (cx, 17)):
-        parts.append(P(round(x), y, 's'))
-    # tucked-in talons
-    parts += [P(round(cx - 1), 19, 'k'), P(round(cx + 1), 19, 'k')]
-    # head (the same as when sitting, ears pulled in)
-    hx = cx
-    parts += [C(hx - 3.4, 4.4, hx - 4.2, 2.0, 1.0, 0.5, 'bad'), C(hx + 3.4, 4.4, hx + 4.2, 2.0, 1.0, 0.5, 'bad'),
-              E(hx, 6.8, 4.6, 3.9, 0, 'bad', 0.15), E(hx - 1.9, 7.2, 1.9, 1.9, 0, 'cCC'), E(hx + 1.9, 7.2, 1.9, 1.9, 0, 'cCC')]
-    for ex_ in (round(hx - 2.0), round(hx + 2.0) - 1):
-        parts += [P(ex_, 7, 'E'), P(ex_ + 1, 7, 'E'), P(ex_, 8, 'E'), P(ex_ + 1, 8, 'E'), P(ex_ + 1, 7, 'e')]
-    parts += [P(round(hx), 9, 'K'), P(round(hx), 10, 'k')]
+            fa = ang + (i - 1.5) * 0.28
+            f0x, f0y = exx + (txx - exx) * 0.75, eyy + (tyy - eyy) * 0.75
+            ps.append(C(f0x, f0y, f0x + math.cos(fa) * 4.2, f0y + math.sin(fa) * 4.2, 0.75, 0.5, keys))
+        if not far:
+            # dark bars across the wing + a light leading edge
+            for t in (0.35, 0.6, 0.82):
+                px, py = sx + (txx - sx) * t, sy + (tyy - sy) * t
+                nx, ny = -(tyy - sy), (txx - sx)
+                L = math.hypot(nx, ny) or 1.0
+                nx, ny = nx / L * 1.8, ny / L * 1.8
+                ps.append(C(px - nx, py - ny, px + nx, py + ny, 0.35, 0.35, stripe))
+            ps.append(C(sx, sy - 0.8, exx, eyy - 0.8, 0.6, 0.6, 'ccc'))
+        return ps
+
+    parts += wing(1.2, -0.8, 'fgg', 'sss', True)               # far wing, behind the body
+    # tail: short, slightly fanned
+    parts += chain([(cx - 4.8, cy - 0.6), (cx - 7.2, cy - 0.2)], [2.2, 1.6], 'bad', 0.2)
+    parts.append(P(round(cx - 7.6), round(cy - 0.2), 's'))
+    # body: compact, almost horizontal, lighter spotted belly
+    parts.append(E(cx, cy, 6.0, 4.2, -0.12, 'bad', 0.2))
+    parts.append(E(cx + 0.8, cy + 1.8, 4.4, 2.4, -0.1, 'cCC', 0.25))
+    for (x, y) in ((cx - 1, cy + 1), (cx + 1, cy + 2), (cx + 3, cy + 1), (cx - 2, cy + 3), (cx + 2, cy + 3)):
+        parts.append(P(round(x), round(y), 's'))
+    # tucked talons
+    parts += [P(round(cx + 1), round(cy + 4.4), 'k'), P(round(cx + 2), round(cy + 4.4), 'k')]
+    # head: big and round, the disc and eyes towards the viewer (like the sitting owl)
+    hx, hy = cx + 6.2, cy - 4.0
+    parts += [C(hx - 2.8, hy - 2.8, hx - 3.4, hy - 4.6, 0.9, 0.45, 'bad'),
+              C(hx + 2.4, hy - 2.8, hx + 3.0, hy - 4.6, 0.9, 0.45, 'bad'),
+              E(hx, hy, 4.3, 3.8, 0, 'bad', 0.15),
+              E(hx - 1.5, hy + 0.3, 1.8, 1.8, 0, 'cCC'), E(hx + 2.1, hy + 0.3, 1.8, 1.8, 0, 'cCC')]
+    for ex_ in (round(hx - 2.2), round(hx + 1.4)):
+        parts += [P(ex_, round(hy), 'E'), P(ex_ + 1, round(hy), 'E'), P(ex_, round(hy) + 1, 'E'),
+                  P(ex_ + 1, round(hy) + 1, 'E'), P(ex_ + 1, round(hy), 'e')]
+    parts += [P(round(hx), round(hy) + 2, 'K'), P(round(hx), round(hy) + 3, 'k')]
+    # near wing last: in front of the body
+    parts += wing(0.0, 0.0, 'BAD', 'sss', False)
     return parts
 
 
@@ -755,8 +837,8 @@ def owl(out):
     ]
     for name, pose in poses:
         emit_frame(out, name, owl_parts(pose), 18, 22)
-    for k in range(3):
-        emit_frame(out, 'fly%d' % k, owl_fly(k), 40, 24, at=(20, 13))
+    for k in range(4):
+        emit_frame(out, 'fly%d' % k, owl_fly(k), 30, 28, at=(15, 15))
 
     # --- in a hollow: the anchor = the middle between the eyes so they can be placed exactly in the opening ---
     def hollow_eyes(look=0, blink=0):
@@ -798,7 +880,7 @@ clip idle loop fps=4 : perch*16 blink_half blink blink_half perch*10 look_l*8 pe
 clip look loop fps=4 : look_l*8 perch*2 look_r*8 perch*2
 clip alert loop fps=4 : ruffle*3 perch*10
 clip sleep loop fps=2 : sleep*20 blink_half sleep*10
-clip fly loop fps=8 speed=40 : fly0 fly1 fly2 fly1
+clip fly loop fps=8 speed=40 : fly0 fly1 fly2 fly1 fly0 fly1 fly2 fly1 fly3*6 fly1
 ''')
     out.append(OWL_TAIL)
 
@@ -1869,7 +1951,7 @@ creature
   move ground climb
   lane 0.2
   speed walk=16 run=40 climb=24
-  anim idle=idle move=move run=run look=look eat=eat climb=climb climb_down=climb_down alert=alert groom=flick
+  anim idle=idle move=move run=run look=look eat=eat climb=climb climb_down=climb_down cling=cling alert=alert groom=flick
   intents forage=4 wander=2 climb=6 look=3 hide=3 leave=2
   homes hollow bush
   fear 0.6
@@ -2283,6 +2365,7 @@ palette
   e 140c08
   w f0f4f8 glow
   n 1a100c
+  r c8605a
 end
 """
     sit = dict(body=[(15.0, 16.0, 5.0, 5.8, -0.75), (12.4, 19.4, 5.4, 3.6, 0.0)],
@@ -2311,22 +2394,106 @@ end
         ('bow', bow),
         ('bow2', dict(bow, tail=[(7.4, 9.6), (6.2, 7.0), (6.8, 4.4), (8.4, 2.4)], hy=14.0)),
     ]
+
+    def shifted(dy, **kw):
+        """The standing pose with the body moved by dy (gallop bob) + changes."""
+        d = dict(body=[(x, y + dy, rx, ry, a) for (x, y, rx, ry, a) in c['body']],
+                 chest=(23.0, 15.2 + dy, 3.2, 3.9, 0.2),
+                 bodyextra=[E(17.4, 16.8 + dy, 5.8, 1.4, 0.0, 'cCC', 0.3)],
+                 neck=(22.4, 12.6 + dy, 24.6, 10.8 + dy, 3.4, 3.0), hy=8.6 + dy)
+        d.update(kw)
+        return d
+
+    def mouth(hx, hy, open_=1):
+        # open mouth below the snout tip (yawn, pant, howl)
+        return [P(round(hx + 5.0), round(hy + 2.6), 'n'), P(round(hx + 6.0), round(hy + 2.6), 'n'),
+                P(round(hx + 5.0), round(hy + 3.4), 'r' if open_ else 'n')]
+
+    # tail wag (standing)
+    wag1 = [(7.8, 12.8), (5.2, 11.2), (4.2, 8.6), (5.0, 6.0)]
+    wag2 = [(7.8, 12.8), (5.0, 12.0), (2.8, 10.6), (1.4, 8.4)]
+    # lying down: body on the ground, front legs stretched forward, tail curled around
+    lie = dict(body=[(17.0, 19.4, 7.6, 3.6, 0.0), (11.6, 19.6, 4.8, 3.6, 0.0)],
+               chest=(22.6, 19.6, 3.0, 3.2, 0.1), bodyextra=[E(17.0, 21.6, 6.0, 1.0, 0.0, 'cCC', 0.3)],
+               neck=(22.0, 18.0, 24.4, 16.6, 3.2, 3.0), hx=26.8, hy=15.0, hang=0.12,
+               legs=dict(nf=(23.0, 21.6, 30.0, G), ff=(24.2, 21.2, 31.2, G - 0.8), nh=(13.6, 21.4, 17.0, G),
+                         fh=None),
+               tail=[(7.0, 19.8), (6.0, 22.4), (9.6, 23.4), (13.6, 23.2)], trad=[2.2, 2.4, 2.2, 1.8])
+    sleep = dict(lie, hx=27.6, hy=18.0, hang=0.25, eye=0, neck=(22.0, 18.4, 25.0, 18.4, 3.2, 3.0),
+                 ear=(-1.6, -2.6, 3.2, 2.0), earlean=-1.6)
+    # sitting scratch: a hind leg raised to the neck, head tilted towards it
+    scratch = dict(sit, hang=0.5, hx=22.6, hy=8.4, eye=0,
+                   legs=dict(nf=(19.6, 14.0, 20.2, G), ff=(21.0, 14.0, 21.6, G), nh=(13.6, 19.4, 18.4, 13.2), fh=None))
+    scratch2 = dict(scratch, legs=dict(nf=(19.6, 14.0, 20.2, G), ff=(21.0, 14.0, 21.6, G),
+                                       nh=(13.6, 19.4, 17.4, 14.6), fh=None))
+    # whistle / howl: dholes call with the head up
+    howl = dict(sit, hang=-0.85, hx=21.0, hy=6.0, neck=(18.0, 12.4, 19.8, 7.6, 3.2, 2.8), eye=0,
+                ear=(-1.8, -2.4, 3.2, 2.0), earlean=-1.8)
+    poses += [
+        ('wag1', dict(tail=wag1)),
+        ('wag2', dict(tail=wag2)),
+        ('wag_blink', dict(tail=wag1, eye=0)),
+        ('pant', dict(bodyextra=c['bodyextra'] + mouth(27.0, 8.6))),
+        ('lie', lie),
+        ('lie_blink', dict(lie, eye=0)),
+        ('lie_look', dict(lie, hang=-0.2, hy=14.4)),
+        ('sleep', sleep),
+        ('sleep2', dict(sleep, body=[(17.0, 19.2, 7.6, 3.8, 0.0), (11.6, 19.6, 4.8, 3.6, 0.0)])),
+        ('yawn', dict(lie, hang=-0.45, hy=14.4, eye=0, bodyextra=lie['bodyextra'] + mouth(25.6, 12.4))),
+        ('scratch', scratch),
+        ('scratch2', scratch2),
+        ('howl', dict(howl, bodyextra=sit['bodyextra'] + [P(25, 3, 'n'), P(25, 4, 'n')])),
+        ('shake1', shifted(-0.4, body=[(17.6, 13.8, 7.6, 5.0, 0.12), (12.2, 14.2, 5.2, 5.0, 0.0)],
+                           ear=(-1.0, -3.2, 3.6, 2.4), earlean=0.6, hang=0.35, eye=0, fuzz=0.5,
+                           tail=[(7.8, 12.8), (5.4, 11.0), (4.4, 8.2), (5.6, 5.6)])),
+        ('shake2', shifted(-0.4, body=[(17.6, 13.8, 7.6, 5.0, -0.12), (12.2, 14.2, 5.2, 5.0, 0.0)],
+                           ear=(-2.4, -2.6, 3.6, 2.4), earlean=-1.8, hang=-0.25, eye=0, fuzz=0.5,
+                           tail=[(7.8, 12.8), (4.8, 13.2), (2.4, 12.0), (1.0, 9.6)])),
+        ('eat0', dict(hx=28.2, hy=18.0, hang=1.0, neck=(22.4, 13.2, 26.4, 16.2, 3.2, 2.6))),
+        ('eat1', dict(hx=28.0, hy=17.2, hang=0.8, neck=(22.4, 13.2, 26.2, 15.6, 3.2, 2.6), eye=0)),
+    ]
+    # gallop: extended (airborne) -> front landing -> gathered -> hind push
+    tailrun = [(7.8, 12.6), (4.8, 12.0), (2.2, 12.4), (0.6, 13.4)]
+    gal = [
+        ('gal0', shifted(-1.2, legs=dict(nf=(23.2, 16.6, 30.0, 20.0), ff=(24.6, 16.6, 31.0, 21.4),
+                                         nh=(12.8, 16.8, 6.0, 21.0), fh=(11.2, 16.8, 5.0, 20.0)),
+                         hx=28.0, hang=0.15, tail=[(x, y - 1.2) for x, y in tailrun])),
+        ('gal1', shifted(0.0, legs=dict(nf=(23.2, 17.8, 26.4, G), ff=(24.6, 17.8, 28.2, G - 1.6),
+                                        nh=(12.8, 18.0, 8.0, 22.6), fh=(11.2, 18.0, 7.0, 21.0)),
+                         hx=27.4, hy=9.4, hang=0.25, tail=tailrun)),
+        ('gal2', shifted(0.6, body=[(17.0, 14.8, 6.6, 5.0, -0.06), (12.6, 14.6, 4.8, 4.8, 0.0)],
+                         legs=dict(nf=(22.6, 18.4, 20.4, G), ff=(23.8, 18.4, 19.4, G - 1.4),
+                                   nh=(13.2, 18.6, 17.4, G), fh=(11.6, 18.6, 16.2, G - 1.0)),
+                         hx=26.6, hy=9.8, hang=0.3, tail=[(x, y + 0.6) for x, y in tailrun])),
+        ('gal3', shifted(-0.4, legs=dict(nf=(23.2, 17.4, 26.6, 20.4), ff=(24.6, 17.4, 27.4, 21.6),
+                                         nh=(12.8, 17.6, 14.0, G), fh=(11.2, 17.6, 12.2, G)),
+                         hx=27.4, hang=0.1, tail=[(x, y - 0.4) for x, y in tailrun])),
+    ]
+    poses += gal
     clips = """
 clip idle loop fps=5 : stand*12 stand_blink stand*6 tilt*6 tilt_blink tilt*3 stand*6 look*6 stand*4
+clip wag loop fps=8 : wag1 wag2 wag1 wag2 wag1 wag2 stand*4 wag_blink wag2 wag1 wag2 stand*6 pant*10 stand*3
+clip pant loop fps=6 : pant*3 stand pant*3 stand_blink pant*4 tilt*4
 clip look loop fps=4 : look*6 tilt*6 tilt_blink tilt*3 look*4
+clip howl loop fps=3 : sit*3 howl*8 sit_blink sit*3 howl*6 sit*4
 clip alert loop fps=4 : alert*10 stand_blink alert*4
 clip sniff loop fps=7 : sniff sniff2 sniff sniff2 sniff*3 sniff2 stand
+clip eat loop fps=6 : eat0 eat1 eat0 eat1 eat0*2 eat1 eat0 eat1 stand*2 look*3
 clip sit loop fps=3 : sit*10 sit_blink sit*6 sit_tilt*6 sit_blink sit*4
-clip play loop fps=6 : bow bow2 bow bow2 bow*3 stand tilt*3
+clip lie loop fps=3 : lie*10 lie_blink lie*6 lie_look*6 lie*4 yawn*3 lie*6
+clip sleep loop fps=2 : lie*3 sleep sleep2 sleep sleep2 sleep sleep2 sleep sleep2 sleep sleep2 lie_blink sleep sleep2
+clip scratch loop fps=10 : sit*3 scratch scratch2 scratch scratch2 scratch scratch2 scratch scratch2 scratch scratch2 sit*4 sit_blink sit*3
+clip shake loop fps=12 : stand*3 shake1 shake2 shake1 shake2 shake1 shake2 shake1 shake2 stand*6 tilt*6 stand*4
+clip play loop fps=6 : bow bow2 bow bow2 bow*3 stand tilt*3 wag1 wag2 wag1 wag2
 clip walk loop fps=9 speed=15 : walk0 walk1 walk2 walk3 walk4 walk5
-clip run loop fps=15 speed=60 : walk0 walk1 walk2 walk3 walk4 walk5
+clip run loop fps=12 speed=60 : gal0 gal1 gal2 gal3
 """
     profile = """creature
   move ground
   lane 0.3
   speed walk=15 run=60
-  anim idle=idle move=walk run=run look=look alert=alert sniff=sniff eat=sniff rest=sit sit=sit groom=play
-  intents wander=4 sniff=3 look=3 rest=2 groom=4 leave=3
+  anim idle=idle|wag|pant move=walk run=run look=look|howl alert=alert sniff=sniff eat=eat rest=lie|sleep|sit sit=sit groom=play|scratch|shake
+  intents wander=4 forage=2 sniff=3 look=3 rest=2 groom=4 follow=3 leave=2
   homes edge
   fear 0.25
   curiosity 0.7

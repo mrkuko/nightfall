@@ -117,7 +117,7 @@ typedef struct {
 enum {
     A_IDLE, A_MOVE, A_RUN, A_LOOK, A_ALERT, A_EAT, A_GROOM, A_REST, A_FREEZE, A_SNIFF,
     A_CLIMB, A_CLIMB_DOWN, A_APPEAR, A_VANISH, A_SIT,
-    A_HANG, A_LAND, A_TAKEOFF, A_HOLLOW, A_HOLLOW_PEEK, A_COUNT
+    A_HANG, A_LAND, A_TAKEOFF, A_HOLLOW, A_HOLLOW_PEEK, A_CLING, A_COUNT
 };
 
 /* intents */
@@ -157,7 +157,9 @@ typedef struct {
 typedef struct {
     float walk, run, climb;
     int   navmask;
-    int   anim[A_COUNT];        /* clip index for a logical animation */
+    int   anim[A_COUNT];        /* clip index for a logical animation (the first variant) */
+    int16_t avar[A_COUNT][4];   /* variants "groom=scratch|shake|play": one is picked at random */
+    uint8_t nvar[A_COUNT];
     float iw[IN_COUNT];         /* intent weights */
     int   homes;                /* bit mask of place types (1 << PL_*) */
     float fear, curiosity;

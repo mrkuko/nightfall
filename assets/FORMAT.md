@@ -93,6 +93,8 @@ walks back to the trunk's depth. Large animals use a negative value (a bit furth
 
 The intent system asks for logical animations; the profile maps them to clips of the shape.
 Missing ones are replaced sensibly (e.g. `run` -> `move` -> `idle`).
+A logical animation may list **variants** separated by `|` (`groom=play|scratch|shake`,
+`rest=lie|sleep|sit`); each time the creature switches to it, one variant is picked at random.
 
 | Logical | When |
 |---|---|
@@ -100,7 +102,7 @@ Missing ones are replaced sensibly (e.g. `run` -> `move` -> `idle`).
 | `move`, `run` | movement on the ground / through the air (a clip with `speed`) |
 | `look`, `alert`, `sniff` | looking around, alertness, sniffing |
 | `eat`, `groom`, `rest`, `freeze` | eating, grooming, resting, freezing from fear |
-| `climb`, `climb_down` | climbing a trunk |
+| `climb`, `climb_down`, `cling` | climbing a trunk, a short stop on the bark |
 | `appear`, `vanish` | appearing / vanishing (eyes in the dark) |
 | `hang`, `land`, `takeoff` | hanging head down, flipping over when landing, taking off (bat) |
 | `hollow`, `hollow_peek` | only the eyes in a hollow / head poking out (owl) |
