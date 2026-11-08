@@ -114,14 +114,14 @@ once when the creature leaves `X` (getting up). The creature does not move while
 
 ## Intents (`intents`)
 
-`wander forage look groom rest hide peek leave climb perch flee follow watch pass hover sniff emerge vanish roost chase`
+`wander forage look groom rest hide peek leave climb perch flee follow watch pass hover sniff emerge vanish roost chase frolic`
 
 `roost` = settle down: a creature with a `hollow` animation flies into a free visible hollow, a creature with `hang` hangs under a branch (it reserves the spot so that two do not hang in the same place).
 
-`chase` = curiosity, not hunting: a short sprint after a nearby creature from the profile list
+`chase` = curiosity, not hunting: a sprint after any visible creature (even across the screen) from the profile list
 `chases rabbit mouse …`, then `play` and `sniff`. `follow` on the ground = catch up with the
 nearest member of the same species; a `pack N` animal far from the others gets a strong urge to
-follow them, and alone it calls (`look`). `rest_time MIN MAX` = how long a rest lasts (s).
+follow them, and alone it calls (`look`). `frolic` = happy among other animals (2+ creatures within ~90 px): runs into the middle of them, plays and sniffs; the more of them, the more likely. `rest_time MIN MAX` = how long a rest lasts (s).
 
 The weight in the profile is the base; the brain multiplies it by drives (hunger -> `forage`,
 fatigue -> `rest`, boredom -> `leave`, fear -> `hide`) and by randomness. Unreachable

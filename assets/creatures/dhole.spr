@@ -1441,7 +1441,7 @@ creature
   lane 0.3
   speed walk=15 run=60
   anim idle=idle|wag|sniffair|lookback|idle|pant move=walk run=run look=look|howl|lookback|look alert=alert sniff=sniff eat=eat rest=sleep|lie|sleep|sit sit=sit groom=scratch|stretch|scratch|stretch|shake play=play|pounce|play
-  intents wander=3 forage=2 sniff=3 look=3 rest=4 groom=2 chase=1.6 follow=2 leave=1
+  intents wander=3 forage=2 sniff=3 look=3 rest=4 groom=2 chase=2.2 frolic=2 follow=2 leave=1
   rest_time 10 35
   chases rabbit squirrel mouse frog hedgehog dormouse
   homes edge

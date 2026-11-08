@@ -21,7 +21,7 @@ static const char *ANIM_NAMES[A_COUNT] = {
 
 static const char *INTENT_NAMES[IN_COUNT] = {
     "none", "wander", "forage", "look", "groom", "rest", "hide", "peek", "leave",
-    "climb", "perch", "flee", "follow", "watch", "pass", "hover", "sniff", "emerge", "vanish", "roost", "chase"
+    "climb", "perch", "flee", "follow", "watch", "pass", "hover", "sniff", "emerge", "vanish", "roost", "chase", "frolic"
 };
 
 const char *intent_name(int i) { return (i >= 0 && i < IN_COUNT) ? INTENT_NAMES[i] : "?"; }
@@ -512,6 +512,22 @@ static int chase_target(world_t *w, actor_t *a, float maxd)
     return best;
 }
 
+/* Creatures on the ground close to this one (they make a playful animal happy). */
+static int crowd_around(world_t *w, actor_t *a, float radius, float *cx)
+{
+    int n = 0;
+    float sum = 0;
+    for (int i = 0; i < w->nact; i++) {
+        actor_t *o = &w->act[i];
+        if (o == a || !o->alive || o->hidden || o->nav != NAV_GROUND) continue;
+        if (fabsf(o->x - a->x) > radius) continue;
+        n++;
+        sum += o->x;
+    }
+    if (n && cx) *cx = sum / (float)n;
+    return n;
+}
+
 /* Distance to the nearest visible member of the same species (1e9 = alone). */
 static float pack_distance(world_t *w, actor_t *a)
 {
@@ -792,16 +808,32 @@ static void plan_intent(world_t *w, actor_t *a, int in)
     }
     case IN_CHASE: {
         /* curiosity, not hunting: a short sprint after a small creature, then a playful pounce */
-        int t = chase_target(w, a, 160);
+        int t = chase_target(w, a, (float)w->w);        /* anything in sight, even across the screen */
         if (t < 0) { plan_intent(w, a, IN_WANDER); return; }
         a->target = t;
+        s = plan_push(a, ST_FACE);
+        if (s) s->x = w->act[t].x;
         world_log(w, "%s#%u eyes %s#%u", a->spr->name, a->id, w->act[t].spr->name, w->act[t].id);
         push_anim(a, A_ALERT, rng_range(&w->rng, 0.6f, 1.4f));
         s = plan_push(a, ST_CHASE);
-        if (s) { s->place = t; s->dur = rng_range(&w->rng, 2.5f, 5.0f); }
+        if (s) { s->place = t; s->dur = clampf(3.0f + fabsf(w->act[t].x - a->x) / 30.0f, 3.0f, 14.0f); }
         push_anim(a, A_PLAY, rng_range(&w->rng, 1.5f, 3.0f));
         push_anim(a, A_SNIFF, rng_range(&w->rng, 1.0f, 2.5f));
         if (rng_chance(&w->rng, 0.5f)) push_anim(a, A_LOOK, rng_range(&w->rng, 1.0f, 2.5f));
+        break;
+    }
+    case IN_FROLIC: {
+        /* surrounded by animals: happy, runs into the middle of them, jumps around, sniffs everyone */
+        float cx = a->x;
+        if (!ground || crowd_around(w, a, 90, &cx) == 0) { plan_intent(w, a, IN_WANDER); return; }
+        plan_ground_move(w, a, clampf(cx, 10, (float)w->w - 10), fabsf(cx - a->x) > 30, a->lane_z);
+        for (int k = rng_between(&w->rng, 2, 4); k > 0; k--) {
+            s = plan_push(a, ST_FACE);
+            if (s) s->x = cx + rng_range(&w->rng, -30, 30);
+            push_anim(a, A_PLAY, rng_range(&w->rng, 1.2f, 2.6f));
+            push_anim(a, rng_chance(&w->rng, 0.7f) ? A_SNIFF : A_IDLE, rng_range(&w->rng, 0.8f, 2.0f));
+            if (rng_chance(&w->rng, 0.4f)) plan_ground_move(w, a, clampf(cx + rng_range(&w->rng, -22, 22), 10, (float)w->w - 10), 0, a->lane_z);
+        }
         break;
     }
     default:
@@ -850,7 +882,7 @@ static void choose_intent(world_t *w, actor_t *a)
         if (a->nav == NAV_AIR) score[IN_LOOK] *= 0.2f;
         if (a->nav == NAV_PERCH) { score[IN_LOOK] += 2.0f; score[IN_WANDER] *= 0.3f; }
         /* curiosity: running after small creatures (only when one is around and it is not tired) */
-        if (!g || chase_target(w, a, 160) < 0) score[IN_CHASE] = 0;
+        if (!g || chase_target(w, a, (float)w->w) < 0) score[IN_CHASE] = 0;
         else score[IN_CHASE] *= (0.4f + p->curiosity) * (1.2f - a->fatigue);
         /* a pack animal notices it is far from the others and goes after them; alone it calls */
         if (p->pack && g) {
@@ -858,6 +890,11 @@ static void choose_intent(world_t *w, actor_t *a)
             if (d >= 1e8f) score[IN_LOOK] += 1.0f;
             else if (d > 70.0f) score[IN_FOLLOW] += 2.0f + d / 40.0f;
             else score[IN_FOLLOW] *= 0.3f;
+        }
+        /* happy among other animals: the more of them around, the more it wants to play */
+        if (score[IN_FROLIC] > 0) {
+            int n = g ? crowd_around(w, a, 90, NULL) : 0;
+            score[IN_FROLIC] *= n >= 2 ? 0.8f + (float)n * 0.3f : 0.0f;
         }
         /* variety: the same intent again is less likely */
         if (a->intent > 0 && a->intent < IN_COUNT && a->intent != IN_HIDE) score[a->intent] *= 0.45f;
@@ -1262,6 +1299,7 @@ void actor_update(world_t *w, actor_t *a, float dt)
             int moving = a->anim == A_MOVE;
             float r = fast ? 110.0f : moving ? 50.0f : 35.0f;
             float k = fast ? 1.0f : moving ? 0.6f : 0.5f;
+            if (a->intent == IN_FROLIC && !fast) { r = 25.0f; k = 0.3f; }
             world_stimulus(w, a->x, a->y, r, ST_DANGER, k, 0.4f, actor_index(w, a));
         }
         if (sprite_has_tag(a->spr, "glow")) world_stimulus(w, a->x, a->y, 70, ST_GLOW, 0.5f, 0.4f, actor_index(w, a));
