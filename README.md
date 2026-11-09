@@ -34,8 +34,9 @@ Every scene is different. A frame takes about half a millisecond.
   badgers, dholes, moles, fireflies and more. Each has drives (hunger, fatigue, boredom, fear) and picks
   intents: forage, climb a tree along a real path, roost in a hollow, hang under a branch, hide in a bush,
   peek out, chase out of curiosity, play with the pack, sleep.
-- **Living weather.** Wind blows from a direction in slow waves that sweep across the grass. Animals push
-  plants aside as they walk through. Moonbeams, drifting mist and glowing fungi.
+- **Living weather.** Gusts of wind roll through the grass from one side, with calm in between, and each
+  plant is a damped spring that sways as a gust passes. An animal walking through bends only the plants it
+  actually brushes against. Moonbeams, drifting mist and glowing fungi.
 - **Biomes.** Oak wood, beech hall, spruce taiga, rocky pine wood, birch grove, alder swamp, mixed forest.
   Each has its own trees, undergrowth, animals and ground (needles, moss, mud, gravel …).
 - **Tiny and fast.** One ~500 kB binary with all art compiled in. Plain C99 with libc and libm only

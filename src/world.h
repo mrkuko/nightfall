@@ -33,6 +33,10 @@
 enum { GT_SOIL, GT_LITTER, GT_NEEDLES, GT_MOSS, GT_GRASS, GT_STONE, GT_GRAVEL, GT_PEBBLES, GT_MUD, GT_SAND, GT_COUNT };
 extern const char *const GROUND_NAMES[GT_COUNT];
 
+/* One gust of wind: a wave of strength `amp` (< 0 = blowing to the left) that travels `left` more pixels. */
+#define MAX_GUST 8
+typedef struct { float pos, v, width, amp, left, total; } gust_t;
+
 typedef struct {
     sprite_t *spr;
     float  x, y;          /* anchor position in raster pixels */
@@ -229,8 +233,12 @@ typedef struct {
     stim_t     stim[MAX_STIM];
     int        nstim;
     float      t, wind, gust;
-    /* wind: the prevailing direction changes slowly, gust waves roll in the wind direction */
-    float      wind_dir, wind_target, wind_timer, wind_str, wave_pos;
+    /* wind: the prevailing direction changes slowly; between the gusts the air is calm, a gust is a wave
+     * that is born somewhere, rolls through the plants in the wind direction and dies out */
+    float      wind_dir, wind_target, wind_timer, wind_str;
+    gust_t     gusts[MAX_GUST];
+    int        ngust;
+    float      next_gust;
     rng_t      rng;
     library_t *lib;
     uint32_t   next_id;

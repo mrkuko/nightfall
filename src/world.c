@@ -22,7 +22,7 @@ void world_init(world_t *w, library_t *lib, int width, int height, uint64_t seed
     w->wind_target = rng_chance(&w->rng, 0.5f) ? rng_range(&w->rng, 0.6f, 1.0f) : -rng_range(&w->rng, 0.6f, 1.0f);
     w->wind_dir = w->wind_target;
     w->wind_timer = rng_range(&w->rng, 60, 180);
-    w->wave_pos = rng_range(&w->rng, 0, 1000);
+    w->next_gust = rng_range(&w->rng, 1.5f, 5.0f);
     /* gently undulating ground in the lower quarter */
     uint32_t ns = rng_u32(&w->rng);
     float base = (float)height * 0.80f;
@@ -336,39 +336,64 @@ static void update_objects(world_t *w, float dt)
     }
 }
 
-/* Creatures on the ground set plants in motion as they pass through: the push in the movement
- * direction goes into the same spring as the wind, so the plant bends, returns with a delay and rings out. */
+/* A creature on the ground sets in motion only the plants it really brushes against: at nearly the
+ * same depth and under its body, at most the two closest ones, not everything around. The push in the
+ * movement direction goes into the same spring as the wind, so the plant bends, returns with a delay
+ * and rings out. */
 static void touch_plants(world_t *w)
 {
     for (int i = 0; i < w->nobj; i++) w->obj[i].push = 0;
     for (int a = 0; a < w->nact; a++) {
         actor_t *ac = &w->act[a];
         if (!ac->alive || ac->hidden || ac->nav != NAV_GROUND || fabsf(ac->moved) < 0.01f) continue;
+        int best[2] = { -1, -1 };
+        float score[2] = { 1e9f, 1e9f };
         for (int i = 0; i < w->nobj; i++) {
-            object_t *o = &w->obj[i];
+            const object_t *o = &w->obj[i];
             if (o->sway_clip < 0) continue;
-            if (ac->x < (float)o->bx0 + 2 || ac->x > (float)o->bx1 - 2) continue;
-            if (fabsf((float)o->z - ac->zf) > 40) continue;
+            float dz = fabsf((float)o->z - ac->zf);
+            if (dz > 9.0f) continue;
             float mid = ((float)o->bx0 + (float)o->bx1) * 0.5f;
             float half = ((float)o->bx1 - (float)o->bx0) * 0.5f;
-            float k = 1.0f - fabsf(ac->x - mid) / (half + 0.01f);
-            if (k <= 0) continue;
-            o->push += (ac->moved > 0 ? 1.0f : -1.0f) * (0.6f + 0.8f * k);
+            float dx = fabsf(ac->x - mid);
+            if (dx > half * 0.55f + 1.0f) continue;                 /* it has to be under the body, not just nearby */
+            float sc = dz + dx * 0.35f;
+            if (sc < score[0]) { score[1] = score[0]; best[1] = best[0]; score[0] = sc; best[0] = i; }
+            else if (sc < score[1]) { score[1] = sc; best[1] = i; }
+        }
+        for (int k = 0; k < 2; k++) {
+            if (best[k] < 0) continue;
+            object_t *o = &w->obj[best[k]];
+            float half = ((float)o->bx1 - (float)o->bx0) * 0.5f;
+            float mid = ((float)o->bx0 + (float)o->bx1) * 0.5f;
+            float c = 1.0f - fabsf(ac->x - mid) / (half + 0.01f);
+            o->push += (ac->moved > 0 ? 1.0f : -1.0f) * (0.7f + 0.6f * c);
         }
     }
 }
 
+/* Strength of one gust at x in [0, 1] (without the sign): a short rise ahead of the front, a longer
+ * decay behind it, fading in at birth and out towards the end of its life. */
+static float gust_shape(const gust_t *g, float x)
+{
+    float dir = g->amp < 0 ? -1.0f : 1.0f;
+    float s = (g->pos - x) * dir;                       /* > 0: the front has already passed x */
+    float u = s < 0 ? s / (0.40f * g->width) : s / (1.30f * g->width);
+    float shape = expf(-u * u);
+    float done = g->total - g->left;
+    float life = fminf(clampf(done / (0.25f * g->total), 0, 1), clampf(g->left / (0.30f * g->total), 0, 1));
+    return shape * life * life * (3.0f - 2.0f * life);  /* smoothstep */
+}
+
+/* Wind at x: zero in the calm, otherwise the sum of the gusts passing by (plus a little turbulence
+ * that exists only inside a gust). */
 float world_wind_at(const world_t *w, float x)
 {
-    float dir = w->wind_dir;
-    float sgn = dir < 0 ? -1.0f : 1.0f;
-    /* waves travel in the wind direction: u decreases over time for sgn > 0 -> the crest moves right */
-    float u = x * sgn - w->wave_pos;
-    float wave = 0.5f + 0.5f * sinf(u * 0.045f);
-    float env = 0.6f + 0.4f * sinf(u * 0.013f + 1.7f);
-    float gust = wave * wave * env;
-    float turb = vnoise1s(x * 0.08f + w->t * 0.7f, 77u) * 0.12f;
-    return dir * w->wind_str * (0.3f + 1.0f * gust) + turb * w->wind_str;
+    float sum = 0;
+    for (int i = 0; i < w->ngust; i++) sum += w->gusts[i].amp * gust_shape(&w->gusts[i], x);
+    if (fabsf(sum) < 0.001f) return 0;
+    float turb = vnoise1s(x * 0.12f + w->t * 0.9f, 77u) * 0.30f * fabsf(sum);
+    return clampf(sum + turb, -1.4f, 1.4f);
 }
 
 static void update_wind(world_t *w, float dt)
@@ -382,9 +407,35 @@ static void update_wind(world_t *w, float dt)
         w->wind_target = sgn * rng_range(&w->rng, 0.55f, 1.0f);
     }
     w->wind_dir += (w->wind_target - w->wind_dir) * fminf(1.0f, dt * 0.05f);
-    /* strength: slow undulation, never completely calm */
+    /* overall strength: slow undulation, scales the gusts */
     w->wind_str = 0.4f + 0.6f * (vnoise1s(w->t * 0.015f, 31u) * 0.5f + 0.5f);
-    w->wave_pos += dt * (10.0f + 14.0f * w->wind_str);
+
+    /* a new gust now and then (in a wide scene more of them, so that the density stays the same) */
+    w->next_gust -= dt;
+    if (w->next_gust <= 0) {
+        float wide = fmaxf(1.0f, (float)w->w / 260.0f);
+        w->next_gust = fmaxf(1.0f, (rng_chance(&w->rng, 0.25f) ? rng_range(&w->rng, 1.2f, 3.0f)
+                                                             : rng_range(&w->rng, 7.0f, 20.0f)) / wide);
+        if (w->ngust < MAX_GUST) {
+            gust_t *g = &w->gusts[w->ngust++];
+            float dir = w->wind_dir < 0 ? -1.0f : 1.0f;
+            g->width = rng_range(&w->rng, 22.0f, 60.0f);
+            g->v = rng_range(&w->rng, 30.0f, 60.0f) * (0.7f + 0.5f * w->wind_str);
+            g->amp = dir * rng_range(&w->rng, 0.55f, 1.0f) * (0.6f + 0.6f * w->wind_str);
+            g->total = g->left = rng_range(&w->rng, 220.0f, 700.0f);
+            /* born in the upwind half, so that it has somewhere to go */
+            g->pos = dir > 0 ? rng_range(&w->rng, -g->width, (float)w->w * 0.5f)
+                             : rng_range(&w->rng, (float)w->w * 0.5f, (float)w->w + g->width);
+        }
+    }
+    for (int i = 0; i < w->ngust; i++) {
+        gust_t *g = &w->gusts[i];
+        float step = g->v * dt;
+        g->pos += (g->amp < 0 ? -step : step);
+        g->left -= step;
+        if (g->left <= 0 || g->pos < -3.0f * g->width || g->pos > (float)w->w + 3.0f * g->width)
+            w->gusts[i--] = w->gusts[--w->ngust];
+    }
     w->wind = w->wind_dir * w->wind_str;
     w->gust = world_wind_at(w, (float)w->w * 0.5f);
 }
