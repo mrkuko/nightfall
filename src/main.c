@@ -55,7 +55,8 @@ static void usage(void)
            "authoring:\n"
            "  --assets DIR                     load .spr assets from DIR instead of the built-in ones\n"
            "  --sheet OUT.ppm [--filter X] [--depth] [--scale N] [--width PX]   export a sprite sheet\n"
-           "  --snap OUT.ppm [--time S] [--spawn NAME ...] [--shot-scale N]   headless simulation + snapshot\n"
+           "  --snap OUT.ppm [--time S] [--spawn NAME ...] [--shot-scale N] [--width COLS] [--rows N]\n"
+           "                                   headless simulation + snapshot of a COLS x N-row terminal\n"
            "  --record DIR --record-time S [--record-fps F] [--follow NAME] [--crop W H]\n"
            "                                   with --snap: also write frames f0000.ppm … (for GIFs)\n"
            "\n"
@@ -78,6 +79,7 @@ int main(int argc, char **argv)
     const char *spawn[16];
     int nspawn = 0, nrate = 0;
     const char *rate_names[16];
+    int snap_rows = 48;
     int depth = 0, scale = 3, play = 0, gallery = 0, maxw = 360, seed_given = 0;
     float scene_time = 600.0f;
     uint64_t seed = 0;
@@ -109,6 +111,7 @@ int main(int argc, char **argv)
         else if (!strcmp(a, "--record-fps") && i + 1 < argc) g_rec_fps = (float)atof(argv[++i]);
         else if (!strcmp(a, "--follow") && i + 1 < argc) g_rec_follow = argv[++i];
         else if (!strcmp(a, "--crop") && i + 2 < argc) { g_rec_cw = atoi(argv[i + 1]); g_rec_ch = atoi(argv[i + 2]); i += 2; }
+        else if (!strcmp(a, "--rows") && i + 1 < argc) snap_rows = clampi(atoi(argv[++i]), 10, 400);
         else if (!strcmp(a, "--shot-scale") && i + 1 < argc) g_shot_scale = clampi(atoi(argv[++i]), 1, 12);
         else if (!strcmp(a, "--biome") && i + 1 < argc) g_biome_arg = argv[++i];
         else if (!strcmp(a, "--grass-density") && i + 1 < argc) g_fg_density = (float)atof(argv[++i]);
@@ -149,7 +152,7 @@ int main(int argc, char **argv)
 
     int rc;
     if (sheet) rc = sheet_export(&lib, sheet, filter, depth, scale, maxw);
-    else if (snap) rc = play_snapshot(&lib, seed, maxw > 0 && maxw != 360 ? maxw : 160, 48, simtime, snap, spawn, nspawn);
+    else if (snap) rc = play_snapshot(&lib, seed, maxw > 0 && maxw != 360 ? maxw : 160, snap_rows, simtime, snap, spawn, nspawn);
     else if (play) rc = play_run(&lib, assets, seed);
     else if (gallery) rc = gallery_run(&lib, assets, seed_given ? seed : 1);
     else rc = saver_run(&lib, seed, scene_time);

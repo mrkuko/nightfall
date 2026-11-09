@@ -524,9 +524,11 @@ static void add_branches(world_t *w, rng_t *r, int t, float x, int z, int nmin, 
     int dead = sprite_has_tag(ts, "dead");
     int toward = x < (float)w->w * 0.5f;              /* 1 = branches to the right */
     int nb = rng_between(r, nmin, nmax);
-    float ys[8];
+    /* a tall window has more trunk to cover: more branches (1 up to 150 px, then proportionally) */
+    if (w->h > 150) nb = (int)lroundf((float)nb * (float)w->h / 150.0f);
+    float ys[24];
     int ny = 0;
-    for (int i = 0; i < nb * 3 && ny < nb && ny < 8; i++) {
+    for (int i = 0; i < nb * 3 && ny < nb && ny < 24; i++) {
         float by = (float)w->h * rng_range(r, 0.06f, 0.55f);
         int ok = by < world_ground(w, x) - 22.0f;
         for (int k = 0; k < ny; k++) if (fabsf(ys[k] - by) < 9.0f) ok = 0;
@@ -605,8 +607,18 @@ static int fg_z(rng_t *r, int centre, int half)
     return centre + rng_between(r, -half, half) * g_fg_zspread;
 }
 
+/* Trunk / background-tree height for a window of h pixels: 128 up to 150, higher above that so
+ * that the trees always reach beyond the top edge (and are clipped there) instead of ending in the air. */
+static int tree_height_for(int h)
+{
+    if (h <= 150) return 128;
+    int t = (int)(0.92f * (float)h) + 24;
+    return clampi((t + 31) / 32 * 32, 160, 640);
+}
+
 static void build_scene(world_t *w, uint64_t seed)
 {
+    gen_set_tree_height(tree_height_for(w->h));
     rng_t r = rng_seed(seed ^ 0x5eedu);
     int W = w->w;
     int ar = rng_int(&r, AR_COUNT);
@@ -755,6 +767,7 @@ static void build_scene(world_t *w, uint64_t seed)
         world_add_object(w, "mist", x, G(x) + 2, 115, 0, SD);
 
     world_link_paths(w);
+    gen_set_tree_height(128);          /* the gallery and later regenerations use normal-sized shapes */
 #undef BP
 #undef G
 #undef SD

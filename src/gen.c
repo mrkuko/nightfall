@@ -781,6 +781,15 @@ static rgb_t trunk_bark(int kind, int x, int y, float u, float lit, uint32_t ns,
     return c;
 }
 
+/* Height of trunks and background trees in pixels: 128 normally; a tall window (a high-resolution
+ * monitor with small text) needs taller trees, so that they reach beyond the top edge and get clipped. */
+static int g_tree_h = 128;
+
+void gen_set_tree_height(int h)
+{
+    g_tree_h = h < 128 ? 128 : h > 640 ? 640 : h;
+}
+
 static void gen_trunk_kind(sprite_t *s, uint64_t seed, int kind)
 {
     rng_t r = rng_seed(seed);
@@ -791,13 +800,15 @@ static void gen_trunk_kind(sprite_t *s, uint64_t seed, int kind)
     static const float hollow_p[TRUNK_KINDS] = { 0.8f, 0.1f, 0.3f, 0.9f, 0.95f, 0.5f, 0.2f, 0.95f, 0.6f };
     static const float wob_amp[TRUNK_KINDS] = { 3.0f, 2.0f, 1.5f, 3.0f, 3.5f, 2.0f, 1.2f, 8.0f, 3.0f };
     int W = rng_between(&r, wr[kind][0], wr[kind][1]);
-    int H = 128;
+    int H = g_tree_h;
+    int bands = (H + 127) / 128;            /* 1 normally; features repeat per 128 px of a tall trunk */
+    float ext = (float)(H - 128);           /* extra height; the lower 128 px look as on a normal trunk */
     int flare = rng_between(&r, fr[kind][0], fr[kind][1]);
     int fw = W + flare * 2 + 4 + (int)(wob_amp[kind] * 2.0f);
     frame_t *f = sprite_add_frame(s, "base", fw, H, fw / 2, H - 1);
     uint32_t ns = rng_u32(&r);
     float cx = (float)fw / 2.0f;
-    float hol_y = (float)H * rng_range(&r, 0.38f, 0.58f);
+    float hol_y = (float)H - 128.0f * (1.0f - rng_range(&r, 0.38f, 0.58f));   /* same height above the ground */
     float hol_x = cx + rng_range(&r, -W * 0.15f, W * 0.15f);
     float hol_rx = rng_range(&r, 2.8f, 4.0f), hol_ry = rng_range(&r, 5.0f, 7.5f);
     if (kind == TRUNK_GIANT) { hol_rx *= 1.6f; hol_ry *= 1.4f; }
@@ -835,9 +846,9 @@ static void gen_trunk_kind(sprite_t *s, uint64_t seed, int kind)
     }
     /* old oak: burls (growths) with a spiral pattern */
     if (kind == TRUNK_OLD) {
-        int nb = rng_between(&r, 2, 4);
+        int nb = rng_between(&r, 2, 4) * bands;
         for (int i = 0; i < nb; i++) {
-            float by = rng_range(&r, (float)H * 0.3f, (float)H * 0.85f);
+            float by = rng_range(&r, 38.4f, 108.8f + ext);
             float side = rng_chance(&r, 0.5f) ? 1.0f : -1.0f;
             float bx = cx + side * (float)W * 0.42f, br = rng_range(&r, 3.0f, 5.0f);
             for (int yy = (int)(by - br); yy <= (int)(by + br); yy++)
@@ -861,10 +872,10 @@ static void gen_trunk_kind(sprite_t *s, uint64_t seed, int kind)
     }
     /* ivy: climbing stems with leaves on the front of the trunk */
     if (kind == TRUNK_IVY) {
-        int nv = rng_between(&r, 2, 4);
+        int nv = rng_between(&r, 2, 4) * bands;
         for (int v = 0; v < nv; v++) {
             float x = cx + rng_range(&r, -W * 0.35f, W * 0.35f);
-            int top = rng_between(&r, 0, H / 2);
+            int top = rng_between(&r, 0, 64 + (int)ext);
             for (int y = H - 1; y > top; y--) {
                 x += rng_range(&r, -0.7f, 0.7f);
                 x = clampf(x, cx - W * 0.42f, cx + W * 0.42f);
@@ -879,10 +890,10 @@ static void gen_trunk_kind(sprite_t *s, uint64_t seed, int kind)
         }
     }
     /* cracks: dark vertical lines */
-    int ncr = rng_between(&r, 2, 5);
+    int ncr = rng_between(&r, 2, 5) * bands;
     for (int i = 0; i < ncr; i++) {
         float x = cx + rng_range(&r, -W * 0.35f, W * 0.35f);
-        float y0 = rng_range(&r, 0, (float)H * 0.8f), len = rng_range(&r, 10, 30);
+        float y0 = rng_range(&r, 0, 102.4f + ext), len = rng_range(&r, 10, 30);
         for (float y = y0; y < y0 + len && y < H; y += 1.0f) {
             x += rng_range(&r, -0.6f, 0.6f);
             int ix = (int)floorf(x + 0.5f), iy = (int)y;
@@ -911,17 +922,17 @@ static void gen_trunk_kind(sprite_t *s, uint64_t seed, int kind)
     /* bracket fungi on the side */
     /* woodpecker holes on a dead tree */
     if (kind == TRUNK_DEAD) {
-        int nh = rng_between(&r, 2, 5);
+        int nh = rng_between(&r, 2, 5) * bands;
         for (int i = 0; i < nh; i++) {
             int hx = (int)(cx + rng_range(&r, -W * 0.3f, W * 0.3f)), hy = rng_between(&r, 10, H - 30);
             cv_force(f, hx, hy, mkrgb(6, 6, 6), -5);
             cv_force(f, hx, hy + 1, mkrgb(10, 9, 8), -5);
         }
     }
-    int nf = rng_between(&r, 0, kind == TRUNK_DEAD ? 5 : kind == TRUNK_BIRCH ? 1 : 3);
+    int nf = rng_between(&r, 0, kind == TRUNK_DEAD ? 5 : kind == TRUNK_BIRCH ? 1 : 3) * bands;
     for (int i = 0; i < nf; i++) {
         float side = rng_chance(&r, 0.5f) ? -1.0f : 1.0f;
-        float y = rng_range(&r, (float)H * 0.3f, (float)H * 0.85f);
+        float y = rng_range(&r, 38.4f, 108.8f + ext);
         float x = cx + side * ((float)W * 0.5f - 1.0f);
         int fwid = rng_between(&r, 4, 7);
         for (int k = 0; k < fwid; k++) {
@@ -940,7 +951,8 @@ static void gen_trunk_kind(sprite_t *s, uint64_t seed, int kind)
     int nl = kind == TRUNK_BIRCH ? 2 : 3;
     for (int k = 0; k < nl; k++) {
         char buf[384] = "", key[24];
-        for (int y = H - 1; y >= 0; y -= 6) {
+        int pstep = H <= 128 ? 6 : (H + 35) / 36;       /* at most ~36 points (a property value is short) */
+        for (int y = H - 1; y >= 0; y -= pstep) {
             float fromb = (float)(H - 1 - y);
             float fl = fromb < (float)flare * 1.6f ? powf(1.0f - fromb / ((float)flare * 1.6f), 2.2f) : 0.0f;
             float half = (float)W * 0.5f + fl * (float)flare + (vnoise2(0.5f, (float)y * 0.06f, ns) - 0.5f) * 2.5f;
@@ -1683,7 +1695,7 @@ static void gen_firefly(sprite_t *s, uint64_t seed)
 static void gen_tree_far(sprite_t *s, uint64_t seed)
 {
     rng_t r = rng_seed(seed);
-    int W = rng_between(&r, 5, 12), H = 128;
+    int W = rng_between(&r, 5, 12), H = g_tree_h;
     int fw = W + 10;
     frame_t *f = sprite_add_frame(s, "base", fw, H, fw / 2, H - 1);
     uint32_t ns = rng_u32(&r);
@@ -2170,7 +2182,7 @@ static void gen_hanging_moss(sprite_t *s, uint64_t seed)
 static void gen_moonbeam(sprite_t *s, uint64_t seed)
 {
     rng_t r = rng_seed(seed);
-    int bw = rng_between(&r, 10, 22), h = 128;
+    int bw = rng_between(&r, 10, 22), h = g_tree_h;
     float slant = rng_range(&r, 0.12f, 0.3f);
     int w = bw + (int)(slant * (float)h) + 4;
     rgb_t c = mkrgb(150, 180, 192);
@@ -2235,15 +2247,16 @@ static void gen_canopy(sprite_t *s, uint64_t seed)
 {
     rng_t r = rng_seed(seed);
     int w = rng_between(&r, 50, 90), h = rng_between(&r, 18, 30);
+    h = (int)((float)h * (1.0f + ((float)g_tree_h / 128.0f - 1.0f) * 0.5f));     /* a bit thicker in a tall window */
     uint32_t ns = rng_u32(&r);
     float bottom[128];
     for (int x = 0; x < w; x++)
         bottom[x] = (float)h * (0.35f + 0.55f * vnoise2((float)x * 0.08f, 0.5f, ns))
                   * fminf(1.0f, 0.4f + fminf((float)x, (float)(w - 1 - x)) / 12.0f);
     typedef struct { float x, y, len, ang; rgb_t l, d; int z; } cl_t;
-    static cl_t lv[900];
+    static cl_t lv[3000];
     int nl = 0;
-    for (int i = 0; i < w * h / 3 && nl < 900; i++) {
+    for (int i = 0; i < w * h / 3 && nl < 3000; i++) {
         float x = rng_range(&r, 0, (float)w), y = rng_range(&r, 0, (float)h);
         if (y > bottom[(int)x]) continue;
         cl_t *L = &lv[nl++];

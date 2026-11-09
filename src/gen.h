@@ -12,4 +12,7 @@
 /* Registers all generators in the library (with their default seed). */
 void gen_register_all(library_t *lib, uint64_t seed);
 
+/* Height of the generated trunks, background trees and moonbeams (128 = normal, taller for tall windows). */
+void gen_set_tree_height(int h);
+
 #endif

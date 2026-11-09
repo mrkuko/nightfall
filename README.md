@@ -96,7 +96,9 @@ console host needs Windows 10 1809 or newer.
 - **True colour (24-bit)** and **Unicode**: kitty, Alacritty, WezTerm, foot, Ghostty,
   GNOME Terminal, Konsole, iTerm2, Windows Terminal …
 - A font with the `▀` (upper half block) glyph. Practically every monospace font has one.
-- A larger window means a bigger forest. The scene adapts to the terminal size and to resizing.
+- A larger window means a bigger forest. The scene adapts to the terminal size and to resizing. In a
+  very tall window (a 4K monitor with small text) the trees, the background trunks, the canopy and the
+  moonbeams grow taller so that they reach beyond the top edge, and the trunks get more branches.
 
 ## Usage
 
