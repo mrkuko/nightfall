@@ -1,0 +1,28 @@
+name: Sync branches
+
+# Whenever main changes (a merge, a push), merge it into every other branch that is behind it.
+# Branches that would conflict are left alone and the run fails, so you get a notification.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-branches
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # SYNC_TOKEN (optional secret, a personal access token with "contents" and "workflows"
+          # write access): needed when main changed files in .github/workflows (the default token
+          # may not push those), and it makes CI run on the merge commits (the default token does not).
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
+      - name: Merge main into the other branches
+        run: sh .github/scripts/sync-branches.sh main
