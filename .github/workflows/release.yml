@@ -25,7 +25,7 @@ jobs:
       - name: Package
         run: |
           name=nightfall-${GITHUB_REF_NAME#v}-linux-${{ matrix.arch }}
-          mkdir -p $name && cp nightfall README.md docs/nightfall.6 $name/ && cp LICENSE* $name/ 2>/dev/null || true
+          sh packaging/stage-archive.sh $name nightfall man      # binary, README with its images, license
           strip $name/nightfall
           tar czf $name.tar.gz $name
           cp $name/nightfall nightfall-bin
@@ -71,7 +71,7 @@ jobs:
       - name: Package
         run: |
           name=nightfall-${GITHUB_REF_NAME#v}-macos-universal
-          mkdir -p $name && cp nightfall README.md docs/nightfall.6 $name/ && (cp LICENSE* $name/ 2>/dev/null || true)
+          sh packaging/stage-archive.sh $name nightfall man
           tar czf $name.tar.gz $name
       - uses: actions/upload-artifact@v4
         with:
@@ -94,7 +94,7 @@ jobs:
       - name: Package
         run: |
           name=nightfall-${GITHUB_REF_NAME#v}-windows-x86_64
-          mkdir -p $name && cp nightfall.exe README.md $name/ && (cp LICENSE* $name/ 2>/dev/null || true)
+          sh packaging/stage-archive.sh $name nightfall.exe
           strip $name/nightfall.exe
           zip -r $name.zip $name
       - uses: actions/upload-artifact@v4

@@ -11,3 +11,4 @@ build/
 
 # Packages built by packaging/build-packages.sh
 /dist/
+/stage/

@@ -14,8 +14,12 @@ published by hand), a tag `vX.Y.Z` with `Z` above 0 makes a nightly build (publi
 pre-release). The notes are written by `.github/scripts/release-notes.sh` from the commit messages
 (`feat:`, `fix:`, `docs:` ...). Releasing: `git tag v1.0.0 && git push origin v1.0.0`.
 
+The release archives (tar.gz, zip) are laid out by `packaging/stage-archive.sh`: besides the binary they
+contain the README with its images in `Images/` (the links are rewritten from `docs/images/` to
+`./Images/`), the license and FORMAT.md.
+
 CI builds them on every push (`ci.yml`, artifact `packages`) and attaches them to a GitHub
-release when a tag is pushed (`release.yml`): `git tag v0.1.0 && git push --tags`.
+release when a tag is pushed (`release.yml`): `git tag v1.0.0 && git push origin v1.0.0`.
 
 Installing a downloaded package:
 
