@@ -560,13 +560,14 @@ creature
   move ground
   lane 0.3
   speed walk=14 run=60
-  anim idle=idle move=walk run=trot look=look alert=alert eat=sniff sniff=sniff rest=sit sit=sit
-  intents wander=5 sniff=4 look=3 rest=2 leave=3
+  anim idle=idle move=walk run=trot look=look alert=alert eat=sniff sniff=sniff rest=sit sit=sit play=pounce
+  intents wander=4 sniff=4 look=3 rest=2 chase=3 leave=2
   homes edge
   fear 0.2
   curiosity 0.6
   size medium
-  scares rabbit squirrel mouse hedgehog frog
+  chases rabbit mouse mole
+  scares rabbit squirrel mouse hedgehog frog mole
   point head 11 -15
 end
 end
@@ -660,11 +661,34 @@ def fox(out):
     ]
     for name, pose in poses:
         emit_frame(out, name, fox_parts(pose), W, H)
+    # --- the pounce: crouch with a wiggling rump, leap, nose-first landing (the classic fox-on-a-mouse) ---
+    crouch = dict(by=17.4, hx=28.6, hy=16.0, hang=0.4, neck=(23.0, 16.0, 26.8, 16.4), ears=-0.5,
+                  legs=dict(nf=(25.0, 19.2, 27.8, 22.6), ff=(26.6, 19.2, 29.2, 22.6),
+                            nh=(11.0, 19.6, 13.2, 22.6), fh=(9.4, 19.6, 11.4, 22.6)),
+                  tail=[(7.2, 16.8), (4.2, 17.4), (1.8, 17.8), (0.2, 18.2)], trad=[2.0, 2.4, 2.2, 1.7])
+    wiggle1 = dict(crouch, by=16.4, tail=[(7.2, 15.8), (4.4, 14.6), (2.8, 13.2), (2.0, 11.6)],
+                   legs=dict(crouch['legs'], nh=(11.0, 18.6, 11.6, 22.6), fh=(9.4, 18.6, 9.6, 22.6)))
+    wiggle2 = dict(crouch, by=16.4, tail=[(7.2, 15.8), (4.0, 15.8), (1.6, 14.8), (0.2, 13.4)],
+                   legs=dict(crouch['legs'], nh=(11.0, 18.6, 12.8, 22.6), fh=(9.4, 18.6, 11.0, 22.6)))
+    leap = dict(by=8.6, hx=30.4, hy=11.4, hang=1.0, neck=(23.0, 10.0, 28.0, 11.2), ears=-0.4, eye=0,
+                legs=dict(nf=(25.0, 12.0, 30.0, 18.2), ff=(26.6, 12.0, 31.4, 19.0),
+                          nh=(11.0, 12.4, 5.6, 16.6), fh=(9.4, 12.4, 4.0, 15.4)),
+                tail=[(7.2, 7.8), (4.4, 6.4), (2.6, 4.6), (2.0, 2.6)], trad=[2.0, 2.4, 2.2, 1.7])
+    land = dict(by=14.2, hx=31.0, hy=18.6, hang=1.25, neck=(23.0, 13.2, 28.6, 17.6), ears=-0.6, eye=0,
+                legs=dict(nf=(25.0, 16.4, 28.8, 22.6), ff=(26.6, 16.4, 30.4, 22.6),
+                          nh=(11.0, 15.8, 12.0, 22.6), fh=(9.4, 15.8, 9.4, 22.6)),
+                tail=[(7.2, 11.4), (4.4, 9.8), (2.8, 8.0), (2.2, 6.2)], trad=[2.0, 2.4, 2.2, 1.7])
+    shake = dict(land, hy=17.6, hang=1.0, neck=(23.0, 13.2, 28.0, 16.4), eye=1)
+    for name, pose in (('pcrouch', crouch), ('pwiggle1', wiggle1), ('pwiggle2', wiggle2), ('pleap', leap),
+                       ('pland', land), ('pland2', dict(land, tail=[(7.2, 11.8), (4.0, 11.0), (1.8, 10.2), (0.4, 9.0)])),
+                       ('pshake', shake)):
+        emit_frame(out, name, fox_parts(pose), W, H)
     for i in range(6):
         emit_frame(out, 'walk%d' % i, fox_parts(fox_walk(i * math.pi / 3)), W, H)
     for i in range(4):
         emit_frame(out, 'trot%d' % i, fox_parts(fox_walk(i * math.pi / 2, True)), W, H)
     out.append('''
+clip pounce loop fps=8 : pcrouch*4 pwiggle1 pwiggle2 pwiggle1 pwiggle2 pwiggle1 pwiggle2 pcrouch pleap pleap pland*3 pland2 pland*2 pshake pland stand*3
 clip idle loop fps=5 : stand*18 stand_blink stand*10 look*8 stand*6
 clip look loop fps=4 : look*10 stand_blink look*4
 clip alert loop fps=4 : alert*10
@@ -2556,13 +2580,13 @@ clip run loop fps=12 speed=60 : gal0 gal1 gal2 gal3
   anim idle=idle|wag|sniffair|lookback|idle|pant move=walk run=run look=look|howl|lookback|look alert=alert sniff=sniff eat=eat rest=sleep|lie|sleep|sit sit=sit groom=scratch|stretch|scratch|stretch|shake play=play|pounce|play
   intents wander=3 forage=2 sniff=3 look=3 rest=4 groom=2 chase=2.2 frolic=2 follow=2 leave=1
   rest_time 10 35
-  chases rabbit squirrel mouse frog hedgehog dormouse
+  chases rabbit squirrel mouse mole frog hedgehog dormouse
   homes edge
   fear 0.25
   curiosity 0.7
   size medium
   pack 4
-  scares rabbit squirrel mouse hedgehog frog deer weasel dormouse
+  scares rabbit squirrel mouse mole hedgehog frog deer weasel dormouse
   point head 10 -15
 end
 end

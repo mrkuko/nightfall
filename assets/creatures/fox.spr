@@ -231,6 +231,188 @@ frame sit_blink
 |........FffFfFFfFfCCcKkj
 |.........FF.F..F.FCC.K
 
+frame pcrouch
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|...........................Bg
+|...........................BFg
+|..........................BABg
+|..........b....bbbb..bbbb.DkBg
+|........bbabb.baaaabbaaaabDABbb
+|...gg.gbaaaaabaaaaaadaaaabaDaaab
+|gggffgfdaaaaaabaaaaadaaaaadaaEeb
+|cFfffFbaaaaaaabaaaaadaaaaaddccab
+|CcfFf.FdaaBBaabaaaaaadddBBddCCcab
+|CcF.g..daaDABaaaaaaaaaaCDABc.Ccddb
+|.......daaDkkbddddddddaaDAkBj....bn
+|........dddKKk..........aDKkJj
+|..........JjKk............KKkj
+|.............k.............K
+
+frame pwiggle1
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|..g........................Bg
+|ggc........................BFg
+|cccgg.....b....bbbb.......BABg
+|.Ccffgg.bbabbbbaaaab.bbbb.DkBg
+|.gFffffbaaaabbaaaaaabaaaabDABbb
+|...FFffdaaaaaabaaaaadaaaabaDaaab
+|...F.FbaaaaaaabaaaaadaaaaadaaEeb
+|......daaaBBaabaaaaadaaaaaddccab
+|.......daaDBaaaaaaaaddddBBddCCcab
+|.......daaDBabdddddd.daCDABc.Ccddb
+|........ddkkd..........aDAkBj....bn
+|.........jKkB............DKkJj
+|.........j.Kk.............KKkj
+|...........K...............K
+
+frame pwiggle2
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|...........................Bg
+|...........................BFg
+|.g........b....bbbb.......BABg
+|.cggg...bbabbbbaaaab.bbbb.DkBg
+|ccffg.gbaaaabbaaaaaabaaaabDABbb
+|FffffgfdaaaaaabaaaaadaaaabaDaaab
+|FFFfffbaaaaaaabaaaaadaaaaadaaEeb
+|...FFFdaaaBBaabaaaaadaaaaaddccab
+|.......daaDBaaaaaaaaddddBBddCCcab
+|.......daaDABbdddddd.daCDABc.Ccddb
+|........dddkk..........aDAkBj....bn
+|.........FJKk............DKkJj
+|..........JjKk............KKkj
+|............K..............K
+
+frame pleap
+|.
+|.gg
+|gfcg
+|ccCc
+|FCffgg
+|.Fffffg.bbbbbbbbbbbbbbb.....BBg
+|.FFffffgdaaaabaaaaaaaab.....DBFg
+|...FFfffdaaaaabaaaaaabbbbcc.DBFg
+|...F.FbbaaaaaabaaaaabaaaabbcDkBg
+|......daaaaaaabaaaaadaaaaaabDABb
+|.......daaaaaabaaaaaadaaaaaaDDBab
+|.......daaBBaddaaaadbaaaBBaadaadb
+|.......gdBABd..dddd..dddDABddacbb
+|.....jjfBADB.............DABgdCcb
+|....jJjkkD...............DAkBgCcb
+|...jJkkKk.................DKkj.cb
+|.....KK....................KKkjdab
+|.....K......................KKk.db
+|.............................Kkj.n
+|...............................j
+|.
+|.
+|.
+|.
+
+frame pland
+|.
+|.
+|.
+|.
+|.
+|.gc
+|.cCc
+|.CCfg
+|.gfffgg
+|.Ffffffg
+|..FFFfffgbbb..bbbbbb..bb
+|.....Fffgdaabbaaaaaabbaabb
+|......Fbbaaaabaaaaaadaaaaab..B
+|.......daaaaaabaaaaadaaaaaab.B.g
+|......baaaaaaabaaaaadaaaaaaabDBg
+|......daaaBBaabaaaaaaddaBBaaakBfg
+|.......daaDBaaaaaaaaaaadDABaaDABb
+|.......ddaDABbdddddddd.aDABabDDab
+|........FdDkB..........aaDABdaaaab
+|........jjkKk............Dkkddabdb
+|........Jj.Kk.............KKkdccb
+|........Jj.Kk..............KkJCcb
+|.........j.Kk...............KkdCc
+|............................K..db
+
+frame pland2
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|cggg
+|Ccffggg
+|CFffffg.gbbb..bbbbbb..bb
+|gFFffffggdaabbaaaaaabbaabb
+|...FFffbbaaaabaaaaaadaaaaab..B
+|.....FFdaaaaaabaaaaadaaaaaab.B.g
+|......baaaaaaabaaaaadaaaaaaabDBg
+|......daaaBBaabaaaaaaddaBBaaakBfg
+|.......daaDBaaaaaaaaaaadDABaaDABb
+|.......ddaDABbdddddddd.aDABabDDab
+|........FdDkB..........aaDABdaaaab
+|........jjkKk............Dkkddabdb
+|........Jj.Kk.............KKkdccb
+|........Jj.Kk..............KkJCcb
+|.........j.Kk...............KkdCc
+|............................K..db
+
+frame pshake
+|.
+|.
+|.
+|.
+|.
+|.gc
+|.cCc
+|.CCfg
+|.gfffgg
+|.Ffffffg
+|..FFFfffgbbb..bbbbbb..bb
+|.....Fffgdaabbaaaaaabbaabb...B
+|......Fbbaaaabaaaaaadaaaaab..B.g
+|.......daaaaaabaaaaadaaaaaab.DBg
+|......baaaaaaabaaaaadaaaaaaabkBfg
+|......daaaBBaabaaaaaaddaBBaaaDABb
+|.......daaDBaaaaaaaaaaadDABabDDab
+|.......ddaDABbdddddddd.aDABadaaaab
+|........FdDkB..........aaDABddabEe
+|........jjkKk............Dkkjdccb
+|........Jj.Kk.............KKkjCCcb
+|........Jj.Kk..............KkJjCcb
+|.........j.Kk...............Kkj.db
+|............................K....db
+
 frame walk0
 |.
 |.
@@ -492,6 +674,7 @@ frame trot3
 |.
 
 
+clip pounce loop fps=8 : pcrouch*4 pwiggle1 pwiggle2 pwiggle1 pwiggle2 pwiggle1 pwiggle2 pcrouch pleap pleap pland*3 pland2 pland*2 pshake pland stand*3
 clip idle loop fps=5 : stand*18 stand_blink stand*10 look*8 stand*6
 clip look loop fps=4 : look*10 stand_blink look*4
 clip alert loop fps=4 : alert*10
@@ -505,13 +688,14 @@ creature
   move ground
   lane 0.3
   speed walk=14 run=60
-  anim idle=idle move=walk run=trot look=look alert=alert eat=sniff sniff=sniff rest=sit sit=sit
-  intents wander=5 sniff=4 look=3 rest=2 leave=3
+  anim idle=idle move=walk run=trot look=look alert=alert eat=sniff sniff=sniff rest=sit sit=sit play=pounce
+  intents wander=4 sniff=4 look=3 rest=2 chase=3 leave=2
   homes edge
   fear 0.2
   curiosity 0.6
   size medium
-  scares rabbit squirrel mouse hedgehog frog
+  chases rabbit mouse mole
+  scares rabbit squirrel mouse hedgehog frog mole
   point head 11 -15
 end
 end

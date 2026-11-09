@@ -186,7 +186,7 @@ floor patches. Add your own without touching the code.
 
 | | | |
 |---|---|---|
-| **Rabbit** forages, grooms, freezes, bolts into a bush | **Squirrel** climbs trunks along real paths, runs out onto branches, hides in hollows | **Fox** trots, sniffs, scares the small ones |
+| **Rabbit** forages, grooms, freezes, bolts into a bush | **Squirrel** climbs trunks along real paths, runs out onto branches, hides in hollows | **Fox** trots, sniffs and hunts rabbits, mice and moles with a crouch and a pounce |
 | **Owl** roosts in a hollow with only its eyes glowing and pokes its head out | **Bat** hangs upside down under branches | **Dhole** lives in packs, plays, chases out of curiosity, sleeps curled up |
 | **Deer** grazes with its head down and blinks | **Mole** surfaces here and there and leaves molehills | **Hedgehog, badger, boar, wildcat, weasel, mouse, dormouse** |
 | **Frog, salamander, snail, slug** | **Beetle, stag beetle, moth, fireflies, spider** | **Eyes in the dark, forest spirit** |
