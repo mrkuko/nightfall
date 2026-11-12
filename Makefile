@@ -44,8 +44,13 @@ build/assets_embed.o: build/assets_embed.c
 
 # Windows screensaver (win/scr.c #includes src/gallery.c, so it links every object except gallery and main)
 SCR_OBJ = $(filter-out build/gallery.o build/main.o,$(OBJ))
-nightfall.scr: win/scr.c $(SCR_OBJ) $(wildcard src/*.h src/gallery.c) | build
-	$(CC) $(CPPFLAGS) $(CFLAGS) -mwindows -o $@ win/scr.c $(SCR_OBJ) $(LDLIBS) -lgdi32 -luser32
+# build/nightfall-saver.exe is the same file: run it from a shell with arguments (a .scr is started by
+# the shell association, which drops them): build/nightfall-saver.exe /s --height 400
+nightfall.scr: build/nightfall-saver.exe
+	cp $< $@
+
+build/nightfall-saver.exe: win/scr.c $(SCR_OBJ) $(wildcard src/*.h src/gallery.c) | build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -mwindows -o $@ win/scr.c $(SCR_OBJ) $(LDLIBS) -lgdi32 -luser32 -ladvapi32
 
 build:
 	mkdir -p build
