@@ -94,8 +94,9 @@ jobs:
       - name: Package
         run: |
           name=nightfall-${GITHUB_REF_NAME#v}-windows-x86_64
-          sh packaging/stage-archive.sh $name nightfall.exe
-          strip $name/nightfall.exe
+          # nightfall.exe (terminal) + nightfall.scr (the Windows screensaver) + its install script
+          EXTRA="nightfall.scr packaging/windows/install-screensaver.ps1" sh packaging/stage-archive.sh $name nightfall.exe
+          strip $name/nightfall.exe $name/nightfall.scr
           zip -r $name.zip $name
       - uses: actions/upload-artifact@v4
         with:

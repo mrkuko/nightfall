@@ -50,7 +50,7 @@ nightfall.scr: build/nightfall-saver.exe
 	cp $< $@
 
 build/nightfall-saver.exe: win/scr.c $(SCR_OBJ) $(wildcard src/*.h src/gallery.c) | build
-	$(CC) $(CPPFLAGS) $(CFLAGS) -mwindows -o $@ win/scr.c $(SCR_OBJ) $(LDLIBS) -lgdi32 -luser32 -ladvapi32
+	$(CC) $(CPPFLAGS) $(CFLAGS) -mwindows $(LDFLAGS) -o $@ win/scr.c $(SCR_OBJ) $(LDLIBS) -lgdi32 -luser32 -ladvapi32
 
 build:
 	mkdir -p build

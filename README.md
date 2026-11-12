@@ -71,7 +71,7 @@ offline. The Linux builds are static, so they have no dependencies.
 | Arch Linux | `nightfall-*.pkg.tar.zst` | `sudo pacman -U nightfall-*.pkg.tar.zst` |
 | any Linux | `nightfall-*-linux-*.tar.gz` | unpack and run `nightfall` |
 | macOS | `nightfall-*-macos-universal.tar.gz` | unpack and run `nightfall` |
-| Windows | `nightfall-*-windows-x86_64.zip` | unpack and run `nightfall.exe` in Windows Terminal |
+| Windows | `nightfall-*-windows-x86_64.zip` | unpack; run `nightfall.exe` in Windows Terminal, or install `nightfall.scr` as a [real screensaver](#as-a-real-screensaver) |
 
 Versions: **`vX.Y.0` is a full release**; `vX.Y.Z` with `Z` above 0 is a **nightly build**, marked as a
 pre-release on the releases page.
@@ -89,8 +89,8 @@ sudo make install                   # optional: /usr/local/bin + man page (PREFI
 ```
 
 **Windows:** build with [MSYS2](https://www.msys2.org/) (MinGW-w64):
-`pacman -S make mingw-w64-x86_64-gcc`, then `make`. Run it in **Windows Terminal**. The classic
-console host needs Windows 10 1809 or newer.
+`pacman -S make mingw-w64-x86_64-gcc`, then `make` (it builds `nightfall.exe` and the screensaver
+`nightfall.scr`). Run it in **Windows Terminal**. The classic console host needs Windows 10 1809 or newer.
 
 ### Terminal requirements
 
@@ -167,6 +167,27 @@ set -g lock-command "nightfall"
 
 Any key returns you to your work. You can also bind it to a shell alias, a `swayidle`/`xautolock`
 hook that opens a fullscreen terminal, or just leave it running on a second monitor.
+
+#### Windows
+
+`nightfall.scr` is a native Windows screensaver: it needs no terminal, no `nightfall.exe` and no runtime.
+The forest is drawn fullscreen on **every monitor** as one scene (animals walk from screen to screen; each
+monitor is anchored at the bottom of the scene, so the ground is at the bottom everywhere). Any key, mouse
+click or mouse movement quits.
+
+* **Install:** right-click `nightfall.scr` in Explorer, **Install** (it asks for admin rights, copies the
+  file to `System32` and opens the screensaver dialog). Without admin rights run
+  `powershell -ExecutionPolicy Bypass -File install-screensaver.ps1` instead (`-Minutes 10` sets the idle
+  time, `-Remove` uninstalls); it uses the file where it is, so do not delete the folder afterwards.
+* **Settings:** *Settings…* in the screensaver dialog (or `nightfall.scr /c`): the pixel size (auto, or the
+  art-pixel size of the main monitor, default 300 rows), the foreground plants (`--grass-density`,
+  `--grass-spread`, `--grass-zspread`), the biome and the spawn rates (`--spawn-rate`). They are stored
+  in `HKCU\Software\Nightfall`.
+* **Trying options:** a `.scr` is started through the shell association, which drops command-line
+  arguments, so run the same program as an exe: `make` also leaves `build\nightfall-saver.exe`, and
+  `build\nightfall-saver.exe /s --height 400 --grass-density 2 --spawn-rate rabbit=0` runs it with those
+  options (they override the saved settings and are not saved). `--info` shows the monitors and the scene
+  size instead of running.
 
 ## Biomes
 
@@ -259,6 +280,7 @@ Python rig ([`tools/sketch_rig.py`](tools/sketch_rig.py)) that builds them from 
 
 ```text
 src/          engine: terminal, raster + z-buffer, sprites, generators, world, creatures, scenes
+win/          Windows screensaver (nightfall.scr): a GDI window per monitor
 assets/       creatures (.spr), biomes, FORMAT.md
 tools/        embed.c (packs assets into the binary), sketch_rig.py (pose sketching)
 docs/         man page, screenshots

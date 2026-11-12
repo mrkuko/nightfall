@@ -273,7 +273,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     }
     case WM_ACTIVATEAPP:
-        if (!wp && armed) g_quit = 1;
+        if (!wp && armed) g_quit = 2;
         return 0;
     case WM_SETCURSOR: SetCursor(NULL); return TRUE;
     case WM_ERASEBKGND: return 1;
@@ -288,6 +288,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         if ((wp & 0xFFF0) == SC_SCREENSAVE || (wp & 0xFFF0) == SC_MONITORPOWER) return 0;
         break;
     case WM_CLOSE: g_quit = 1; return 0;
+    case WM_DISPLAYCHANGE: g_quit = 3; return 0;       /* a monitor was plugged in/out or resized: the layout is stale */
     }
     return DefWindowProcA(h, msg, wp, lp);
 }
@@ -451,5 +452,5 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
     raster_free(&g_r);
     lib_free(&lib);
     CloseHandle(once);
-    return 0;
+    return g_quit == 1 ? 0 : g_quit;               /* exit code = why it ended: 0 input, 2 lost focus, 3 display change */
 }

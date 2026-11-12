@@ -43,6 +43,9 @@ jobs:
         run: |
           ./nightfall.exe --version
           ./nightfall.exe --snap snap.ppm --seed 1 --time 20
+          test -s nightfall.scr                 # the screensaver (win/scr.c) was built too
+      - name: Archive layout (with the screensaver)
+        run: EXTRA="nightfall.scr packaging/windows/install-screensaver.ps1" sh packaging/stage-archive.sh stage nightfall.exe && ls stage
 
   packages:
     # builds the .deb / .rpm / Arch packages on every push, so a broken definition shows up early
