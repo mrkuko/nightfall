@@ -1053,12 +1053,25 @@ int play_run(library_t *lib, const char *assets_dir, uint64_t seed)
         world_render(w, &r, debug);
         screen_from_raster(&sc, &r, 0);
         if (hud) {
-            char line[512];
-            snprintf(line, sizeof line, " NIGHTFALL playground  seed %llu (%s)  creatures %d  %.2gx%s   "
+            char line[512], head[640];
+            snprintf(head, sizeof head, " NIGHTFALL playground  seed %llu (%s)  creatures %d  %.2gx%s  %dx%d cells (%dx%d px)   "
                      "q quit  l new scene  B biome  h hud  d places/paths  space pause  +/- time  n spawn  r s x o v e g j b c m w p = rabbit squirrel fox owl bat eyes spirit deer boar cat mole weasel dhole ",
-                     (unsigned long long)seed, g_scene_desc, w->population, (double)speed, paused ? " PAUSED" : "");
-            screen_text(&sc, 0, 0, line, UI_DIM, &UI_BG);
-            int y = 1;
+                     (unsigned long long)seed, g_scene_desc, w->population, (double)speed, paused ? " PAUSED" : "",
+                     sc.w, sc.h, r.w, r.h);
+            /* the header wraps at word boundaries when the terminal is narrow */
+            int y = 0, width = sc.w > 8 ? sc.w : 8;
+            for (const char *p = head; *p && y < sc.h / 3 + 1;) {
+                int n = (int)strlen(p);
+                if (n > width) {
+                    n = width;
+                    while (n > 1 && p[n] != ' ') n--;       /* break at the last space that fits */
+                    if (n <= 1) n = width;
+                }
+                snprintf(line, sizeof line, "%.*s", n, p);
+                screen_text(&sc, 0, y++, line, UI_DIM, &UI_BG);
+                p += n;
+                while (*p == ' ') p++;
+            }
             for (int i = 0; i < w->nact && y < sc.h - 8; i++) {
                 actor_t *a = &w->act[i];
                 if (!a->alive) continue;
