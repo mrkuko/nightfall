@@ -179,6 +179,9 @@ click or mouse movement quits.
   file to `System32` and opens the screensaver dialog). Without admin rights run
   `powershell -ExecutionPolicy Bypass -File install-screensaver.ps1` instead (`-Minutes 10` sets the idle
   time, `-Remove` uninstalls); it uses the file where it is, so do not delete the folder afterwards.
+* **SmartScreen:** the file is not code-signed, so Windows may warn when you open a downloaded `.scr` or
+  the ZIP (*Windows protected your PC*): click **More info**, then **Run anyway**. Or right-click the
+  downloaded ZIP, **Properties**, tick **Unblock**, before unpacking it.
 * **Settings:** *Settings…* in the screensaver dialog (or `nightfall.scr /c`): the pixel size (auto, or the
   art-pixel size of the main monitor, default 300 rows), the foreground plants (`--grass-density`,
   `--grass-spread`, `--grass-zspread`), the biome and the spawn rates (`--spawn-rate`). They are stored
@@ -193,15 +196,17 @@ click or mouse movement quits.
 
 | Biome | Trees | Ground | Typical visitors |
 |---|---|---|---|
-| Oak wood | oak, old oak, ivy oak, beech | leaf litter, soil, moss | rabbit, squirrel, badger, fox, deer, stag beetle |
-| Beech hall | beech | deep leaf litter | squirrel, dormouse, owl, wildcat |
-| Spruce taiga | spruce, pine | needles, moss | squirrel, owl, dhole, boar |
-| Rocky pine wood | pine, dead pine | stone, gravel, sand | fox, weasel, wildcat, dhole |
-| Birch grove | birch | grass, moss | rabbit, mole, hedgehog, deer, frog |
-| Alder swamp | birch, dead trees | mud, moss, puddles | frog, salamander, snail, bat, fireflies |
-| Mixed forest | a bit of everything | a bit of everything | anyone |
+| Oak wood (`oak_wood`) | oak, old oak, ivy oak, beech | leaf litter, soil, moss | rabbit, squirrel, badger, fox, deer, stag beetle |
+| Beech hall (`beech_hall`) | beech | deep leaf litter | squirrel, dormouse, owl, wildcat |
+| Spruce taiga (`taiga`) | spruce, pine | needles, moss | squirrel, owl, dhole, boar |
+| Rocky pine wood (`pine_rocks`) | pine, dead pine | stone, gravel, sand | fox, weasel, wildcat, dhole |
+| Birch grove (`birch_grove`) | birch | grass, moss | rabbit, mole, hedgehog, deer, frog |
+| Alder swamp (`swamp`) | birch, dead trees | mud, moss, puddles | frog, salamander, snail, bat, fireflies |
+| Mixed forest (`mixed`) | a bit of everything | a bit of everything | anyone |
 
-Biomes are plain data (`assets/biomes/biomes.spr`): weighted lists of trees, plants, animals and
+The name in brackets is what `--biome` takes (`--biome taiga`; `--biome list` prints them all, `--biome off`
+turns the recommendations off, the default `auto` picks one at random). Biomes are plain data
+(`assets/biomes/biomes.spr`): weighted lists of trees, plants, animals and
 floor patches. Add your own without touching the code.
 
 ## Creatures
