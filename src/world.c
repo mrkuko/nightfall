@@ -12,7 +12,7 @@ void world_init(world_t *w, library_t *lib, int width, int height, uint64_t seed
 {
     memset(w, 0, sizeof *w);
     w->lib = lib;
-    w->w = width < 1024 ? width : 1024;
+    w->w = width < NF_MAX_W ? width : NF_MAX_W;
     w->h = height;
     w->rng = rng_seed(seed);
     w->ground_z = 100;

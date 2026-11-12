@@ -17,6 +17,7 @@ DOCDIR  ?= $(PREFIX)/share/doc/nightfall
 
 ifeq ($(OS),Windows_NT)
 EXE     = .exe
+SCR     = nightfall.scr
 endif
 BIN     = nightfall$(EXE)
 
@@ -24,7 +25,7 @@ SRC     = $(wildcard src/*.c)
 OBJ     = $(patsubst src/%.c,build/%.o,$(SRC)) build/assets_embed.o
 ASSETS  = $(sort $(wildcard assets/*.spr assets/*/*.spr))
 
-all: $(BIN)
+all: $(BIN) $(SCR)
 
 $(BIN): $(OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ) $(LDLIBS)
@@ -41,6 +42,11 @@ build/assets_embed.c: build/embed$(EXE) $(ASSETS)
 build/assets_embed.o: build/assets_embed.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+# Windows screensaver (win/scr.c #includes src/gallery.c, so it links every object except gallery and main)
+SCR_OBJ = $(filter-out build/gallery.o build/main.o,$(OBJ))
+nightfall.scr: win/scr.c $(SCR_OBJ) $(wildcard src/*.h src/gallery.c) | build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -mwindows -o $@ win/scr.c $(SCR_OBJ) $(LDLIBS) -lgdi32 -luser32
+
 build:
 	mkdir -p build
 
@@ -55,6 +61,6 @@ uninstall:
 	rm -rf $(DESTDIR)$(DOCDIR)
 
 clean:
-	rm -rf build $(BIN)
+	rm -rf build $(BIN) $(SCR)
 
 .PHONY: all install uninstall clean

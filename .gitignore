@@ -13,3 +13,4 @@ garbage/
 # Packages built by packaging/build-packages.sh
 /dist/
 /stage/
+/nightfall.scr
