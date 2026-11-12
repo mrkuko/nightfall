@@ -26,8 +26,10 @@ void world_init(world_t *w, library_t *lib, int width, int height, uint64_t seed
     /* gently undulating ground in the lower quarter */
     uint32_t ns = rng_u32(&w->rng);
     float base = (float)height * 0.80f;
+    /* the swell is in art pixels: a tall window must not get hills (10 % of the height, at most 12 px) */
+    float amp = fminf((float)height * 0.10f, 12.0f);
     for (int x = 0; x < w->w; x++)
-        w->ground[x] = base + (fbm2((float)x * 0.02f, 0.5f, 3, ns) - 0.5f) * (float)height * 0.10f;
+        w->ground[x] = base + (fbm2((float)x * 0.02f, 0.5f, 3, ns) - 0.5f) * amp;
 }
 
 void world_free(world_t *w)

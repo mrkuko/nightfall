@@ -130,8 +130,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show)
         if (g_mon[i].rc.bottom > vb) vb = g_mon[i].rc.bottom;
     }
     g_vw = vr - g_vx; g_vh = vb - g_vy;
-    /* art pixel size: about 270 art rows on the primary screen; the world is NF_MAX_W wide at most */
-    g_scale = (GetSystemMetrics(SM_CYSCREEN) + 135) / 270;
+    /* art pixel size: about 540 art rows on the primary screen (4 px on 4K, 2 px on 1080p); the world is NF_MAX_W wide at most */
+    g_scale = (GetSystemMetrics(SM_CYSCREEN) + 270) / 540;
     if (g_scale < 1) g_scale = 1;
     while (g_vw / g_scale > NF_MAX_W) g_scale++;
 

@@ -21,7 +21,7 @@
 /* widest scene in art pixels (terminal: columns; Windows screensaver: the whole desktop) */
 #define NF_MAX_W   2048
 
-#define MAX_OBJ    160
+#define MAX_OBJ    1024     /* a 4K scene needs ~600 (trees, branches, the foreground plants last) */
 #define MAX_ACT    32
 #define MAX_PLACE  128
 #define MAX_STIM   48
