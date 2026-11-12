@@ -4,7 +4,7 @@
 #   make install              install to $(PREFIX) (default /usr/local); DESTDIR for packaging
 #   make uninstall
 #   make CC=clang             any C99 compiler; on Windows use MSYS2 / MinGW-w64
-VERSION ?= 1.0.0
+VERSION ?= 1.1.0
 CC      ?= cc
 CFLAGS  ?= -std=c99 -O2 -Wall -Wextra -Wno-unused-parameter
 CPPFLAGS += -DNF_VERSION=\"$(VERSION)\"
