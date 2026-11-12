@@ -607,6 +607,22 @@ static int fg_z(rng_t *r, int centre, int half)
     return centre + rng_between(r, -half, half) * g_fg_zspread;
 }
 
+/* --grass-zspread above 1 also plants in front of the usual strip, down the dirt towards the bottom edge:
+ * 2 = half way, 3 or more = all the way. The lower a plant stands, the nearer it is (drawn in front).
+ * Returns 0..1 (the depth within that extra area, for z) and sets *dy (the extra y, in pixels);
+ * `below` = how far under the ground line the plant already stands. At zspread <= 1 nothing changes
+ * (and no random numbers are drawn, so existing seeds look the same). */
+static float fg_extra(world_t *w, rng_t *r, float x, float below, float *dy)
+{
+    float frac = fminf(1.0f, (g_fg_zspread - 1.0f) * 0.5f);
+    *dy = 0;
+    if (frac <= 0) return 0;
+    float room = (float)w->h - 1.0f - (world_ground(w, x) + below);
+    float t = rng_float(r) * frac;
+    *dy = room > 0 ? t * room : 0;
+    return t;
+}
+
 /* Trunk / background-tree height for a window of h pixels: 128 up to 150, higher above that so
  * that the trees always reach beyond the top edge (and are clipped there) instead of ending in the air. */
 static int tree_height_for(int h)
@@ -749,16 +765,23 @@ static void build_scene(world_t *w, uint64_t seed)
     float step0 = (ar == AR_THICKET ? 5.0f : ar == AR_CLEARING ? 11.0f : 7.0f) * 1.45f
                 / fmaxf(0.1f, bnum("plant_density", 1.0f));
     /* far band: low grass and small flowers, slightly in front of the creatures */
-    for (float x = rng_range(&r, -4, 8); x < (float)W + 10; x += fg_gap(&r, step0 * 2.4f, step0 * 5.0f))
-        world_add_object(w, BP("plants_far", ALL_FAR), x, G(x) + rng_range(&r, 2, 6),
-                         fg_z(&r, 112, 4), FLIP, SD);
+    for (float x = rng_range(&r, -4, 8); x < (float)W + 10; x += fg_gap(&r, step0 * 2.4f, step0 * 5.0f)) {
+        float dy, e = fg_extra(w, &r, x, 6, &dy);
+        world_add_object(w, BP("plants_far", ALL_FAR), x, G(x) + rng_range(&r, 2, 6) + dy,
+                         fg_z(&r, 112, 4) + (int)(e * 60), FLIP, SD);
+    }
     /* middle band: the main undergrowth */
-    for (float x = rng_range(&r, -6, 6); x < (float)W + 10; x += fg_gap(&r, step0 * 1.9f, step0 * 4.2f))
-        world_add_object(w, BP("plants", ALL_PLANTS), x, G(x) + rng_range(&r, 4, 11), fg_z(&r, w->fg_z - 2, 6), FLIP, SD);
+    for (float x = rng_range(&r, -6, 6); x < (float)W + 10; x += fg_gap(&r, step0 * 1.9f, step0 * 4.2f)) {
+        float dy, e = fg_extra(w, &r, x, 11, &dy);
+        world_add_object(w, BP("plants", ALL_PLANTS), x, G(x) + rng_range(&r, 4, 11) + dy,
+                         fg_z(&r, w->fg_z - 2, 6) + (int)(e * 60), FLIP, SD);
+    }
     /* near band: big plants, sparse, closest to the camera and lowest on the screen */
-    for (float x = rng_range(&r, -10, 20); x < (float)W + 12; x += fg_gap(&r, step0 * 4.0f, step0 * 7.5f))
-        world_add_object(w, BP("plants_near", ALL_NEAR), x, G(x) + rng_range(&r, 9, 15),
-                         fg_z(&r, w->fg_z + 18, 6), FLIP, SD);
+    for (float x = rng_range(&r, -10, 20); x < (float)W + 12; x += fg_gap(&r, step0 * 4.0f, step0 * 7.5f)) {
+        float dy, e = fg_extra(w, &r, x, 15, &dy);
+        world_add_object(w, BP("plants_near", ALL_NEAR), x, G(x) + rng_range(&r, 9, 15) + dy,
+                         fg_z(&r, w->fg_z + 18, 6) + (int)(e * 60), FLIP, SD);
+    }
     for (float x = rng_range(&r, 0, 10); x < (float)W; x += fg_gap(&r, 24, 55))
         world_add_object(w, BP("plants_far", ALL_FAR), x, G(x) + 1, 98, FLIP, SD);
 

@@ -14,7 +14,7 @@
  *   --biome B           auto (default: random by seed) | off (no recommendations) | NAME | list
  *   --grass-density F   foreground plant density (1 = default, 2 = twice as dense, 0.5 = sparser)
  *   --grass-spread F    randomness of the gaps between plants (0 = even, 1 = default, 2 = clumpy)
- *   --grass-zspread F   spread of foreground depth (0 = one layer, 1 = default, 2 = deeper)
+ *   --grass-zspread F   depth of the foreground (0 = one layer, 1 = default strip, 2 = half way down the dirt, 3+ = down to the bottom edge)
  *   --assets DIR    load assets from a directory (instead of the embedded ones; 'r' = reload)
  *   --filter X      (sheet) only shapes whose name/tag matches X
  *   --depth         (sheet) depth view
@@ -50,7 +50,7 @@ static void usage(void)
            "  --spawn-rate NAME=F [NAME=F ...] override spawn chances (biome chances sum to 1)\n"
            "  --grass-density F                foreground plant density (default 1)\n"
            "  --grass-spread F                 randomness of the gaps between plants (default 1)\n"
-           "  --grass-zspread F                depth spread of the foreground (default 1)\n"
+           "  --grass-zspread F                depth of the foreground: 2 = half way down the dirt, 3+ = to the bottom (default 1)\n"
            "\n"
            "authoring:\n"
            "  --assets DIR                     load .spr assets from DIR instead of the built-in ones\n"

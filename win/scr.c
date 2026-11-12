@@ -206,7 +206,7 @@ static void run_settings(HINSTANCE inst)
     CTL("EDIT", "", TXT, 210, 165, 50, 24, ID_GS);
     CTL("STATIC", "Depth", 0, 276, 168, 44, 20, 0);
     CTL("EDIT", "", TXT, 324, 165, 50, 24, ID_GZ);
-    CTL("STATIC", "Density: how many plants. 0.5 = half as many, 2 = twice as many.\nSpread: how uneven the gaps are. 0 = evenly spaced, 2 = clumpy.\nDepth: how many layers in front. 0 = one flat layer, 2 = deeper.", 0, 36, 194, 380, 50, 0);
+    CTL("STATIC", "Density: how many plants. 0.5 = half as many, 2 = twice as many.\nSpread: how uneven the gaps are. 0 = evenly spaced, 2 = clumpy.\nDepth: 1 = a strip by the ground, 2 = half way down the dirt, 3 = down to the bottom.", 0, 36, 194, 380, 50, 0);
 
     CTL("STATIC", "Biome", 0, 14, 258, 70, 20, 0);
     CTL("EDIT", "", TXT, 90, 255, 120, 24, ID_BIOME);

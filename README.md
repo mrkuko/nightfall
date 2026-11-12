@@ -124,7 +124,7 @@ crosses = hideouts and perches. The playground also shows a HUD with every creat
 | `--spawn-rate NAME=F …` | override spawn chances, e.g. `--spawn-rate dhole=0.3 rabbit=0` |
 | `--grass-density F` | foreground plant density (default `1`) |
 | `--grass-spread F` | randomness of the gaps between plants (`0` even … `2` clumpy) |
-| `--grass-zspread F` | depth spread of the foreground (`0` one layer … `2` deep) |
+| `--grass-zspread F` | depth of the foreground (`0` one layer, `1` default strip by the ground, `2` half way down the dirt, `3`+ all the way to the bottom edge) |
 | `--assets DIR` | load `.spr` files from a folder instead of the built-in ones |
 | `--help`, `--version` | |
 
