@@ -43,7 +43,9 @@ build/assets_embed.o: build/assets_embed.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 # Windows screensaver (win/scr.c #includes src/gallery.c, so it links every object except gallery and main)
-SCR_OBJ = $(filter-out build/gallery.o build/main.o,$(OBJ))
+SCR_OBJ = $(filter-out build/gallery.o build/main.o,$(OBJ)) build/scr_res.o
+WINDRES ?= windres
+comma   := ,
 # build/nightfall-saver.exe is the same file: run it from a shell with arguments (a .scr is started by
 # the shell association, which drops them): build/nightfall-saver.exe /s --height 400
 nightfall.scr: build/nightfall-saver.exe
@@ -51,6 +53,10 @@ nightfall.scr: build/nightfall-saver.exe
 
 build/nightfall-saver.exe: win/scr.c $(SCR_OBJ) $(wildcard src/*.h src/gallery.c) | build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -mwindows $(LDFLAGS) -o $@ win/scr.c $(SCR_OBJ) $(LDLIBS) -lgdi32 -luser32 -ladvapi32
+
+# icon + version information of the .scr (win/scr.rc); NF_VNUM = 1,2,3,0 and NF_VSTR = 1.2.3 from VERSION
+build/scr_res.o: win/scr.rc docs/images/favicon.ico | build
+	$(WINDRES) -DNF_VNUM=$(subst .,$(comma),$(VERSION)),0 -DNF_VSTR=$(VERSION) -O coff -o $@ $<
 
 build:
 	mkdir -p build
