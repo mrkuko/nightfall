@@ -18,7 +18,10 @@
 #include "raster.h"
 #include "rng.h"
 
-#define MAX_OBJ    160
+/* widest scene in art pixels (terminal: columns; Windows screensaver: the whole desktop) */
+#define NF_MAX_W   2048
+
+#define MAX_OBJ    1024     /* a 4K scene needs ~600 (trees, branches, the foreground plants last) */
 #define MAX_ACT    32
 #define MAX_PLACE  128
 #define MAX_STIM   48
@@ -220,7 +223,7 @@ typedef struct {
 
 typedef struct {
     int        w, h;            /* raster dimensions */
-    float      ground[1024];    /* ground height for x (y of the feet) */
+    float      ground[NF_MAX_W];    /* ground height for x (y of the feet) */
     int        ground_z;        /* base depth of the creature lane on the ground */
     float      ground_mix[GT_COUNT];  /* weights of the floor patch types (biome); all 0 = plain soil */
     float      ground_scale;    /* patch size multiplier (1 = default) */

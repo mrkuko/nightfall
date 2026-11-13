@@ -4,7 +4,7 @@
 #   make install              install to $(PREFIX) (default /usr/local); DESTDIR for packaging
 #   make uninstall
 #   make CC=clang             any C99 compiler; on Windows use MSYS2 / MinGW-w64
-VERSION ?= 1.0.0
+VERSION ?= 1.1.0
 CC      ?= cc
 CFLAGS  ?= -std=c99 -O2 -Wall -Wextra -Wno-unused-parameter
 CPPFLAGS += -DNF_VERSION=\"$(VERSION)\"
@@ -17,6 +17,7 @@ DOCDIR  ?= $(PREFIX)/share/doc/nightfall
 
 ifeq ($(OS),Windows_NT)
 EXE     = .exe
+SCR     = nightfall.scr
 endif
 BIN     = nightfall$(EXE)
 
@@ -24,7 +25,7 @@ SRC     = $(wildcard src/*.c)
 OBJ     = $(patsubst src/%.c,build/%.o,$(SRC)) build/assets_embed.o
 ASSETS  = $(sort $(wildcard assets/*.spr assets/*/*.spr))
 
-all: $(BIN)
+all: $(BIN) $(SCR)
 
 $(BIN): $(OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ) $(LDLIBS)
@@ -41,6 +42,22 @@ build/assets_embed.c: build/embed$(EXE) $(ASSETS)
 build/assets_embed.o: build/assets_embed.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+# Windows screensaver (win/scr.c #includes src/gallery.c, so it links every object except gallery and main)
+SCR_OBJ = $(filter-out build/gallery.o build/main.o,$(OBJ)) build/scr_res.o
+WINDRES ?= windres
+comma   := ,
+# build/nightfall-saver.exe is the same file: run it from a shell with arguments (a .scr is started by
+# the shell association, which drops them): build/nightfall-saver.exe /s --height 400
+nightfall.scr: build/nightfall-saver.exe
+	cp $< $@
+
+build/nightfall-saver.exe: win/scr.c $(SCR_OBJ) $(wildcard src/*.h src/gallery.c) | build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -mwindows $(LDFLAGS) -o $@ win/scr.c $(SCR_OBJ) $(LDLIBS) -lgdi32 -luser32 -ladvapi32
+
+# icon + version information of the .scr (win/scr.rc); NF_VNUM = 1,2,3,0 and NF_VSTR = 1.2.3 from VERSION
+build/scr_res.o: win/scr.rc docs/images/favicon.ico | build
+	$(WINDRES) -DNF_VNUM=$(subst .,$(comma),$(VERSION)),0 -DNF_VSTR=$(VERSION) -O coff -o $@ $<
+
 build:
 	mkdir -p build
 
@@ -55,6 +72,6 @@ uninstall:
 	rm -rf $(DESTDIR)$(DOCDIR)
 
 clean:
-	rm -rf build $(BIN)
+	rm -rf build $(BIN) $(SCR)
 
 .PHONY: all install uninstall clean

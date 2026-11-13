@@ -72,7 +72,7 @@ offline. The Linux builds are static, so they have no dependencies.
 | Arch Linux | `nightfall-*.pkg.tar.zst` | `sudo pacman -U nightfall-*.pkg.tar.zst` |
 | any Linux | `nightfall-*-linux-*.tar.gz` | unpack and run `nightfall` |
 | macOS | `nightfall-*-macos-universal.tar.gz` | unpack and run `nightfall` |
-| Windows | `nightfall-*-windows-x86_64.zip` | unpack and run `nightfall.exe` in Windows Terminal |
+| Windows | `nightfall-*-windows-x86_64.zip` | unpack; run `nightfall.exe` in Windows Terminal, or install `nightfall.scr` as a [real screensaver](#as-a-real-screensaver) |
 
 Versions: **`vX.Y.0` is a full release**; `vX.Y.Z` with `Z` above 0 is a **nightly build**, marked as a
 pre-release on the releases page.
@@ -90,8 +90,8 @@ sudo make install                   # optional: /usr/local/bin + man page (PREFI
 ```
 
 **Windows:** build with [MSYS2](https://www.msys2.org/) (MinGW-w64):
-`pacman -S make mingw-w64-x86_64-gcc`, then `make`. Run it in **Windows Terminal**. The classic
-console host needs Windows 10 1809 or newer.
+`pacman -S make mingw-w64-x86_64-gcc`, then `make` (it builds `nightfall.exe` and the screensaver
+`nightfall.scr`). Run it in **Windows Terminal**. The classic console host needs Windows 10 1809 or newer.
 
 ### Terminal requirements
 
@@ -125,7 +125,7 @@ crosses = hideouts and perches. The playground also shows a HUD with every creat
 | `--spawn-rate NAME=F …` | override spawn chances, e.g. `--spawn-rate dhole=0.3 rabbit=0` |
 | `--grass-density F` | foreground plant density (default `1`) |
 | `--grass-spread F` | randomness of the gaps between plants (`0` even … `2` clumpy) |
-| `--grass-zspread F` | depth spread of the foreground (`0` one layer … `2` deep) |
+| `--grass-zspread F` | depth of the foreground (`0` one layer, `1` default strip by the ground, `2` half way down the dirt, `3`+ all the way to the bottom edge) |
 | `--assets DIR` | load `.spr` files from a folder instead of the built-in ones |
 | `--help`, `--version` | |
 
@@ -169,19 +169,45 @@ set -g lock-command "nightfall"
 Any key returns you to your work. You can also bind it to a shell alias, a `swayidle`/`xautolock`
 hook that opens a fullscreen terminal, or just leave it running on a second monitor.
 
+#### Windows
+
+`nightfall.scr` is a native Windows screensaver: it needs no terminal, no `nightfall.exe` and no runtime.
+The forest is drawn fullscreen on **every monitor** as one scene (animals walk from screen to screen; each
+monitor is anchored at the bottom of the scene, so the ground is at the bottom everywhere). Any key, mouse
+click or mouse movement quits.
+
+* **Install:** right-click `nightfall.scr` in Explorer, **Install** (it asks for admin rights, copies the
+  file to `System32` and opens the screensaver dialog). Without admin rights run
+  `powershell -ExecutionPolicy Bypass -File install-screensaver.ps1` instead (`-Minutes 10` sets the idle
+  time, `-Remove` uninstalls); it uses the file where it is, so do not delete the folder afterwards.
+* **SmartScreen:** the file is not code-signed, so Windows may warn when you open a downloaded `.scr` or
+  the ZIP (*Windows protected your PC*): click **More info**, then **Run anyway**. Or right-click the
+  downloaded ZIP, **Properties**, tick **Unblock**, before unpacking it.
+* **Settings:** *Settings…* in the screensaver dialog (or `nightfall.scr /c`): the pixel size (auto, or the
+  art-pixel size of the main monitor, default 300 rows), the foreground plants (`--grass-density`,
+  `--grass-spread`, `--grass-zspread`), the biome and the spawn rates (`--spawn-rate`). They are stored
+  in `HKCU\Software\Nightfall`.
+* **Trying options:** a `.scr` is started through the shell association, which drops command-line
+  arguments, so run the same program as an exe: `make` also leaves `build\nightfall-saver.exe`, and
+  `build\nightfall-saver.exe /s --height 400 --grass-density 2 --spawn-rate rabbit=0` runs it with those
+  options (they override the saved settings and are not saved). `--info` shows the monitors and the scene
+  size instead of running.
+
 ## Biomes
 
 | Biome | Trees | Ground | Typical visitors |
 |---|---|---|---|
-| Oak wood | oak, old oak, ivy oak, beech | leaf litter, soil, moss | rabbit, squirrel, badger, fox, deer, stag beetle |
-| Beech hall | beech | deep leaf litter | squirrel, dormouse, owl, wildcat |
-| Spruce taiga | spruce, pine | needles, moss | squirrel, owl, dhole, boar |
-| Rocky pine wood | pine, dead pine | stone, gravel, sand | fox, weasel, wildcat, dhole |
-| Birch grove | birch | grass, moss | rabbit, mole, hedgehog, deer, frog |
-| Alder swamp | birch, dead trees | mud, moss, puddles | frog, salamander, snail, bat, fireflies |
-| Mixed forest | a bit of everything | a bit of everything | anyone |
+| Oak wood (`oak_wood`) | oak, old oak, ivy oak, beech | leaf litter, soil, moss | rabbit, squirrel, badger, fox, deer, stag beetle |
+| Beech hall (`beech_hall`) | beech | deep leaf litter | squirrel, dormouse, owl, wildcat |
+| Spruce taiga (`taiga`) | spruce, pine | needles, moss | squirrel, owl, dhole, boar |
+| Rocky pine wood (`pine_rocks`) | pine, dead pine | stone, gravel, sand | fox, weasel, wildcat, dhole |
+| Birch grove (`birch_grove`) | birch | grass, moss | rabbit, mole, hedgehog, deer, frog |
+| Alder swamp (`swamp`) | birch, dead trees | mud, moss, puddles | frog, salamander, snail, bat, fireflies |
+| Mixed forest (`mixed`) | a bit of everything | a bit of everything | anyone |
 
-Biomes are plain data (`assets/biomes/biomes.spr`): weighted lists of trees, plants, animals and
+The name in brackets is what `--biome` takes (`--biome taiga`; `--biome list` prints them all, `--biome off`
+turns the recommendations off, the default `auto` picks one at random). Biomes are plain data
+(`assets/biomes/biomes.spr`): weighted lists of trees, plants, animals and
 floor patches. Add your own without touching the code.
 
 ## Creatures
@@ -260,6 +286,7 @@ Python rig ([`tools/sketch_rig.py`](tools/sketch_rig.py)) that builds them from 
 
 ```text
 src/          engine: terminal, raster + z-buffer, sprites, generators, world, creatures, scenes
+win/          Windows screensaver (nightfall.scr): a GDI window per monitor
 assets/       creatures (.spr), biomes, FORMAT.md
 tools/        embed.c (packs assets into the binary), sketch_rig.py (pose sketching)
 docs/         man page, screenshots
