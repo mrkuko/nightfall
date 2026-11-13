@@ -7,6 +7,8 @@
 extern float g_fg_density, g_fg_spread, g_fg_zspread;
 /* Biome: "auto" (random by seed), "off" (no recommendations) or a biome name. */
 extern const char *g_biome_arg;
+/* Weather: "auto" (it comes and goes) or a pattern that stays: clear mist fog drizzle rain rainfog. */
+extern const char *g_weather_arg;
 int biome_cycle(const library_t *lib);
 /* "NAME=F": spawn frequency of a species regardless of the biome (F = share of the commonest species). */
 int spawn_rate_set(const char *spec);

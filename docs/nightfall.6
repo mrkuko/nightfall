@@ -36,6 +36,10 @@ Compose a new scene every \fIS\fR seconds (0 = never, default 600).
 Biome of the scene. \fBauto\fR picks one by the seed, \fBoff\fR allows everything,
 \fBlist\fR prints the available biomes.
 .TP
+.BR \-\-weather " auto|\fINAME\fR"
+Weather. \fBauto\fR (default): fog and rain come and go as fronts that travel with the wind.
+A name keeps that weather: \fBclear\fR, \fBmist\fR, \fBfog\fR, \fBdrizzle\fR, \fBrain\fR, \fBrainfog\fR.
+.TP
 .BI \-\-spawn\-rate " NAME=F " "[NAME=F ...]"
 Override spawn chances. The biome's chances add up to 1; \fIF\fR replaces the chance of
 that species in the same scale (0 = never).
@@ -68,6 +72,9 @@ new scene
 .TP
 .B B
 next biome (auto, each biome, off)
+.TP
+.B W
+next weather pattern (its fronts start moving)
 .TP
 .B h
 toggle the HUD

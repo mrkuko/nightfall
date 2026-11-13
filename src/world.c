@@ -30,6 +30,7 @@ void world_init(world_t *w, library_t *lib, int width, int height, uint64_t seed
     float amp = fminf((float)height * 0.10f, 12.0f);
     for (int x = 0; x < w->w; x++)
         w->ground[x] = base + (fbm2((float)x * 0.02f, 0.5f, 3, ns) - 0.5f) * amp;
+    weather_init(w, seed);
 }
 
 void world_free(world_t *w)
@@ -460,6 +461,7 @@ void world_update(world_t *w, float dt)
 {
     w->t += dt;
     update_wind(w, dt);
+    weather_update(w, dt);
 
     for (int i = 0; i < w->nstim; i++) {
         w->stim[i].ttl -= dt;
@@ -601,6 +603,7 @@ void world_render(world_t *w, raster_t *r, int debug)
                     (int)floorf(a->zf + 0.5f), a->facing < 0 ? BLIT_FLIPX : 0, 1, NULL);
         r->mask_on = 0;
     }
+    weather_render(w, r);
     if (debug) {
         static const rgb_t pc[PL_COUNT] = {
             {200, 60, 60}, {240, 200, 60}, {60, 200, 240}, {200, 120, 255},

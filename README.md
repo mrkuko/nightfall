@@ -37,7 +37,9 @@ Every scene is different. A frame takes about half a millisecond.
   over, stoop and either catch it and fly off with it in its talons, or miss.
 - **Living weather.** Gusts of wind roll through the grass from one side, with calm in between, and each
   plant is a damped spring that sways as a gust passes. An animal walking through bends only the plants it
-  actually brushes against. Moonbeams, drifting mist and glowing fungi.
+  actually brushes against. Moonbeams, drifting mist and glowing fungi. Fog and rain come and go: a fog
+  bank pours in from the side along the forest floor, a rain front sweeps across, one can roll out while
+  the other moves in, and the swamp is foggier than the rocky pine wood.
 - **Biomes.** Oak wood, beech hall, spruce taiga, rocky pine wood, birch grove, alder swamp, mixed forest.
   Each has its own trees, undergrowth, animals and ground (needles, moss, mud, gravel …).
 - **Tiny and fast.** One ~500 kB binary with all art compiled in. Plain C99 with libc and libm only
@@ -122,6 +124,7 @@ crosses = hideouts and perches. The playground also shows a HUD with every creat
 | `--seed N` | reproducible scene and behaviour |
 | `--scene-time S` | compose a new scene every *S* seconds (`0` = never, default `600`) |
 | `--biome auto\|off\|NAME\|list` | pick a biome (`auto`: by the seed, `off`: anything goes) |
+| `--weather auto\|NAME` | `auto` (default): fog and rain come and go; or one that stays: `clear mist fog drizzle rain rainfog` |
 | `--spawn-rate NAME=F …` | override spawn chances, e.g. `--spawn-rate dhole=0.3 rabbit=0` |
 | `--grass-density F` | foreground plant density (default `1`) |
 | `--grass-spread F` | randomness of the gaps between plants (`0` even … `2` clumpy) |
@@ -142,6 +145,7 @@ nightfall --seed 42 --scene-time 0 --grass-density 0.6
 | `l` | new scene | `+` / `-` | simulation speed |
 | `B` | next biome | `n` | someone arrives now |
 | `h` | toggle HUD | `d` | show places, paths, links |
+| `W` | next weather (the fronts start moving) | | |
 
 Spawn a creature: `r` rabbit · `s` squirrel · `x` fox · `o` owl · `v` bat · `e` eyes ·
 `g` spirit · `j` deer · `b` boar · `c` wildcat · `m` mole · `w` weasel · `p` dhole

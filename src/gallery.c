@@ -252,6 +252,7 @@ static int random_place(world_t *w, int typemask, int free_only)
 /* biomes: recommendation lists (whitelists with weights) from "biome" blocks in assets/biomes/ */
 /* ------------------------------------------------------------------ */
 
+const char *g_weather_arg = "auto";     /* auto | clear | mist | fog | drizzle | rain | rainfog (--weather) */
 const char *g_biome_arg = "auto";       /* auto | off | NAME (command line, 'B' in the playground) */
 static const sprite_t *g_biome;         /* biome of the current scene, NULL = no recommendations */
 static float g_species_w[NF_COUNT(SPECIES)];
@@ -371,6 +372,11 @@ static void apply_biome(world_t *w, rng_t *r)
     }
     if (!any) { w->ground_mix[GT_SOIL] = 1; w->ground_mix[GT_MOSS] = 0.6f; }
     w->ground_scale = bnum("ground_scale", 1.0f);
+    /* weather: "weather fog=2 rain=0.6" = how much more / less likely than normal */
+    const char *wl = g_biome ? sprite_prop(g_biome, "weather") : NULL;
+    float fb = wl ? list_weight(wl, "fog") : 1.0f, rb = wl ? list_weight(wl, "rain") : 1.0f;
+    w->wx.bias[WX_FOG] = fb < 0 ? 1.0f : fb;
+    w->wx.bias[WX_RAIN] = rb < 0 ? 1.0f : rb;
     w->ground_seed = (uint32_t)rng_next(r);
 }
 
@@ -790,6 +796,7 @@ static void build_scene(world_t *w, uint64_t seed)
         world_add_object(w, "mist", x, G(x) + 2, 115, 0, SD);
 
     world_link_paths(w);
+    weather_begin(w, g_weather_arg);
     gen_set_tree_height(128);          /* the gallery and later regenerations use normal-sized shapes */
 #undef BP
 #undef G
@@ -1035,6 +1042,7 @@ int play_run(library_t *lib, const char *assets_dir, uint64_t seed)
             case '+': case '=': speed = fminf(8.0f, speed * 2.0f); break;
             case '-': speed = fmaxf(0.25f, speed * 0.5f); break;
             case 'n': w->next_spawn = 0; director(w, 0); break;
+            case 'W': weather_next(w); break;      /* the next weather pattern now (its fronts start moving) */
             case 'B':                       /* next biome: auto -> each biome -> off */
                 biome_cycle(lib);
                 world_free(w);
@@ -1076,10 +1084,11 @@ int play_run(library_t *lib, const char *assets_dir, uint64_t seed)
         world_render(w, &r, debug);
         screen_from_raster(&sc, &r, 0);
         if (hud) {
-            char line[512], head[640];
-            snprintf(head, sizeof head, " NIGHTFALL playground  seed %llu (%s)  creatures %d  %.2gx%s  %dx%d cells (%dx%d px)   "
-                     "q quit  l new scene  B biome  h hud  d places/paths  space pause  +/- time  n spawn  r s x o v e g j b c m w p = rabbit squirrel fox owl bat eyes spirit deer boar cat mole weasel dhole ",
-                     (unsigned long long)seed, g_scene_desc, w->population, (double)speed, paused ? " PAUSED" : "",
+            char line[512], head[720], wxd[64];
+            weather_describe(w, wxd, sizeof wxd);
+            snprintf(head, sizeof head, " NIGHTFALL playground  seed %llu (%s)  weather %s  creatures %d  %.2gx%s  %dx%d cells (%dx%d px)   "
+                     "q quit  l new scene  B biome  W weather  h hud  d places/paths  space pause  +/- time  n spawn  r s x o v e g j b c m w p = rabbit squirrel fox owl bat eyes spirit deer boar cat mole weasel dhole ",
+                     (unsigned long long)seed, g_scene_desc, wxd, w->population, (double)speed, paused ? " PAUSED" : "",
                      sc.w, sc.h, r.w, r.h);
             /* the header wraps at word boundaries when the terminal is narrow */
             int y = 0, width = sc.w > 8 ? sc.w : 8;

@@ -183,12 +183,14 @@ end
 ```
 
 Keys: `label weight trees stumps logs bushes floor fungi plants plants_near plants_far
-plant_density rocks moss puddles ground ground_scale creatures` (described in the header of
+plant_density rocks moss puddles ground ground_scale creatures weather` (described in the header of
 `assets/biomes/biomes.spr`). A missing list = everything allowed. `ground` types: `soil litter
 needles moss grass stone gravel pebbles mud sand` — the floor strip is painted with noise patches
 of these. `--biome auto` (default) picks one by the seed and `weight`, `--biome NAME` forces one,
 `--biome off` ignores biomes (everything allowed, a random floor mix), `--biome list` lists them.
 In the playground `B` cycles auto → each biome → off.
+`weather fog=2.5 rain=1.3` makes the weather patterns that contain fog / rain that many times more
+likely (the swamp is foggy, the rocky pine wood rarely); `--weather NAME` overrides it.
 
 `--spawn-rate NAME=F NAME=F …` (any mode) overrides **spawn chances**. Every species has a chance
 of 0 unless the biome lists it; the biome's chances (base frequency × its multiplier) add up to 1.

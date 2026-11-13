@@ -221,6 +221,42 @@ typedef struct {
     uint32_t   id;
 } actor_t;
 
+/* --- weather ---------------------------------------------------------
+ * Layers (fog, rain) that live side by side: each has a strength and a front that travels across the
+ * screen with the wind. Arriving, the leading edge sweeps in from one side; leaving, the trailing edge
+ * follows it out, so fog can roll out while rain sweeps in. A mix such as "12 % fog, 88 % rain" is
+ * simply two layers at different strengths. */
+enum { WX_FOG, WX_RAIN, WX_COUNT };
+enum { WXS_NONE, WXS_ARRIVE, WXS_ON, WXS_LEAVE };
+
+typedef struct {
+    int   state;                /* WXS_* */
+    float amount, target;       /* strength 0 … 1; it eases towards target (a change without a front) */
+    float lead, tail;           /* front edges in travel coordinates: 0 = the side it comes from, 1 = the other */
+    float dir;                  /* +1 travels to the right, -1 to the left */
+    float speed;                /* screen widths per second */
+    float soft;                 /* width of the soft edge (screen widths) */
+} wx_layer_t;
+
+#define MAX_DROP   700
+#define MAX_SPLASH 96
+typedef struct { float x, y, z, vx, vy, len; float floor_y; } wx_drop_t;
+typedef struct { float x, y; int z; float age, life; int ring; } wx_splash_t;
+
+typedef struct {
+    wx_layer_t layer[WX_COUNT];
+    int        pattern;         /* current pattern (weather_pattern_name) */
+    int        fixed;           /* --weather NAME: it stays */
+    float      next_change;     /* seconds to the next pattern */
+    float      bias[WX_COUNT];  /* biome: how likely fog / rain is (1 = normal) */
+    float      spawn_acc;       /* fractional raindrops to spawn */
+    wx_drop_t  drop[MAX_DROP];
+    int        ndrop;
+    wx_splash_t splash[MAX_SPLASH];
+    int        nsplash;
+    rng_t      rng;             /* its own stream: the weather does not change how a seed builds the scene */
+} weather_t;
+
 typedef struct {
     int        w, h;            /* raster dimensions */
     float      ground[NF_MAX_W];    /* ground height for x (y of the feet) */
@@ -258,6 +294,7 @@ typedef struct {
     /* baked static layer (background, ground, static objects) */
     raster_t   bake;
     int        bake_ok;
+    weather_t  wx;
     /* director */
     float      next_spawn;
     int        population;
@@ -286,6 +323,22 @@ void  world_update(world_t *w, float dt);
 /* Wind at x: sign = direction (+ right), magnitude ~0 … 1.3 */
 float world_wind_at(const world_t *w, float x);
 void  world_render(world_t *w, raster_t *r, int debug);
+
+/* --- weather (weather.c) --- */
+void  weather_init(world_t *w, uint64_t seed);
+/* Starts the weather of a new scene: "auto" = random changes (sometimes it is already there),
+ * a pattern name = that weather, fully there and staying. Unknown names fall back to auto. */
+void  weather_begin(world_t *w, const char *arg);
+/* Changes to the next pattern now (playground 'W'): the fronts start moving. */
+void  weather_next(world_t *w);
+void  weather_update(world_t *w, float dt);
+/* Draws rain, splashes and fog over the finished frame (uses the z-buffer). */
+void  weather_render(world_t *w, raster_t *r);
+/* How much of a layer (WX_FOG, WX_RAIN) is at x right now, 0 … 1 (for the creatures' reactions). */
+float weather_at(const world_t *w, int layer, float x);
+const char *weather_pattern_name(int pattern);
+/* "fog 12% rain 88%" style description for the HUD */
+void  weather_describe(const world_t *w, char *out, int cap);
 
 /* --- creatures --- */
 int   actor_spawn(world_t *w, const char *species, float x, float y, int nav, int lane_z);
