@@ -185,8 +185,8 @@ click or mouse movement quits.
   downloaded ZIP, **Properties**, tick **Unblock**, before unpacking it.
 * **Settings:** *Settings…* in the screensaver dialog (or `nightfall.scr /c`): the pixel size (auto, or the
   art-pixel size of the main monitor, default 300 rows), the foreground plants (`--grass-density`,
-  `--grass-spread`, `--grass-zspread`), the biome and the spawn rates (`--spawn-rate`). They are stored
-  in `HKCU\Software\Nightfall`.
+  `--grass-spread`, `--grass-zspread`), the biome and the spawn rates (`--spawn-rate`), and how often the scene is replaced by a new one (minutes, default 10, `0` = never
+  change it). They are stored in `HKCU\Software\Nightfall`.
 * **Trying options:** a `.scr` is started through the shell association, which drops command-line
   arguments, so run the same program as an exe: `make` also leaves `build\nightfall-saver.exe`, and
   `build\nightfall-saver.exe /s --height 400 --grass-density 2 --spawn-rate rabbit=0` runs it with those
