@@ -725,6 +725,10 @@ palette
   h 141210
   f 5a4e40 ~5 z-2
   g 3a3228 ~3 z-2
+  m 9a7452 ~3 z+2
+  n 5a4030 ~2 z+2
+  y d49a92 z+2
+  Y 8a5c54 z+2
 end
 '''
 
@@ -732,8 +736,9 @@ OWL_TAIL = '''
 creature
   move air perch
   speed walk=30 run=60
-  anim idle=idle move=fly run=fly look=look alert=alert rest=sleep hollow=in_hollow hollow_peek=hollow_peek
-  intents perch=5 roost=5 look=4 rest=2 leave=1
+  anim idle=idle move=fly run=fly look=look alert=alert rest=sleep hollow=in_hollow hollow_peek=hollow_peek swoop=swoop strike=strike carry=carry
+  intents perch=5 roost=5 look=4 rest=2 leave=1 hunt=3
+  hunts mouse
   homes branch hollow
   fear 0.1
   curiosity 0.4
@@ -781,7 +786,7 @@ def owl_parts(pose):
     return parts
 
 
-def owl_fly(k):
+def owl_fly(k, talons=0, mouse=False):
     """Flight from the side (facing right), in the style of the sitting owl: a compact round body,
     a big round head with the facial disc turned towards the viewer (glowing eyes), a short tail,
     broad rounded wings with spread primaries and dark bars. k = 0 up, 1 middle, 2 down, 3 glide.
@@ -792,7 +797,9 @@ def owl_fly(k):
     W = {0: ((-3.0, -6.5), (-8.5, -12.0)),      # up: raised high above the back
          1: ((-4.5, -2.0), (-11.5, -3.5)),      # middle (upstroke / recovery)
          2: ((-3.4, 3.4), (-8.6, 7.6)),         # down: below the belly
-         3: ((-4.6, -1.0), (-12.5, -1.0))}[k]   # glide: level, swept back
+         3: ((-4.6, -1.0), (-12.5, -1.0)),      # glide: level, swept back
+         4: ((-4.0, -2.4), (-11.0, -4.4)),      # stoop: folded back, the tips trail upwards
+         5: ((-1.2, -6.6), (-4.2, -12.6))}[k]   # strike: braking, flared up and slightly forward
     (ex, ey), (tx, ty) = W
 
     def wing(dx, dy, keys, stripe, far):
@@ -831,8 +838,30 @@ def owl_fly(k):
     parts.append(E(cx + 0.8, cy + 1.8, 4.4, 2.4, -0.1, 'cCC', 0.25))
     for (x, y) in ((cx - 1, cy + 1), (cx + 1, cy + 2), (cx + 3, cy + 1), (cx - 2, cy + 3), (cx + 2, cy + 3)):
         parts.append(P(round(x), round(y), 's'))
-    # tucked talons
-    parts += [P(round(cx + 1), round(cy + 4.4), 'k'), P(round(cx + 2), round(cy + 4.4), 'k')]
+    # talons
+    if talons == 0:
+        parts += [P(round(cx + 1), round(cy + 4.4), 'k'), P(round(cx + 2), round(cy + 4.4), 'k')]
+    elif talons in (1, 2):
+        reach = 1.0 if talons == 1 else 1.35
+        for dx0 in (0.0, 1.6):                    # two legs, feathered thighs, bare toes
+            x0, y0 = cx + 1.2 + dx0, cy + 3.6
+            x1, y1 = (x0 + 5.2, y0 + 2.6) if talons == 1 else (x0 + 3.4 * reach, y0 + 3.8 * reach)
+            parts.append(C(x0, y0, x1, y1, 1.0, 0.55, 'cCC'))
+            for da in ((0.0, 1.5), (1.3, 1.1), (1.6, -0.2)) if talons == 2 else ((0.0, 1.2), (1.1, 0.7)):
+                parts.append(C(x1, y1, x1 + da[0] * 1.3, y1 + da[1] * 1.3, 0.45, 0.3, 'kkk'))
+    else:
+        for dx0 in (0.0, 1.8):                    # short feathered legs; the toes close around the mouse
+            parts.append(C(cx + 1.2 + dx0, cy + 3.6, cx + 1.8 + dx0, cy + 5.6, 0.85, 0.55, 'cCC'))
+            parts += [P(round(cx + 1.6 + dx0), round(cy + 6.0), 'k'), P(round(cx + 2.8 + dx0), round(cy + 6.2), 'k')]
+    if mouse:
+        mx, my = cx + 2.8, cy + 8.0                # the mouse hangs from the talons, head forward
+        parts += chain([(mx - 3.2, my + 0.5), (mx - 6.0, my + 2.6), (mx - 8.4, my + 2.4)], [0.6, 0.5, 0.35], 'yYY', 0.1)
+        parts += [E(mx, my, 3.8, 2.0, -0.1, 'mmn', 0.1),
+                  E(mx + 3.7, my + 0.5, 1.8, 1.4, 0.15, 'mmn', 0.1),
+                  P(round(mx + 5.4), round(my + 0.9), 'y'), P(round(mx + 4.4), round(my - 0.2), 'e'),
+                  P(round(mx + 2.6), round(my - 1.6), 'y'), P(round(mx + 3.8), round(my - 1.8), 'y'),
+                  P(round(mx - 0.6), round(my + 2.2), 'Y'), P(round(mx + 1.6), round(my + 2.3), 'Y'),
+                  P(round(mx + 2.4), round(my + 1.4), 'Y')]
     # head: big and round, the disc and eyes towards the viewer (like the sitting owl)
     hx, hy = cx + 6.2, cy - 4.0
     parts += [C(hx - 2.8, hy - 2.8, hx - 3.4, hy - 4.6, 0.9, 0.45, 'bad'),
@@ -863,6 +892,12 @@ def owl(out):
         emit_frame(out, name, owl_parts(pose), 18, 22)
     for k in range(4):
         emit_frame(out, 'fly%d' % k, owl_fly(k), 30, 28, at=(15, 15))
+    # hunt: stoop (nose down, wings folded back, talons reaching), strike (flared, talons spread),
+    # and flapping away with a mouse in the talons
+    emit_frame(out, 'stoop', owl_fly(4, talons=1), 30, 28, at=(15, 15), rot=0.42, pivot=(15, 15))
+    emit_frame(out, 'strike', owl_fly(5, talons=2), 30, 28, at=(15, 15), rot=-0.18, pivot=(15, 15))
+    for k in range(4):
+        emit_frame(out, 'carry%d' % k, owl_fly(k, talons=3, mouse=True), 30, 28, at=(15, 15))
 
     # --- in a hollow: the anchor = the middle between the eyes so they can be placed exactly in the opening ---
     def hollow_eyes(look=0, blink=0):
@@ -905,6 +940,9 @@ clip look loop fps=4 : look_l*8 perch*2 look_r*8 perch*2
 clip alert loop fps=4 : ruffle*3 perch*10
 clip sleep loop fps=2 : sleep*20 blink_half sleep*10
 clip fly loop fps=8 speed=30 : fly0 fly1 fly2 fly1 fly0 fly1 fly2 fly1 fly3*6 fly1
+clip swoop loop fps=8 : stoop
+clip strike loop fps=8 : strike
+clip carry loop fps=8 speed=30 : carry0 carry1 carry2 carry1 carry0 carry1 carry2 carry1 carry3*4 carry1
 ''')
     out.append(OWL_TAIL)
 

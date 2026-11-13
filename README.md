@@ -33,7 +33,8 @@ Every scene is different. A frame takes about half a millisecond.
 - **Creatures with intentions.** 25 creatures: rabbits, squirrels, foxes, owls, bats, deer, boars,
   badgers, dholes, moles, fireflies and more. Each has drives (hunger, fatigue, boredom, fear) and picks
   intents: forage, climb a tree along a real path, roost in a hollow, hang under a branch, hide in a bush,
-  peek out, chase out of curiosity, play with the pack, sleep.
+  peek out, chase out of curiosity, play with the pack, sleep. An owl may spot a mouse from its hollow, glide
+  over, stoop and either catch it and fly off with it in its talons, or miss.
 - **Living weather.** Gusts of wind roll through the grass from one side, with calm in between, and each
   plant is a damped spring that sways as a gust passes. An animal walking through bends only the plants it
   actually brushes against. Moonbeams, drifting mist and glowing fungi.

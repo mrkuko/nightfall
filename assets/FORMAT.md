@@ -60,6 +60,7 @@ creature                  # CREATURE PROFILE for the intent system
   fear 0.6                # sensitivity to danger
   curiosity 0.5
   scares rabbit mouse     # (predator) whom it scares
+  hunts mouse             # (bird of prey) whom it stoops on and may catch (intent `hunt`)
   attracted glow          # (moth) flies towards light
   point head 7 -10        # head point relative to the anchor (peeking out of openings)
 end
@@ -111,12 +112,15 @@ once when the creature leaves `X` (getting up). The creature does not move while
 | `appear`, `vanish` | appearing / vanishing (eyes in the dark) |
 | `hang`, `land`, `takeoff` | hanging head down, flipping over when landing, taking off (bat) |
 | `hollow`, `hollow_peek` | only the eyes in a hollow / head poking out (owl) |
+| `swoop`, `strike`, `carry` | stooping on prey (a dive pose), the strike with spread talons, flying away with the catch in the talons (owl) |
 
 ## Intents (`intents`)
 
-`wander forage look groom rest hide peek leave climb perch flee follow watch pass hover sniff emerge vanish roost chase frolic`
+`wander forage look groom rest hide peek leave climb perch flee follow watch pass hover sniff emerge vanish roost chase frolic hunt`
 
 `roost` = settle down: a creature with a `hollow` animation flies into a free visible hollow, a creature with `hang` hangs under a branch (it reserves the spot so that two do not hang in the same place).
+
+`hunt` = (a creature with `hunts mouse …` and `swoop` / `strike` / `carry` clips) a bird of prey eyes a creature from the list that is out in the open, glides to a point above and beside it, stoops in a dive that gets faster, spreads its talons and strikes. With a catch (about half of the hunts) the prey disappears into the talons and the owl flaps away over the edge of the screen with it (`carry` shows the mouse in its talons); on a miss the prey has bolted, the owl strikes the empty ground and pulls up. An owl sitting in a hollow or on a branch can also spot prey and burst out after it.
 
 `chase` = curiosity, not hunting: a sprint after any visible creature (even across the screen) from the profile list
 `chases rabbit mouse …`, then `play` and `sniff`. `follow` on the ground = catch up with the

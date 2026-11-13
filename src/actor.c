@@ -16,12 +16,12 @@
 static const char *ANIM_NAMES[A_COUNT] = {
     "idle", "move", "run", "look", "alert", "eat", "groom", "rest", "freeze", "sniff",
     "climb", "climb_down", "appear", "vanish", "sit",
-    "hang", "land", "takeoff", "hollow", "hollow_peek", "cling", "play"
+    "hang", "land", "takeoff", "hollow", "hollow_peek", "cling", "play", "swoop", "strike", "carry"
 };
 
 static const char *INTENT_NAMES[IN_COUNT] = {
     "none", "wander", "forage", "look", "groom", "rest", "hide", "peek", "leave",
-    "climb", "perch", "flee", "follow", "watch", "pass", "hover", "sniff", "emerge", "vanish", "roost", "chase", "frolic"
+    "climb", "perch", "flee", "follow", "watch", "pass", "hover", "sniff", "emerge", "vanish", "roost", "chase", "frolic", "hunt"
 };
 
 const char *intent_name(int i) { return (i >= 0 && i < IN_COUNT) ? INTENT_NAMES[i] : "?"; }
@@ -105,6 +105,7 @@ void profile_parse(const sprite_t *s, profile_t *p)
     if ((v = sprite_prop(s, "rest_time"))) sscanf(v, "%f %f", &p->rest_min, &p->rest_max);
     p->pack = sprite_prop(s, "pack") != NULL;
     if ((v = sprite_prop(s, "chases"))) snprintf(p->chases, sizeof p->chases, " %s ", v);
+    if ((v = sprite_prop(s, "hunts"))) snprintf(p->hunts, sizeof p->hunts, " %s ", v);
     p->lane = (v = sprite_prop(s, "lane")) ? (float)atof(v) : 0.15f;
     p->rare = (v = sprite_prop(s, "rare")) ? atoi(v) : 0;
     p->burrow = (v = sprite_prop(s, "burrow")) ? atoi(v) : 0;
@@ -537,6 +538,30 @@ static int chase_target(world_t *w, actor_t *a, float maxd)
     return best;
 }
 
+/* Prey of a bird of prey: the nearest creature from its `hunts` list that is out in the open on
+ * the ground, on screen, and that nobody else is stooping on. */
+static int hunt_target(world_t *w, actor_t *a)
+{
+    if (!a->prof.hunts[0]) return -1;
+    int best = -1;
+    float bd = 1e9f;
+    char key[NF_NAME + 2];
+    for (int i = 0; i < w->nact; i++) {
+        actor_t *o = &w->act[i];
+        if (o == a || !o->alive || o->hidden || o->nav != NAV_GROUND) continue;
+        if (o->x < 12.0f || o->x > (float)w->w - 12.0f) continue;
+        snprintf(key, sizeof key, " %s ", o->spr->name);
+        if (!strstr(a->prof.hunts, key)) continue;
+        int taken = 0;
+        for (int k = 0; k < w->nact; k++)
+            if (k != i && w->act[k].alive && w->act[k].intent == IN_HUNT && w->act[k].target == i) taken = 1;
+        if (taken) continue;
+        float d = fabsf(o->x - a->x) + fabsf(o->y - a->y) * 0.5f + rng_range(&w->rng, 0.0f, 40.0f);   /* not always the very nearest */
+        if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+}
+
 /* Creatures on the ground close to this one (they make a playful animal happy). */
 static int crowd_around(world_t *w, actor_t *a, float radius, float *cx)
 {
@@ -869,6 +894,24 @@ static void plan_intent(world_t *w, actor_t *a, int in)
         if (rng_chance(&w->rng, 0.5f)) push_anim(a, A_LOOK, rng_range(&w->rng, 1.0f, 2.5f));
         break;
     }
+    case IN_HUNT: {
+        /* a bird of prey: eyes its prey, then glides over, stoops, strikes (see ST_HUNT) */
+        int t = hunt_target(w, a);
+        if (t < 0) { plan_intent(w, a, IN_WANDER); return; }
+        actor_t *o = &w->act[t];
+        a->target = t;
+        world_log(w, "%s#%u eyes %s#%u", a->spr->name, a->id, o->spr->name, o->id);
+        if (a->nav == NAV_PERCH) {
+            s = plan_push(a, ST_FACE);
+            if (s) s->x = o->x;
+            push_anim(a, A_ALERT, rng_range(&w->rng, 0.8f, 1.6f));
+        }
+        s = plan_push(a, ST_HUNT);
+        if (s) { s->place = t; s->anim = (int)o->id; s->z = rng_chance(&w->rng, 0.55f); }
+        s = plan_push(a, ST_FLY);                       /* only after a miss: the catch leaves inside ST_HUNT */
+        if (s) { s->x = screen_x(w, 10); s->y = air_y(w); s->z = cruise_z(w); }
+        break;
+    }
     case IN_FROLIC: {
         /* surrounded by animals: happy, runs into the middle of them, jumps around, sniffs everyone */
         float cx = a->x;
@@ -925,6 +968,8 @@ static void choose_intent(world_t *w, actor_t *a)
         if (!(p->navmask & NAV_CLIMB) || pick_ground_climb(w, a, 2000) < 0) score[IN_CLIMB] = 0;
         if (!(p->navmask & (NAV_PERCH | NAV_AIR)) || find_place(w, a, 1 << PL_PERCH, 1, 4000) < 0) score[IN_PERCH] = 0;
         if (!roost_available(w, a)) score[IN_ROOST] = 0;
+        if (!p->hunts[0] || hunt_target(w, a) < 0) score[IN_HUNT] = 0;
+        else score[IN_HUNT] *= 0.5f + a->hunger;
         if (!g) { score[IN_GROOM] *= 0.2f; score[IN_SNIFF] = 0; }
         if (a->nav == NAV_AIR) score[IN_LOOK] *= 0.2f;
         if (a->nav == NAV_PERCH) { score[IN_LOOK] += 2.0f; score[IN_WANDER] *= 0.3f; }
@@ -983,7 +1028,8 @@ static void perceive(world_t *w, actor_t *a, float dt)
         if (s->src == me) continue;
         float d = fabsf(s->x - a->x) + fabsf(s->y - a->y) * 0.6f;
         if (d > s->r) continue;
-        if (s->kind == ST_DANGER && s->src >= 0 && strstr(w->act[s->src].prof.scares, key)) {
+        if (s->kind == ST_DANGER && s->src >= 0 &&
+            (strstr(w->act[s->src].prof.scares, key) || strstr(w->act[s->src].prof.hunts, key))) {
             float k = s->strength * (1.0f - d / s->r);
             if (k > danger) { danger = k; dx_danger = s->x - a->x; }
         } else if (s->kind == ST_NOISE && !a->hidden && a->intent != IN_FLEE && a->intent != IN_HIDE) {
@@ -1049,6 +1095,20 @@ static void add_molehill(world_t *w, actor_t *a)
     world_add_object(w, "molehill", a->x, world_ground_at(w, a->x, a->zf) + 1.0f, (int)a->zf + 2,
                      rng_chance(&w->rng, 0.5f), rng_next(&w->rng) | 1);
 }
+
+/* Takes the creature out of the scene (it left, or it was caught). */
+static void remove_actor(world_t *w, actor_t *a)
+{
+    if (a->place >= 0) w->place[a->place].occupant = -1;
+    for (int i = 0; i < w->nplace; i++)
+        if (w->place[i].occupant == actor_index(w, a)) w->place[i].occupant = -1;
+    a->alive = 0;
+    w->population--;
+}
+
+/* ST_HUNT: where the owl's talons have to be so that they close around prey standing at (px, py). */
+#define HUNT_TALON_DX 7.0f
+#define HUNT_TALON_DY 11.0f
 
 /* Returns 1 if the step is finished. */
 static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
@@ -1393,13 +1453,121 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         add_molehill(w, a);
         return 1;
     }
+    case ST_HUNT: {
+        /* A bird of prey: glides in silence to a point above and to the side of the prey, stoops on it in
+         * a straight dive that gets faster and faster, spreads its talons and strikes. A catch disappears
+         * into the talons and the owl flaps away over the edge of the screen with it; a miss strikes the
+         * empty ground (the mouse has bolted) and pulls up again. */
+        actor_t *o = s->place >= 0 && s->place < MAX_ACT ? &w->act[s->place] : NULL;    /* nact shrinks when the last ones die */
+        int valid = o && o->alive && !o->hidden && o->nav == NAV_GROUND && o->id == (uint32_t)s->anim;
+        int me = actor_index(w, a);
+        if (first) {
+            a->nav = NAV_AIR;
+            a->path = -1;
+            a->carry = 0;
+            a->hphase = 0;
+            a->hx = 0;                                                      /* approach: the side it comes from (chosen once) */
+            a->hy = 0;
+            a->bob = 0;
+            a->mask_place = 0;
+        }
+        a->bob += dt;
+        if (a->hphase < 2 && !valid) { a->hphase = 3; a->bob = 0; s->z = 0; }       /* the prey is gone: give up */
+        if (a->hphase == 0) {
+            set_anim(a, A_MOVE);
+            if (a->hx == 0) {                                               /* the side it comes from: its own, if that is on screen */
+                a->hx = a->x < o->x ? -1.0f : 1.0f;
+                float sx = o->x + a->hx * 58.0f;
+                if (sx < 14.0f || sx > (float)w->w - 14.0f) a->hx = -a->hx;
+            }
+            float ax = clampf(o->x + a->hx * 58.0f, 14.0f, (float)w->w - 14.0f), ay = fmaxf(8.0f, o->y - 54.0f);
+            float dx = ax - a->x, dy = ay - a->y, d = sqrtf(dx * dx + dy * dy);
+            a->facing = o->x < a->x ? -1 : 1;
+            a->zf = approach(a->zf, (float)cruise_z(w), dt * 14.0f);
+            if (d < 3.0f || a->bob > 14.0f) { a->hphase = 1; a->bob = 0; a->hx = 0; return 0; }
+            float spd = a->prof.walk * 1.2f * a->speed_mul, st = fminf(d, spd * dt);
+            a->x += dx / d * st;
+            a->y += dy / d * st + sinf(a->bob * 3.0f) * 0.1f * spd * dt;
+            return 0;
+        }
+        if (a->hphase == 1) {
+            float f = o->x < a->x ? -1.0f : 1.0f;
+            float px = (a->hy > 0 && !s->z) ? a->hx : o->x;               /* a miss aims at where the prey WAS */
+            float tx = px - f * HUNT_TALON_DX;
+            float ty = (a->hy > 0 && !s->z ? world_ground_at(w, px, o->zf) : o->y) - HUNT_TALON_DY;
+            float dx = tx - a->x, dy = ty - a->y, d = sqrtf(dx * dx + dy * dy);
+            a->facing = f < 0 ? -1 : 1;
+            a->zf = approach(a->zf, o->zf + 2.0f, dt * 30.0f);
+            set_anim(a, A_SWOOP);
+            if (d < 50.0f && !a->hy) {
+                a->hy = 1;
+                a->hx = o->x;
+                if (s->z) {                                               /* it does not notice anything: it freezes at most */
+                    plan_clear(o);
+                    push_anim(o, A_FREEZE, 3.0f);
+                } else {
+                    o->fear = fmaxf(o->fear, 0.95f);                      /* it spots the owl: bolts */
+                }
+                world_log(w, "%s#%u stoops on %s#%u", a->spr->name, a->id, o->spr->name, o->id);
+            }
+            float spd = fminf(45.0f + 90.0f * a->bob, 115.0f), st = fminf(d, spd * dt);
+            if (d > 0.01f) { a->x += dx / d * st; a->y += dy / d * st; }
+            if (d < 2.5f || a->bob > 3.5f) {
+                a->hphase = 2;                                            /* from here on the talons' target is fixed */
+                a->bob = 0;
+                a->hx = tx;
+                a->hy = ty;
+            }
+            return 0;
+        }
+        if (a->hphase == 2) {
+            /* the talons close (the prey slot may already be trimmed away after a catch: it is not used here) */
+            set_anim(a, A_STRIKE);
+            a->x = approach(a->x, a->hx, dt * 60.0f);
+            a->y = approach(a->y, a->hy, dt * 60.0f);
+            if (a->bob - dt <= 0.0f) {
+                a->hunger = 0.0f;
+                if (s->z && valid) {
+                    a->carry = 1;
+                    world_log(w, "%s#%u catches %s#%u", a->spr->name, a->id, o->spr->name, o->id);
+                    world_stimulus(w, o->x, o->y, 70, ST_NOISE, 0.5f, 0.8f, me);
+                    remove_actor(w, o);
+                } else {
+                    s->z = 0;
+                    world_log(w, "%s#%u misses", a->spr->name, a->id);
+                    world_stimulus(w, a->x, a->y, 60, ST_NOISE, 0.4f, 0.8f, me);
+                }
+            }
+            if (a->bob >= 0.3f) { a->hphase = 3; a->bob = 0; }
+            return 0;
+        }
+        /* phase 3: with the catch it climbs away over the edge of the screen; empty-handed it pulls up */
+        if (a->carry) {
+            set_anim(a, A_CARRY);
+            float ex = a->x < (float)w->w * 0.5f ? -40.0f : (float)w->w + 40.0f;
+            float dx = ex - a->x, climb = 0.55f * fabsf(dx);
+            float ey = fmaxf(-40.0f, a->y - climb), dy = ey - a->y, d = sqrtf(dx * dx + dy * dy);
+            a->facing = dx < 0 ? -1 : 1;
+            a->zf = approach(a->zf, (float)cruise_z(w), dt * 14.0f);
+            float spd = a->prof.walk * 1.15f * a->speed_mul, st = fminf(d, spd * dt);
+            a->x += dx / d * st;
+            a->y += dy / d * st + sinf(a->bob * 4.0f) * 0.1f * spd * dt;
+            if (a->x < -20.0f || a->x > (float)w->w + 20.0f || a->y < -25.0f) {
+                world_log(w, "%s#%u flies off with its catch", a->spr->name, a->id);
+                remove_actor(w, a);
+                return 1;
+            }
+            return 0;
+        }
+        set_anim(a, A_MOVE);
+        a->zf = approach(a->zf, (float)cruise_z(w), dt * 14.0f);
+        a->x += (float)a->facing * 30.0f * dt;
+        a->y -= 38.0f * dt;
+        return a->bob > 1.3f || a->y < 6.0f;
+    }
     case ST_DESPAWN:
-        if (a->place >= 0) w->place[a->place].occupant = -1;
-        for (int i = 0; i < w->nplace; i++)
-            if (w->place[i].occupant == actor_index(w, a)) w->place[i].occupant = -1;
         world_log(w, "%s#%u left", a->spr->name, a->id);
-        a->alive = 0;
-        w->population--;
+        remove_actor(w, a);
         return 1;
     }
     return 1;
@@ -1459,6 +1627,28 @@ void actor_update(world_t *w, actor_t *a, float dt)
         if (rng_float(&w->rng) < rate * dt && chase_target(w, a, (float)w->w) >= 0) {
             world_log(w, "%s#%u notices something!", a->spr->name, a->id);
             plan_intent(w, a, IN_CHASE);
+        }
+    }
+
+    /* a bird of prey in its hollow or on a branch may spot something below and go for it */
+    if (a->prof.hunts[0] && !a->hidden && a->intent != IN_HUNT && a->step < a->nplan) {
+        int kind = a->plan[a->step].kind;
+        int in_hollow = a->place >= 0 && kind == ST_HOLLOW && a->step_t > 5.0f;
+        int on_perch = a->nav == NAV_PERCH && a->place < 0 && kind == ST_ANIM && a->intent == IN_PERCH;
+        if ((in_hollow || on_perch) && rng_float(&w->rng) < 0.05f * dt * (0.5f + a->hunger) &&
+            hunt_target(w, a) >= 0) {
+            if (in_hollow) {
+                /* bursts out of the opening: the head stays where the eyes were */
+                place_t *hp = &w->place[a->place];
+                hp->occupant = -1;
+                a->place = -1;
+                a->mask_place = 0;
+                a->nav = NAV_AIR;
+                a->zf = (float)cruise_z(w);
+                a->x -= (float)a->facing * 6.0f;
+                a->y += 4.0f;
+            }
+            plan_intent(w, a, IN_HUNT);
         }
     }
 

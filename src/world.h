@@ -121,14 +121,15 @@ typedef struct {
 enum {
     A_IDLE, A_MOVE, A_RUN, A_LOOK, A_ALERT, A_EAT, A_GROOM, A_REST, A_FREEZE, A_SNIFF,
     A_CLIMB, A_CLIMB_DOWN, A_APPEAR, A_VANISH, A_SIT,
-    A_HANG, A_LAND, A_TAKEOFF, A_HOLLOW, A_HOLLOW_PEEK, A_CLING, A_PLAY, A_COUNT
+    A_HANG, A_LAND, A_TAKEOFF, A_HOLLOW, A_HOLLOW_PEEK, A_CLING, A_PLAY,
+    A_SWOOP, A_STRIKE, A_CARRY, A_COUNT
 };
 
 /* intents */
 enum {
     IN_NONE, IN_WANDER, IN_FORAGE, IN_LOOK, IN_GROOM, IN_REST, IN_HIDE, IN_PEEK, IN_LEAVE,
     IN_CLIMB, IN_PERCH, IN_FLEE, IN_FOLLOW, IN_WATCH, IN_PASS, IN_HOVER, IN_SNIFF, IN_EMERGE,
-    IN_VANISH, IN_ROOST, IN_CHASE, IN_FROLIC, IN_COUNT
+    IN_VANISH, IN_ROOST, IN_CHASE, IN_FROLIC, IN_HUNT, IN_COUNT
 };
 
 /* plan steps */
@@ -148,6 +149,7 @@ enum {
     ST_HOLLOW,      /* sit in a hollow (place = place): the eyes glow, occasionally the head pokes out */
     ST_CHASE,       /* run after creature `place` (curiosity, not hunting) for at most dur seconds */
     ST_TUNNEL,      /* (mole) underground to x, then surfaces with a new molehill */
+    ST_HUNT,        /* (owl) stoop on creature `place` from above; z = 1: it will catch it, 0: it misses */
     ST_DESPAWN
 };
 
@@ -178,6 +180,7 @@ typedef struct {
     float rest_min, rest_max;   /* how long a rest lasts (s) */
     int   pack;                 /* lives in a pack: looks for the others */
     char  chases[128];          /* " rabbit mouse " — runs after them out of curiosity */
+    char  hunts[128];           /* " mouse " — a bird of prey stoops on them (and may catch them) */
 } profile_t;
 
 typedef struct {
@@ -209,6 +212,9 @@ typedef struct {
     float      bob;             /* phase for flying */
     int        path;            /* current path or -1 */
     float      path_t;
+    int        carry;           /* carries its catch in the talons (clip "carry") */
+    int        hphase;          /* ST_HUNT: 0 approach, 1 stoop, 2 strike, 3 pull up */
+    float      hx, hy;          /* ST_HUNT: the point it aims at */
     uint32_t   id;
 } actor_t;
 
