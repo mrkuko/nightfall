@@ -3,6 +3,7 @@ _*
 
 # Build files
 build/
+garbage/
 
 # Release
 /nightfall
