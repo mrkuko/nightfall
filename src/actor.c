@@ -420,10 +420,35 @@ static void plan_hide(world_t *w, actor_t *a, int run)
     p->occupant = actor_index(w, a);
 }
 
+static int can_fly(const actor_t *a) { return (a->prof.navmask & (NAV_AIR | NAV_PERCH)) != 0; }
+
+/* A climber (squirrel) left standing on a branch: nav is NAV_PERCH there, but it must never be planned
+ * like a flyer (a straight ST_FLY through the air). It walks back along the branch, over the link onto
+ * the trunk and climbs down; after that it is an ordinary ground creature. */
+static int stranded_on_branch(const actor_t *a) { return a->nav == NAV_PERCH && !can_fly(a); }
+
+static void plan_descend(world_t *w, actor_t *a)
+{
+    if (a->path >= 0 && w->path[a->path].kind == PATH_WALK) {
+        int other;
+        float th, to;
+        navpath_t *p = &w->path[a->path];
+        if (pick_link_kind(w, a->path, PATH_CLIMB, &other, &th, &to) == 0) {
+            push_path(a, a->path, th, p->z);
+            push_path(a, other, to, w->path[other].z);
+            plan_dismount(w, a, other);
+            return;
+        }
+        push_path(a, a->path, 0.0f, p->z);      /* no trunk linked: at least to the start of the branch */
+    }
+    step_t *s = plan_push(a, ST_CLIMB);
+    if (s) { s->x = a->x; s->y = world_ground(w, a->x); s->z = (int)a->zf; }
+}
+
 static void plan_leave(world_t *w, actor_t *a, int run)
 {
     if (a->hidden) { plan_push(a, ST_DESPAWN); return; }
-    if (a->nav == NAV_AIR || a->nav == NAV_PERCH) {
+    if (a->nav == NAV_AIR || (a->nav == NAV_PERCH && can_fly(a))) {
         step_t *s = plan_push(a, ST_FLY);
         if (s) {
             s->x = rng_chance(&w->rng, 0.5f) ? -30.0f : (float)w->w + 30.0f;
@@ -545,8 +570,10 @@ static void plan_intent(world_t *w, actor_t *a, int in)
     plan_clear(a);
     a->intent = in;
     a->intent_age = 0;
-    int ground = a->nav == NAV_GROUND;
-    int air = a->nav == NAV_AIR || a->nav == NAV_PERCH;
+    int stranded = stranded_on_branch(a);
+    if (stranded) plan_descend(w, a);                   /* first back down, then whatever it wants to do */
+    int ground = a->nav == NAV_GROUND || stranded;
+    int air = a->nav == NAV_AIR || (a->nav == NAV_PERCH && !stranded);
     step_t *s;
 
     switch (in) {
