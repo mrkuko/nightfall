@@ -790,6 +790,36 @@ void gen_set_tree_height(int h)
     g_tree_h = h < 128 ? 128 : h > 640 ? 640 : h;
 }
 
+/* Shapes of a tree hollow. Every shape contains the ellipse rx × ry (the creature inside is clipped
+ * to that ellipse, see world_hollow_opening), it can only add to it. */
+enum { HOL_OVAL, HOL_ROUND, HOL_SLIT, HOL_PEAK, HOL_ROT, HOL_LIP, HOL_SCAR, HOL_SHAPES };
+
+/* Distance metric of a hollow: <= 1 inside the opening, 1 … ~2 the rim around it.
+ * dx, dy: offset from the centre divided by rx, ry. */
+static float hollow_metric(int shape, float dx, float dy, uint32_t ns)
+{
+    float e = dx * dx + dy * dy;
+    switch (shape) {
+    case HOL_PEAK:
+        /* pointed arch: above the centre the opening narrows into a tip at 1.8 × ry */
+        if (dy < 0) {
+            float t = -dy / 1.8f;
+            float half = powf(fmaxf(1.0f - t, 0.0f), 0.75f) + 0.02f;
+            float m = (dx / half) * (dx / half) + (t > 1.0f ? (t - 1.0f) * 8.0f : 0.0f);
+            return fminf(e, fmaxf(m, t * t * 0.5f));
+        }
+        return e;
+    case HOL_ROT: {
+        /* rotted out: the edge breaks outward irregularly */
+        float a = atan2f(dy, dx);
+        float k = 1.0f + 0.45f * vnoise2(cosf(a) * 1.8f + 5.0f, sinf(a) * 1.8f + 5.0f, ns);
+        return e / (k * k);
+    }
+    default:
+        return e;
+    }
+}
+
 static void gen_trunk_kind(sprite_t *s, uint64_t seed, int kind)
 {
     rng_t r = rng_seed(seed);
@@ -808,10 +838,24 @@ static void gen_trunk_kind(sprite_t *s, uint64_t seed, int kind)
     frame_t *f = sprite_add_frame(s, "base", fw, H, fw / 2, H - 1);
     uint32_t ns = rng_u32(&r);
     float cx = (float)fw / 2.0f;
-    float hol_y = (float)H - 128.0f * (1.0f - rng_range(&r, 0.38f, 0.58f));   /* same height above the ground */
-    float hol_x = cx + rng_range(&r, -W * 0.15f, W * 0.15f);
-    float hol_rx = rng_range(&r, 2.8f, 4.0f), hol_ry = rng_range(&r, 5.0f, 7.5f);
+    /* hollow: never lower than 54 px above the ground; on a tall window anywhere up to ~62 % of the
+     * visible trunk (the ground lies at ~80 % of the window, the trunk is ~0.92 × window + 24) */
+    float hol_hi = fmaxf(79.0f, (float)(H - 24) / 0.92f * 0.62f);
+    float hol_y = (float)(H - 1) - rng_range(&r, 54.0f, hol_hi);
+    float hol_wob = (vnoise2(3.5f, hol_y * 0.04f, ns) - 0.5f) * wob_amp[kind];   /* follow the trunk's waviness */
+    float hol_x = cx + hol_wob + rng_range(&r, -W * 0.18f, W * 0.18f);
+    int hol_shape = rng_int(&r, HOL_SHAPES);
+    float hol_rx, hol_ry;
+    switch (hol_shape) {
+    case HOL_ROUND: hol_rx = rng_range(&r, 3.4f, 4.6f); hol_ry = hol_rx * rng_range(&r, 1.0f, 1.25f); break;
+    case HOL_SLIT:  hol_rx = rng_range(&r, 2.3f, 2.8f); hol_ry = rng_range(&r, 6.5f, 9.0f); break;
+    case HOL_LIP:   hol_rx = rng_range(&r, 2.6f, 3.6f); hol_ry = rng_range(&r, 4.5f, 6.5f); break;
+    case HOL_SCAR:  hol_rx = rng_range(&r, 3.0f, 4.0f); hol_ry = rng_range(&r, 3.4f, 4.6f); break;
+    case HOL_ROT:   hol_rx = rng_range(&r, 3.0f, 4.2f); hol_ry = rng_range(&r, 4.5f, 7.0f); break;
+    default:        hol_rx = rng_range(&r, 2.8f, 4.0f); hol_ry = rng_range(&r, 5.0f, 7.5f); break;
+    }
     if (kind == TRUNK_GIANT) { hol_rx *= 1.6f; hol_ry *= 1.4f; }
+    uint32_t hol_ns = rng_u32(&r);
     int has_hollow = rng_chance(&r, hollow_p[kind]);
     float moss_side = rng_chance(&r, 0.7f) ? -1.0f : 1.0f;
 
@@ -904,13 +948,69 @@ static void gen_trunk_kind(sprite_t *s, uint64_t seed, int kind)
     }
     /* hollow */
     if (has_hollow) {
-        for (int y = (int)(hol_y - hol_ry - 2); y <= (int)(hol_y + hol_ry + 2); y++)
-            for (int x = (int)(hol_x - hol_rx - 2); x <= (int)(hol_x + hol_rx + 2); x++) {
+        /* a long frost crack runs above and below a slit */
+        if (hol_shape == HOL_SLIT) {
+            float len = hol_ry * rng_range(&r, 1.2f, 2.4f);
+            for (int side = -1; side <= 1; side += 2) {
+                float x = hol_x;
+                for (float t = hol_ry * 0.8f; t < hol_ry + len; t += 1.0f) {
+                    x += rng_range(&r, -0.5f, 0.5f);
+                    int iy = (int)(hol_y + (float)side * t), ix = (int)floorf(x + 0.5f);
+                    float wdt = 1.0f - (t - hol_ry * 0.8f) / (len + hol_ry * 0.2f);
+                    if (!cv_opaque(f, ix, iy)) continue;
+                    cv_force(f, ix, iy, mkrgb(8, 7, 6), -1);
+                    if (wdt > 0.5f && cv_opaque(f, ix + 1, iy)) cv_force(f, ix + 1, iy, mkrgb(16, 13, 11), -1);
+                    if (cv_opaque(f, ix - 1, iy)) cv_force(f, ix - 1, iy, rgb_scale(C_BARK_LIGHT, 0.7f), 3);
+                }
+            }
+        }
+        /* rim width (in the metric) and how far the drawing reaches */
+        float rim = hol_shape == HOL_LIP ? 2.6f : hol_shape == HOL_SCAR ? 2.4f : hol_shape == HOL_SLIT ? 1.5f : 1.7f;
+        float reach = sqrtf(rim) * (hol_shape == HOL_ROT ? 1.5f : 1.0f) + 0.2f;
+        int y0 = (int)(hol_y - hol_ry * (hol_shape == HOL_PEAK ? 1.9f : reach) - 2);
+        for (int y = y0; y <= (int)(hol_y + hol_ry * reach + 2); y++)
+            for (int x = (int)(hol_x - hol_rx * reach - 2); x <= (int)(hol_x + hol_rx * reach + 2); x++) {
                 float dx = ((float)x - hol_x) / hol_rx, dy = ((float)y - hol_y) / hol_ry;
-                float d = dx * dx + dy * dy;
-                if (d <= 1.0f) cv_force(f, x, y, rgb_mix(mkrgb(2, 3, 3), mkrgb(12, 10, 9), d), -1);   /* interior just below the bark: it is not a hole all the way through */
-                else if (d <= 1.7f && cv_opaque(f, x, y))
-                    cv_force(f, x, y, rgb_scale(C_BARK_LIGHT, dy > 0 ? 0.9f : 0.55f), 3);
+                float d = hollow_metric(hol_shape, dx, dy, hol_ns);
+                if (d <= 1.0f) {
+                    /* interior just below the bark: it is not a hole all the way through */
+                    rgb_t in = rgb_mix(mkrgb(2, 3, 3), mkrgb(12, 10, 9), d);
+                    if (hol_shape == HOL_ROT && hash2f(x, y, hol_ns) > 0.9f) in = mkrgb(20, 15, 11);   /* crumbs of rotten wood */
+                    cv_force(f, x, y, in, -1);
+                    continue;
+                }
+                if (d > rim || !cv_opaque(f, x, y)) continue;
+                float q = (d - 1.0f) / (rim - 1.0f);      /* 0 at the opening, 1 at the outer edge of the rim */
+                rgb_t c;
+                int z = 3;
+                switch (hol_shape) {
+                case HOL_LIP: {
+                    /* swollen callus lip rolled around the opening: lit from the upper right, thickest below */
+                    float bulge = sinf(q * NF_PI);
+                    float lit = clampf(0.45f + dx * 0.25f - dy * 0.25f + bulge * 0.35f, 0.2f, 1.1f);
+                    c = rgb_scale(rgb_mix(C_BARK, C_BARK_LIGHT, 0.4f + bulge * 0.6f), 0.55f + lit * 0.7f);
+                    if (q < 0.15f) c = rgb_scale(C_BARK_DARK, 0.8f);
+                    z = 3 + (int)(bulge * 3.0f);
+                    break;
+                }
+                case HOL_SCAR: {
+                    /* branch scar: concentric growth rings of bare wood around the hole */
+                    float ring = sinf(sqrtf(d) * 9.0f);
+                    c = rgb_scale(ring > 0.2f ? mkrgb(140, 116, 86) : mkrgb(82, 64, 48), 0.65f + 0.3f * (dx * 0.5f - dy * 0.5f + 0.5f));
+                    if (q > 0.8f) c = rgb_scale(C_BARK_DARK, 0.9f);
+                    z = 3 + (q < 0.6f ? 1 : 0);
+                    break;
+                }
+                case HOL_ROT:
+                    /* soft decayed edge: dark, mottled */
+                    c = rgb_scale(hash2f(x, y, hol_ns ^ 0x5u) > 0.5f ? mkrgb(62, 46, 34) : mkrgb(38, 30, 24), 0.7f + (1.0f - q) * 0.3f);
+                    z = 2;
+                    break;
+                default:
+                    c = rgb_scale(C_BARK_LIGHT, dy > 0 ? 0.9f : 0.55f);
+                    break;
+                }
+                cv_force(f, x, y, c, z);
             }
         set_point(s, "hollow", (int)(hol_x - (float)f->ax), (int)(hol_y + hol_ry * 0.6f) - f->ay);
         /* centre of the opening: the eyes of the creature inside (owl) sit here */
