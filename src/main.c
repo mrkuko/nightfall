@@ -13,6 +13,8 @@
  *                       add up to 1; e.g. --spawn-rate dhole=0.2 rabbit=0; 0 = never)
  *   --biome B           auto (default: random by seed) | off (no recommendations) | NAME | list
  *   --weather W         auto (default: fog and rain come and go) | clear | mist | fog | drizzle | rain | rainfog
+ *   --weather-in NAME   start clear and let NAME (fog, rain, …) roll in as a front, then keep it
+ *   --weather-timelapse K  (recording) fronts move K times faster, everything else in real time
  *   --weather-time M    about how long one weather lasts in minutes (default 6, random 0.6–1.4 ×, 0 = no weather)
  *   --grass-density F   foreground plant density (1 = default, 2 = twice as dense, 0.5 = sparser)
  *   --grass-spread F    randomness of the gaps between plants (0 = even, 1 = default, 2 = clumpy)
@@ -51,6 +53,8 @@ static void usage(void)
            "  --biome auto|off|NAME|list       biome (default: random by seed)\n"
            "  --weather auto|NAME              weather: auto comes and goes, or one that stays:\n"
            "                                   clear mist fog drizzle rain rainfog\n"
+           "  --weather-in NAME                start clear, then NAME rolls in as a front and stays\n"
+           "  --weather-timelapse K            fronts move K times faster (for recording timelapses)\n"
            "  --weather-time M                 a weather lasts about M minutes, randomly 0.6-1.4x\n"
            "                                   (default 6, 0 = no weather)\n"
            "  --spawn-rate NAME=F [NAME=F ...] override spawn chances (biome chances sum to 1)\n"
@@ -121,6 +125,8 @@ int main(int argc, char **argv)
         else if (!strcmp(a, "--shot-scale") && i + 1 < argc) g_shot_scale = clampi(atoi(argv[++i]), 1, 12);
         else if (!strcmp(a, "--biome") && i + 1 < argc) g_biome_arg = argv[++i];
         else if (!strcmp(a, "--weather") && i + 1 < argc) g_weather_arg = argv[++i];
+        else if (!strcmp(a, "--weather-timelapse") && i + 1 < argc) { g_weather_timelapse = (float)atof(argv[++i]); if (g_weather_timelapse < 0.01f) g_weather_timelapse = 1; }
+        else if (!strcmp(a, "--weather-in") && i + 1 < argc) { static char in[48]; snprintf(in, sizeof in, "in:%s", argv[++i]); g_weather_arg = in; }
         else if (!strcmp(a, "--weather-time") && i + 1 < argc) { g_weather_minutes = (float)atof(argv[++i]); if (g_weather_minutes < 0) g_weather_minutes = 0; }
         else if (!strcmp(a, "--grass-density") && i + 1 < argc) g_fg_density = (float)atof(argv[++i]);
         else if (!strcmp(a, "--grass-spread") && i + 1 < argc) g_fg_spread = (float)atof(argv[++i]);

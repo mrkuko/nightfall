@@ -40,6 +40,12 @@ Biome of the scene. \fBauto\fR picks one by the seed, \fBoff\fR allows everythin
 Weather. \fBauto\fR (default): fog and rain come and go as fronts that travel with the wind.
 A name keeps that weather: \fBclear\fR, \fBmist\fR, \fBfog\fR, \fBdrizzle\fR, \fBrain\fR, \fBrainfog\fR.
 .TP
+.BI \-\-weather\-in " NAME"
+Starts clear and lets \fINAME\fR (for example \fBfog\fR) roll in as a front, then keeps it.
+.TP
+.BI \-\-weather\-timelapse " K"
+For recording timelapses: the fog and rain fronts move \fIK\fR times faster, everything else stays in real time.
+.TP
 .BI \-\-weather\-time " M"
 About how long one weather lasts, in minutes (default 6). The real length is random, 0.6 to 1.4 times
 \fIM\fR. Only the duration changes, the fog and rain fronts always move at the same speed.
