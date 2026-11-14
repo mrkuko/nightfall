@@ -1552,7 +1552,8 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
             }
             float ax = clampf(o->x + a->hx * 58.0f, 14.0f, (float)w->w - 14.0f), ay = fmaxf(8.0f, o->y - 54.0f);
             float dx = ax - a->x, dy = ay - a->y, d = sqrtf(dx * dx + dy * dy);
-            a->facing = o->x < a->x ? -1 : 1;
+            /* it looks where it flies; only close to the approach point does it turn to the prey */
+            a->facing = fabsf(dx) > 12.0f ? (dx < 0 ? -1 : 1) : (o->x < a->x ? -1 : 1);
             a->zf = approach(a->zf, (float)cruise_z(w), dt * 14.0f);
             if (d < 3.0f || a->bob > 14.0f) { a->hphase = 1; a->bob = 0; a->hx = 0; return 0; }
             float spd = a->prof.walk * 1.2f * a->speed_mul, st = fminf(d, spd * dt);
