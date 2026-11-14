@@ -34,6 +34,14 @@ float g_weather_minutes = 6.0f;
 
 static float wx_base(void) { return g_weather_minutes * 60.0f; }
 
+/* Only for recording timelapses (--weather-timelapse K): the fronts and strength changes run K times faster,
+ * everything else (creatures, wind, raindrops, fog wisps) stays in real time. */
+float g_weather_timelapse = 1.0f;
+
+/* Width of the soft edge of a front, as a fraction of the screen. Rain has a WIDE edge: first a drop here
+ * and there, then more and more, the full rain only well behind the leading edge (no wall of rain). */
+static float soft_of(int k) { return k == WX_FOG ? 0.35f : 0.9f; }
+
 static const struct {
     const char *name;
     float fog, rain, weight;
@@ -82,13 +90,14 @@ static float cover(const world_t *w, int k, float x, float y)
     float u = L->dir > 0 ? x / (float)w->w : 1.0f - x / (float)w->w;
     float h = (float)w->h;
     /* ragged, slowly changing edges; the fog's lower part leads (it pours in along the ground) */
-    float n = (vnoise2(y * 0.045f + (float)k * 17.0f, w->t * 0.012f, 911u) - 0.5f) * L->soft * 1.2f
+    float n = (vnoise2(y * 0.045f + (float)k * 17.0f, w->t * 0.012f, 911u) - 0.5f) * fminf(L->soft, 0.35f) * 1.2f
             + (vnoise2(y * 0.16f, w->t * 0.04f, 913u) - 0.5f) * 0.03f;
     if (k == WX_FOG) n += (y / h - 0.6f) * 0.22f;
-    float c = L->amount;
-    if (L->lead < WX_INF * 0.5f) c *= edge(L->lead + n - u, L->soft);
-    if (L->tail > -WX_INF * 0.5f) c *= edge(u - L->tail - n, L->soft);
-    return c;
+    float e = 1.0f;
+    if (L->lead < WX_INF * 0.5f) e *= edge(L->lead + n - u, L->soft);
+    if (L->tail > -WX_INF * 0.5f) e *= edge(u - L->tail - n, L->soft);
+    if (k == WX_RAIN) e *= e;                  /* a long thin start: single drops, then a shower, then the rain */
+    return L->amount * e;
 }
 
 float weather_at(const world_t *w, int layer, float x)
@@ -100,16 +109,19 @@ float weather_at(const world_t *w, int layer, float x)
 static float wind_sign(const world_t *w) { return w->wind_dir < 0 ? -1.0f : 1.0f; }
 
 /* how far off-screen a new edge starts / an old one ends (the ragged noise and the fog's ground lead) */
-static float margin(int k) { return k == WX_FOG ? 0.3f : 0.08f; }
+static float margin(int k) { return k == WX_FOG ? 0.3f : 0.25f; }
 
 static void arrive(world_t *w, int k, float target)
 {
     weather_t *x = &w->wx;
     wx_layer_t *L = &x->layer[k];
     L->dir = wind_sign(w);
-    L->soft = k == WX_FOG ? 0.35f : 0.12f;
-    L->speed = 1.0f / (k == WX_FOG ? rng_range(&x->rng, 240.0f, 420.0f) : rng_range(&x->rng, 18.0f, 35.0f));
-    L->lead = -L->soft - margin(k);
+    L->soft = soft_of(k);
+    /* screen widths per second; rain: the leading edge crosses in 7-12 s, the full rain follows ~soft behind */
+    L->speed = 1.0f / (k == WX_FOG ? rng_range(&x->rng, 240.0f, 420.0f) : rng_range(&x->rng, 7.0f, 12.0f));
+    /* the very tip of the edge starts at the screen side right away (not a soft-width off-screen first,
+     * which with fog meant minutes of nothing) */
+    L->lead = -margin(k);
     L->tail = -WX_INF;
     L->amount = L->target = target;
     L->state = WXS_ARRIVE;
@@ -124,7 +136,7 @@ static void layer_want(world_t *w, int k, float target)
         L->target = 0.0f;
         if (active && L->state != WXS_LEAVE) {
             L->state = WXS_LEAVE;
-            L->tail = -L->soft - margin(k);
+            L->tail = -L->soft;              /* the trailing edge starts thinning it right away */
         }
         return;
     }
@@ -142,8 +154,8 @@ static void set_pattern(world_t *w, int p, int instant)
             wx_layer_t *L = &x->layer[k];
             memset(L, 0, sizeof *L);
             L->dir = wind_sign(w);
-            L->soft = k == WX_FOG ? 0.35f : 0.12f;
-            L->speed = k == WX_FOG ? 1.0f / 320.0f : 1.0f / 25.0f;
+            L->soft = soft_of(k);
+            L->speed = k == WX_FOG ? 1.0f / 320.0f : 1.0f / 10.0f;
             L->lead = want[k] > 0 ? WX_INF : -WX_INF;
             L->tail = -WX_INF;
             L->amount = L->target = want[k];
@@ -235,6 +247,16 @@ void weather_begin(world_t *w, const char *arg)
     x->wet = 0;
     x->fixed = 0;
     if (g_weather_minutes <= 0.0f) arg = "clear";             /* weather switched off */
+    /* "in:NAME" (--weather-in): it starts clear and NAME rolls in as a front, then stays (screenshots, timelapses) */
+    if (arg && !strncmp(arg, "in:", 3)) {
+        for (int i = 0; i < NPAT; i++)
+            if (!strcmp(arg + 3, PAT[i].name)) {
+                set_pattern(w, 0, 1);
+                set_pattern(w, i, 0);
+                x->fixed = 1;
+                return;
+            }
+    }
     if (arg && strcmp(arg, "auto") != 0) {
         for (int i = 0; i < NPAT; i++)
             if (!strcmp(arg, PAT[i].name)) {
@@ -391,7 +413,7 @@ void weather_update(world_t *w, float dt)
         x->next_change -= dt;
         if (x->next_change <= 0) weather_next(w);
     }
-    for (int k = 0; k < WX_COUNT; k++) update_layer(w, k, dt);
+    for (int k = 0; k < WX_COUNT; k++) update_layer(w, k, dt * g_weather_timelapse);
     update_rain(w, dt);
 }
 
