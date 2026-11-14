@@ -1837,6 +1837,7 @@ typedef struct {
     float ts, tb, ls;               /* stalk angle from vertical and length, blade's rising angle */
     float blen;                     /* length of the blade's rising part (0 = reach) */
     float mirror;                   /* -1: the other face is the upper side (a leaf facing the viewer) */
+    float ribk;                     /* rib density of this plant (1 = normal) */
     int   z;
     uint32_t ns;
 } hosta_leaf_t;
@@ -1925,7 +1926,7 @@ static void hosta_draw_leaf(frame_t *f, const hosta_leaf_t *L, float bx, float b
             } else {
                 float grain = (hash2f(px, py, L->ns) - 0.5f) * 0.06f;
                 /* diagonal ribs: from the midrib forward towards the margin and the tip */
-                float ph = (q - 0.22f * powf(at, 1.25f)) * (11.0f + L->wmax * 0.25f);
+                float ph = (q - 0.22f * powf(at, 1.25f)) * (11.0f + L->wmax * 0.25f) * (L->ribk > 0 ? L->ribk : 1.0f);
                 float fr = ph - floorf(ph);
                 float rib = fr < 0.32f ? 0.72f : fr < 0.5f ? 1.12f : 1.0f;
                 if (upper) {
@@ -1958,22 +1959,28 @@ static void gen_hosta_scaled(sprite_t *s, uint64_t seed, float scale)
     uint32_t ns = rng_u32(&r);
     int mid = HL_CENTER;
     const float PI_ = 3.14159265f;
+    /* each plant has its own character: one roof bigger than the other, sometimes a lower leaf is missing,
+     * the middle leaf leans and rolls its own way, its own rib density */
+    float asym = rng_range(&r, -0.18f, 0.18f);
+    int skip = rng_chance(&r, 0.35f) ? (rng_chance(&r, 0.5f) ? HL_LEFT_LOW : HL_RIGHT_LOW) : -1;
+    float ribk = rng_range(&r, 0.8f, 1.2f);
     for (int i = 0; i < n; i++) {
         hosta_leaf_t *l = &L[i];
         memset(l, 0, sizeof *l);
         float side = (i == HL_LEFT_UP || i == HL_LEFT_LOW) ? -1.0f : 1.0f;
+        float grow = 1.0f + asym * side;
         if (i == HL_CENTER) {
             /* rises nearly upright with its face to the viewer, rolls over at the top towards us */
-            l->yaw = PI_ * 0.5f + rng_range(&r, -0.15f, 0.15f);
-            l->peak = rng_range(&r, 64.0f, 72.0f) * scale;
+            l->yaw = PI_ * 0.5f + rng_range(&r, -0.4f, 0.4f);
+            l->peak = rng_range(&r, 60.0f, 74.0f) * scale;
             l->ls = l->peak * rng_range(&r, 0.38f, 0.45f);
-            l->ts = rng_range(&r, 0.05f, 0.15f);
-            l->tb = rng_range(&r, 0.08f, 0.22f);
+            l->ts = rng_chance(&r, 0.3f) ? rng_range(&r, 0.15f, 0.32f) : rng_range(&r, 0.03f, 0.15f);
+            l->tb = rng_range(&r, 0.05f, 0.3f);
             l->blen = l->peak * rng_range(&r, 1.55f, 1.75f);
             l->reach = rng_range(&r, 12.0f, 18.0f) * scale;
             l->tip = l->peak * rng_range(&r, 0.9f, 1.0f);
-            l->curl = rng_range(&r, 0.7f, 1.0f);
-            l->wmax = rng_range(&r, 14.0f, 17.0f) * scale;
+            l->curl = rng_range(&r, 0.5f, 1.2f);
+            l->wmax = rng_range(&r, 13.0f, 17.0f) * scale;
             l->mirror = -1.0f;
             l->twist = rng_range(&r, 0.05f, 0.2f);
             l->s0 = rng_range(&r, 0.38f, 0.46f);
@@ -1990,7 +1997,8 @@ static void gen_hosta_scaled(sprite_t *s, uint64_t seed, float scale)
             l->ls = l->peak * rng_range(&r, 0.8f, 0.9f);
             l->ts = rng_range(&r, 0.34f, 0.48f);
             l->tb = rng_range(&r, 0.5f, 0.7f);
-            l->reach = rng_range(&r, 72.0f, 88.0f) * scale;
+            l->reach = rng_range(&r, 72.0f, 88.0f) * scale * grow;
+            l->peak *= 0.5f + 0.5f * grow;
             l->blen = l->reach * rng_range(&r, 0.45f, 0.55f);
             l->tip = l->peak * rng_range(&r, 0.3f, 0.42f);
             l->curl = rng_range(&r, 0.12f, 0.28f);
@@ -1998,7 +2006,7 @@ static void gen_hosta_scaled(sprite_t *s, uint64_t seed, float scale)
             l->twist = rng_range(&r, 0.18f, 0.34f);
             l->s0 = rng_range(&r, 0.38f, 0.46f);
             l->fold = rng_range(&r, 0.04f, 0.09f);
-            l->z = -1;
+            l->z = 8;          /* the roof is in front of a creature sheltering below (its edge hides the head) */
         } else {
             /* lower leaves: smaller, behind the sheltering creature, so the space under the roofs stays readable */
             float toward = rng_range(&r, -0.45f, -0.15f);
@@ -2016,11 +2024,13 @@ static void gen_hosta_scaled(sprite_t *s, uint64_t seed, float scale)
             l->fold = rng_range(&r, 0.05f, 0.10f);
             l->z = -3;
         }
+        l->ribk = ribk;
+        if (i == skip) l->wmax = 0;                     /* this lower leaf is missing */
         l->wave = rng_range(&r, 0.09f, 0.16f);
         l->stalk_w = rng_range(&r, 1.4f, 1.9f) * scale;
         l->ns = ns + (uint32_t)i * 613u;
     }
-    rgb_t top = vary(mkrgb(32, 74, 44), &r, 0.05f), under = vary(mkrgb(74, 100, 58), &r, 0.05f);
+    rgb_t top = vary(mkrgb(32, 74, 44), &r, 0.1f), under = vary(mkrgb(74, 100, 58), &r, 0.08f);
     rgb_t stalk = mkrgb(68, 96, 56);
     float sx_mid[7], sy_mid[7], x0[7], x1[7], tipx[7], tipy[7];
 
@@ -2030,7 +2040,7 @@ static void gen_hosta_scaled(sprite_t *s, uint64_t seed, float scale)
         snprintf(name, sizeof name, "bend%d", fi);
         frame_t *f = sprite_add_frame(s, name, W, H, W / 2, H - 1);
         for (int k = 0; k < BB_MAXW * BB_MAXH; k++) g_bbdepth[k] = -1e9f;
-        for (int i = 0; i < n; i++) hosta_draw_leaf(f, &L[i], bx, by, bend, top, under, stalk);
+        for (int i = 0; i < n; i++) if (L[i].wmax > 0) hosta_draw_leaf(f, &L[i], bx, by, bend, top, under, stalk);
         frame_rimlight(f, C_MOON, 0.1f);
         if (fi == SWAY_FRAMES / 2) {
             for (int i = 0; i < n; i++) {
@@ -2057,6 +2067,7 @@ static void gen_hosta_scaled(sprite_t *s, uint64_t seed, float scale)
     int nsh = 0;
     float shx[2] = { 0, 0 };
     for (int i = 0; i < n; i++) {
+        if (L[i].wmax <= 0) continue;                   /* a missing leaf */
         size_t l = strlen(leaves);
         snprintf(leaves + l, sizeof leaves - l, "%d %d %d ", (int)x0[i] + 3 - W / 2, (int)x1[i] - 3 - W / 2,
                  (int)sy_mid[i] - 2 - (H - 1));
@@ -2073,8 +2084,8 @@ static void gen_hosta_scaled(sprite_t *s, uint64_t seed, float scale)
     sprite_set_prop(s, "drips", drips);
 }
 
-static void gen_hosta(sprite_t *s, uint64_t seed) { gen_hosta_scaled(s, seed, 0.8f); }
-static void gen_hosta_big(sprite_t *s, uint64_t seed) { gen_hosta_scaled(s, seed, 0.95f); }
+static void gen_hosta(sprite_t *s, uint64_t seed) { gen_hosta_scaled(s, seed, 0.72f); }
+static void gen_hosta_big(sprite_t *s, uint64_t seed) { gen_hosta_scaled(s, seed, 0.86f); }
 
 static void gen_butterbur(sprite_t *s, uint64_t seed) { gen_butterbur_scaled(s, seed, 1.0f); }
 static void gen_butterbur_big(sprite_t *s, uint64_t seed) { gen_butterbur_scaled(s, seed, 1.3f); }
