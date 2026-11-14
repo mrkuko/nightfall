@@ -222,7 +222,7 @@ static void run_settings(HINSTANCE inst)
     CTL("EDIT", "", TXT, 210, 165, 50, 24, ID_GS);
     CTL("STATIC", "Depth", 0, 276, 168, 44, 20, 0);
     CTL("EDIT", "", TXT, 324, 165, 50, 24, ID_GZ);
-    CTL("STATIC", "Density: how many plants. 0.5 = half as many, 2 = twice as many.\nSpread: how uneven the gaps are. 0 = evenly spaced, 2 = clumpy.\nDepth: 1 = a strip by the ground, 2 = half way down the dirt, 3 = down to the bottom.", 0, 36, 194, 380, 50, 0);
+    CTL("STATIC", "Density: how many plants. 0.5 = half as many, 2 = twice as many.\nSpread: how uneven the gaps are. 0 = evenly spaced, 2 = clumpy.\nDepth: 1 = a strip by the ground, 2 = half way down, 3 = to the bottom.", 0, 36, 194, 380, 50, 0);
 
     CTL("STATIC", "Biome", 0, 14, 258, 70, 20, 0);
     CTL("EDIT", "", TXT, 90, 255, 120, 24, ID_BIOME);
@@ -238,7 +238,7 @@ static void run_settings(HINSTANCE inst)
 
     CTL("STATIC", "Weather lasts about", 0, 14, 418, 110, 20, 0);
     CTL("EDIT", "", WS_BORDER | ES_NUMBER | WS_TABSTOP, 128, 415, 50, 24, ID_WEATHER);
-    CTL("STATIC", "minutes   (random 0.6-1.4 x; 0 = no weather, always clear)", 0, 186, 418, 240, 20, 0);
+    CTL("STATIC", "minutes   (random 0.6-1.4 x; 0 = always clear)", 0, 186, 418, 240, 20, 0);
 
     CTL("BUTTON", "OK", BS_DEFPUSHBUTTON | WS_TABSTOP, 250, 464, 76, 26, IDOK);
     CTL("BUTTON", "Cancel", BS_PUSHBUTTON | WS_TABSTOP, 334, 464, 76, 26, IDCANCEL);
