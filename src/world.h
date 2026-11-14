@@ -71,6 +71,7 @@ enum {
     PL_UNDER,       /* hideout under a log */
     PL_TRUNK,       /* trunk base (where climbing starts) */
     PL_SKY,         /* a point in the air */
+    PL_SHELTER,     /* on the ground under big leaves (butterbur): a dry spot in the rain */
     PL_COUNT
 };
 
@@ -132,7 +133,7 @@ enum {
 enum {
     IN_NONE, IN_WANDER, IN_FORAGE, IN_LOOK, IN_GROOM, IN_REST, IN_HIDE, IN_PEEK, IN_LEAVE,
     IN_CLIMB, IN_PERCH, IN_FLEE, IN_FOLLOW, IN_WATCH, IN_PASS, IN_HOVER, IN_SNIFF, IN_EMERGE,
-    IN_VANISH, IN_ROOST, IN_CHASE, IN_FROLIC, IN_HUNT, IN_COUNT
+    IN_VANISH, IN_ROOST, IN_CHASE, IN_FROLIC, IN_HUNT, IN_SHELTER, IN_COUNT
 };
 
 /* plan steps */
@@ -153,6 +154,7 @@ enum {
     ST_CHASE,       /* run after creature `place` (curiosity, not hunting) for at most dur seconds */
     ST_TUNNEL,      /* (mole) underground to x, then surfaces with a new molehill */
     ST_HUNT,        /* (owl) stoop on creature `place` from above; z = 1: it will catch it, 0: it misses */
+    ST_SHELTER,     /* wait under big leaves (place) until the rain stops */
     ST_DESPAWN
 };
 
@@ -184,6 +186,7 @@ typedef struct {
     int   pack;                 /* lives in a pack: looks for the others */
     char  chases[128];          /* " rabbit mouse " — runs after them out of curiosity */
     char  hunts[128];           /* " mouse " — a bird of prey stoops on them (and may catch them) */
+    int   shelter;              /* "shelter rain": goes under big leaves when it rains */
 } profile_t;
 
 typedef struct {

@@ -1631,6 +1631,199 @@ static void gen_broadleaf_scaled(sprite_t *s, uint64_t seed, float scale)
     add_sway_clips(s, 0);
 }
 
+/* ------------------------------------------------------------------ */
+/* butterbur: huge funnel-shaped leaves on tall stalks (a roof to hide under) */
+/* ------------------------------------------------------------------ */
+
+/* One butterbur leaf as a small 3D surface: a kidney-shaped blade with a notch where the stalk joins,
+ * cupped towards the middle (a shallow funnel) and drooping at the margin, wavy along the edge. It is
+ * turned (yaw), tilted towards / away from the viewer (pitch) and leaned sideways (roll), then seen from a
+ * camera a little above. So every leaf looks different: some show their upper side with veins, some the
+ * pale felty underside, some are almost edge-on. Lit by the moon from the upper right.
+ * Points are splatted into a float depth buffer shared by the whole frame (leaves cover each other). */
+typedef struct {
+    float ax, ay;               /* where the stalk joins (frame pixels) */
+    float R;                    /* radius of the blade */
+    float yaw, pitch, roll;
+    float cup, droop, wave;
+    int   z;
+    uint32_t ns;
+} bb_leaf_t;
+
+#define BB_MAXW 160
+#define BB_MAXH 90
+static float g_bbdepth[BB_MAXW * BB_MAXH];
+
+/* local blade point (u along the midrib, v across, h up) -> 3D (X right, Y up, Z towards the viewer) */
+static void bb_xform(const bb_leaf_t *L, float u, float v, float h, float *X, float *Y, float *Z)
+{
+    float cy = cosf(L->yaw), sy = sinf(L->yaw);
+    float x = u * cy - v * sy, z = u * sy + v * cy, y = h;
+    float cp = cosf(L->pitch), sp = sinf(L->pitch);          /* pitch: tips the far edge up */
+    float y2 = y * cp + z * sp, z2 = -y * sp + z * cp;
+    float cr = cosf(L->roll), sr = sinf(L->roll);
+    *X = x * cr - y2 * sr;
+    *Y = x * sr + y2 * cr;
+    *Z = z2;
+}
+
+static void bb_draw_leaf(frame_t *f, const bb_leaf_t *L, rgb_t top, rgb_t under)
+{
+    const float ce = cosf(0.42f), se = sinf(0.42f);          /* camera ~24 degrees above */
+    const float lx = 0.55f, ly = 0.75f, lz = 0.37f;           /* light from the upper right, a bit in front */
+    float R = L->R;
+    int nr = (int)(R * 2.2f) + 4, nt = (int)(R * 9.0f) + 24;
+    for (int ir = 0; ir <= nr; ir++) {
+        float r = (float)ir / (float)nr;
+        for (int it = 0; it < nt; it++) {
+            float th = (float)it / (float)nt * 6.2831853f - 3.14159265f;     /* 0 = the tip, +-pi = the notch */
+            /* kidney outline: a deep notch at the stalk, wavy margin */
+            float notch = fabsf(th) > 2.75f ? 1.0f - (fabsf(th) - 2.75f) / 0.39f * 0.75f : 1.0f;
+            float edge = (1.0f + 0.06f * cosf(th * 2.0f)) * notch
+                       * (1.0f + L->wave * (vnoise2(th * 2.2f, (float)L->z, L->ns) - 0.5f));
+            if (r > edge) continue;
+            float rr = r * R;
+            /* the stalk joins a little behind the middle, towards the notch */
+            float u = rr * cosf(th) + R * 0.18f, v = rr * sinf(th) * 1.08f;
+            float q = r / (edge > 0.01f ? edge : 0.01f);
+            float h = L->cup * R * q * q - L->droop * R * fmaxf(0.0f, q - 0.7f) * fmaxf(0.0f, q - 0.7f) * 6.0f
+                    + 0.5f * L->wave * R * (vnoise2(th * 3.1f, 7.0f + (float)L->z, L->ns) - 0.5f) * q;
+            float X, Y, Z;
+            bb_xform(L, u, v, h, &X, &Y, &Z);
+            /* surface normal from the slope of h (numerically along r and theta) */
+            float dhr = (2.0f * L->cup * q - L->droop * fmaxf(0.0f, q - 0.7f) * 12.0f);
+            float nu = -dhr * cosf(th), nv = -dhr * sinf(th);
+            float NX, NY, NZ, OX, OY, OZ;
+            bb_xform(L, nu, nv, 1.0f, &NX, &NY, &NZ);
+            bb_xform(L, 0, 0, 0, &OX, &OY, &OZ);
+            NX -= OX; NY -= OY; NZ -= OZ;
+            float nl = sqrtf(NX * NX + NY * NY + NZ * NZ) + 1e-4f;
+            NX /= nl; NY /= nl; NZ /= nl;
+            float facing = NY * se + NZ * ce;                  /* > 0: we see the upper side */
+            if (facing < 0) { NX = -NX; NY = -NY; NZ = -NZ; }
+            float lit = clampf(NX * lx + NY * ly + NZ * lz, 0.0f, 1.0f);
+            rgb_t c;
+            if (facing >= 0) {
+                c = rgb_scale(top, 0.3f + 1.0f * lit);
+                /* veins: the midrib and side veins running out from the joint */
+                float vein = fabsf(sinf(th * 3.5f));
+                if ((vein < 0.09f && r > 0.15f) || (fabsf(th) < 0.05f && r > 0.05f))
+                    c = rgb_mix(c, mkrgb(120, 150, 104), 0.45f);
+            } else {
+                c = rgb_scale(under, 0.45f + 0.7f * lit);         /* the pale felty underside */
+                if (fabsf(sinf(th * 3.5f)) < 0.1f) c = rgb_scale(c, 1.15f);
+            }
+            if (q > 0.9f) c = rgb_scale(c, 0.72f);             /* a darker margin separates overlapping leaves */
+            float sxp = L->ax + X, syp = L->ay - (Y * ce - Z * se);
+            float depth = Z * ce + Y * se;
+            int px = (int)floorf(sxp), py = (int)floorf(syp);
+            if (px < 0 || py < 0 || px >= f->w || py >= f->h || px >= BB_MAXW || py >= BB_MAXH) continue;
+            float *db = &g_bbdepth[py * BB_MAXW + px];
+            if (depth < *db) continue;
+            *db = depth;
+            cv_force(f, px, py, c, L->z + (int)clampf(depth * 0.25f, -3.0f, 3.0f));
+        }
+    }
+}
+
+static void gen_butterbur_scaled(sprite_t *s, uint64_t seed, float scale)
+{
+    rng_t r = rng_seed(seed);
+    int n = scale > 1.1f ? rng_between(&r, 4, 6) : rng_between(&r, 3, 5);
+    bb_leaf_t L[6];
+    float hgt[6], base_roll[6];
+    int W = (int)(84.0f * scale), H = (int)(50.0f * scale);
+    if (W > BB_MAXW) W = BB_MAXW;
+    if (H > BB_MAXH) H = BB_MAXH;
+    float cx = (float)W * 0.5f;
+    uint32_t ns = rng_u32(&r);
+    for (int i = 0; i < n; i++) {
+        float u = n > 1 ? (float)i / (float)(n - 1) - 0.5f : 0.0f;
+        bb_leaf_t *l = &L[i];
+        memset(l, 0, sizeof *l);
+        l->R = rng_range(&r, 9.5f, 15.0f) * scale;
+        l->ax = cx + u * (float)W * 0.48f + rng_range(&r, -3.0f, 3.0f);
+        hgt[i] = rng_range(&r, 23.0f, 31.0f) * scale;            /* a lying dhole is ~12 px tall */
+        l->yaw = rng_range(&r, -3.14f, 3.14f);
+        l->pitch = rng_range(&r, -0.25f, 0.75f);                  /* mostly showing a bit of the top */
+        /* outer leaves lean outwards, the middle ones any way */
+        base_roll[i] = u * 0.9f + rng_range(&r, -0.3f, 0.3f);
+        l->cup = rng_range(&r, 0.15f, 0.45f);
+        l->droop = rng_range(&r, 0.0f, 0.35f);
+        l->wave = rng_range(&r, 0.08f, 0.22f);
+        l->z = rng_between(&r, -1, 3);
+        l->ns = ns + (uint32_t)i * 977u;
+    }
+    if (n > 2) hgt[rng_int(&r, n)] = rng_range(&r, 13.0f, 18.0f) * scale;   /* one lower leaf */
+    rgb_t top = vary(mkrgb(54, 96, 58), &r, 0.12f), under = vary(mkrgb(90, 118, 92), &r, 0.08f);
+    rgb_t stalk = mkrgb(70, 92, 56);
+    float leaf_top[6], leaf_bot[6], leaf_x0[6], leaf_x1[6];
+
+    for (int fi = 0; fi < SWAY_FRAMES; fi++) {
+        float bend = sway_bend(fi) * 2.4f * scale;
+        char name[16];
+        snprintf(name, sizeof name, "bend%d", fi);
+        frame_t *f = sprite_add_frame(s, name, W, H, W / 2, H - 1);
+        for (int k = 0; k < BB_MAXW * BB_MAXH; k++) g_bbdepth[k] = -1e9f;
+        for (int i = 0; i < n; i++) {
+            bb_leaf_t l = L[i];
+            float bx = cx + (L[i].ax - cx) * 0.3f, by = (float)(H - 1);
+            float sway = bend * hgt[i] / 25.0f;
+            l.ax = L[i].ax + sway;
+            l.ay = by - hgt[i];
+            l.roll = base_roll[i] + sway * 0.04f;
+            /* stalk: a gentle curve from the clump up to the joint */
+            float mx = (bx + l.ax) * 0.5f + (l.ax - bx) * 0.15f, my = (by + l.ay) * 0.5f;
+            cv_line(f, bx, by, mx, my, stalk, l.z - 2);
+            cv_line(f, mx, my, l.ax, l.ay, stalk, l.z - 2);
+            if (scale > 1.1f) cv_line(f, bx + 1, by, mx + 1, my, rgb_scale(stalk, 0.75f), l.z - 2);
+            bb_draw_leaf(f, &l, top, under);
+        }
+        frame_rimlight(f, C_MOON, 0.14f);
+        if (fi == SWAY_FRAMES / 2) {
+            /* measure every leaf in the resting frame: span, top and lowest point (for rain and shelter) */
+            for (int i = 0; i < n; i++) { leaf_top[i] = 1e9f; leaf_bot[i] = -1e9f; leaf_x0[i] = 1e9f; leaf_x1[i] = -1e9f; }
+            for (int i = 0; i < n; i++) {
+                float R = L[i].R * 1.3f;
+                for (int y = 0; y < H; y++)
+                    for (int x = (int)(L[i].ax - R); x <= (int)(L[i].ax + R); x++) {
+                        if (x < 0 || x >= W || !cv_opaque(f, x, y)) continue;
+                        if (y > H - 1 - (int)hgt[i] + (int)(L[i].R * 0.9f)) continue;   /* below the blade: stalks, other leaves */
+                        if (y < (int)(H - 1 - hgt[i] - L[i].R * 1.2f)) continue;
+                        if (y < leaf_top[i]) leaf_top[i] = (float)y;
+                        if (y > leaf_bot[i]) leaf_bot[i] = (float)y;
+                        if (x < leaf_x0[i]) leaf_x0[i] = (float)x;
+                        if (x > leaf_x1[i]) leaf_x1[i] = (float)x;
+                    }
+            }
+        }
+    }
+    add_sway_clips(s, 0);
+
+    /* rain lands on the leaves ("x0 x1 y" per leaf, relative to the anchor) and creatures shelter under
+     * the high ones (point.shelterN on the ground below the leaf) */
+    char leaves[256] = "", key[24];
+    int nsh = 0;
+    float shx[2];
+    for (int i = 0; i < n; i++) {
+        if (leaf_x1[i] < leaf_x0[i]) continue;
+        size_t l = strlen(leaves);
+        snprintf(leaves + l, sizeof leaves - l, "%d %d %d ", (int)leaf_x0[i] + 1 - W / 2, (int)leaf_x1[i] - 1 - W / 2,
+                 (int)(leaf_top[i] + (leaf_bot[i] - leaf_top[i]) * 0.3f) - (H - 1));
+        float clear = (float)(H - 1) - leaf_bot[i];                 /* free height below the blade */
+        if (clear < 16.0f * scale || nsh >= 2) continue;
+        float mid = (leaf_x0[i] + leaf_x1[i]) * 0.5f;
+        if (nsh == 1 && fabsf(shx[0] - mid) < 16.0f) continue;
+        shx[nsh] = mid;
+        snprintf(key, sizeof key, "shelter%d", nsh++);
+        set_point(s, key, (int)mid - W / 2, 0);
+    }
+    sprite_set_prop(s, "leaves", leaves);
+}
+
+static void gen_butterbur(sprite_t *s, uint64_t seed) { gen_butterbur_scaled(s, seed, 1.0f); }
+static void gen_butterbur_big(sprite_t *s, uint64_t seed) { gen_butterbur_scaled(s, seed, 1.3f); }
+
 static void gen_broadleaf(sprite_t *s, uint64_t seed) { gen_broadleaf_scaled(s, seed, 1.0f); }
 static void gen_broadleaf_big(sprite_t *s, uint64_t seed) { gen_broadleaf_scaled(s, seed, 1.8f); }
 
@@ -2427,6 +2620,8 @@ static const genreg_t GENS[] = {
     { "bush_big",       gen_bush_big,       "plant bush ground hideout big" },
     { "fern_big",       gen_fern_big,       "plant ground foreground sway big" },
     { "broadleaf_big",  gen_broadleaf_big,  "plant ground foreground sway big" },
+    { "butterbur",      gen_butterbur,      "plant ground sway big shelter" },
+    { "butterbur_big",  gen_butterbur_big,  "plant ground sway big shelter" },
     { "tree_far",       gen_tree_far,       "tree background far" },
     { "stump",          gen_stump,          "tree stump ground perch" },
     { "canopy",         gen_canopy,         "plant hanging canopy sway" },

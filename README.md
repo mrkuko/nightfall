@@ -39,7 +39,9 @@ Every scene is different. A frame takes about half a millisecond.
   plant is a damped spring that sways as a gust passes. An animal walking through bends only the plants it
   actually brushes against. Moonbeams, drifting mist and glowing fungi. Fog and rain come and go: a fog
   bank pours in from the side along the forest floor, a rain front sweeps across, one can roll out while
-  the other moves in, and the swamp is foggier than the rocky pine wood.
+  the other moves in, and the swamp is foggier than the rocky pine wood. When it rains, dholes, foxes,
+  rabbits and others lie down under the huge funnel-shaped leaves of butterbur; in fog they notice a
+  predator later, and the owl hunts by ear.
 - **Biomes.** Oak wood, beech hall, spruce taiga, rocky pine wood, birch grove, alder swamp, mixed forest.
   Each has its own trees, undergrowth, animals and ground (needles, moss, mud, gravel …).
 - **Tiny and fast.** One ~500 kB binary with all art compiled in. Plain C99 with libc and libm only

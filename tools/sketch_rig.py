@@ -203,6 +203,7 @@ creature
   speed walk=16 run=46
   anim idle=idle move=hop run=run look=look alert=alert eat=eat groom=groom rest=rest freeze=freeze sniff=sniff
   intents forage=5 wander=3 look=3 groom=2 rest=1 hide=2 leave=1
+  shelter rain            # goes under big leaves when it rains
   homes bush log hollow
   fear 0.6
   curiosity 0.5
@@ -562,6 +563,7 @@ creature
   speed walk=14 run=60
   anim idle=idle move=walk run=trot look=look alert=alert eat=sniff sniff=sniff rest=sit sit=sit play=pounce
   intents wander=4 sniff=4 look=3 rest=2 chase=3 leave=2
+  shelter rain            # goes under big leaves when it rains
   homes edge
   fear 0.2
   curiosity 0.6
@@ -981,6 +983,7 @@ creature
   speed walk=7 run=14
   anim idle=idle move=walk run=walk look=sniff eat=sniff freeze=curl alert=curl sniff=sniff
   intents forage=6 wander=4 rest=1 leave=2
+  shelter rain            # goes under big leaves when it rains
   homes log bush
   fear 0.3
   curiosity 0.3
@@ -1705,6 +1708,7 @@ clip run loop fps=13 speed=24 : walk0 walk1 walk2 walk3 walk4 walk5
   speed walk=9 run=24
   anim idle=idle move=walk run=run look=look eat=dig sniff=sniff alert=look
   intents forage=6 wander=4 sniff=4 rest=1 hide=1 leave=2
+  shelter rain            # goes under big leaves when it rains
   homes log brushwood edge
   fear 0.2
   curiosity 0.4
@@ -1862,6 +1866,7 @@ clip run loop fps=14 speed=50 : walk0 walk1 walk2 walk3 walk4 walk5
   speed walk=12 run=50
   anim idle=idle move=walk run=run look=look alert=stalk rest=sit sit=sit sniff=stalk
   intents wander=4 look=3 rest=3 sniff=2 leave=3
+  shelter rain            # goes under big leaves when it rains
   homes log edge
   fear 0.3
   curiosity 0.6
@@ -1962,6 +1967,7 @@ creature
   speed walk=24 run=60
   anim idle=idle move=move run=run look=look alert=look sniff=sniff eat=sniff
   intents wander=5 look=4 forage=2 hide=3 leave=2
+  shelter rain            # goes under big leaves when it rains
   homes log brushwood bush
   fear 0.4
   curiosity 0.9
@@ -2617,6 +2623,7 @@ clip run loop fps=12 speed=60 : gal0 gal1 gal2 gal3
   speed walk=15 run=60
   anim idle=idle|wag|sniffair|lookback|idle|pant move=walk run=run look=look|howl|lookback|look alert=alert sniff=sniff eat=eat rest=sleep|lie|sleep|sit sit=sit groom=scratch|stretch|scratch|stretch|shake play=play|pounce|play
   intents wander=3 forage=2 sniff=3 look=3 rest=4 groom=2 chase=2.2 frolic=2 follow=2 leave=1
+  shelter rain            # goes under big leaves when it rains
   rest_time 10 35
   chases rabbit squirrel mouse mole frog hedgehog dormouse
   homes edge

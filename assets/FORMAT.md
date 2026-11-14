@@ -61,6 +61,7 @@ creature                  # CREATURE PROFILE for the intent system
   curiosity 0.5
   scares rabbit mouse     # (predator) whom it scares
   hunts mouse             # (bird of prey) whom it stoops on and may catch (intent `hunt`)
+  shelter rain            # goes under big leaves (`point.shelterN`) when it rains (intent `shelter`)
   attracted glow          # (moth) flies towards light
   point head 7 -10        # head point relative to the anchor (peeking out of openings)
 end
@@ -116,11 +117,13 @@ once when the creature leaves `X` (getting up). The creature does not move while
 
 ## Intents (`intents`)
 
-`wander forage look groom rest hide peek leave climb perch flee follow watch pass hover sniff emerge vanish roost chase frolic hunt`
+`wander forage look groom rest hide peek leave climb perch flee follow watch pass hover sniff emerge vanish roost chase frolic hunt shelter`
 
 `roost` = settle down: a creature with a `hollow` animation flies into a free visible hollow, a creature with `hang` hangs under a branch (it reserves the spot so that two do not hang in the same place).
 
 `hunt` = (a creature with `hunts mouse …` and `swoop` / `strike` / `carry` clips) a bird of prey eyes a creature from the list that is out in the open, glides to a point above and beside it, stoops in a dive that gets faster, spreads its talons and strikes. With a catch (about half of the hunts) the prey disappears into the talons and the owl flaps away over the edge of the screen with it (`carry` shows the mouse in its talons); on a miss the prey has bolted, the owl strikes the empty ground and pulls up. An owl sitting in a hollow or on a branch can also spot prey and burst out after it.
+
+`shelter` = (a creature with `shelter rain`) when it rains where it stands, it goes (runs, in heavy rain) to the nearest free spot under big leaves (a `point.shelterN` of a plant such as butterbur), lies down there until it has been dry for a few seconds, then shakes itself off (`groom`) and looks around. It also breaks off a calm activity when the rain reaches it. In fog creatures see a predator later (the danger radius shrinks to about a third in thick fog) and notice whom they chase only nearby; a bird of prey hunts by ear: only prey that moves, sniffs or eats, not too far away.
 
 `chase` = curiosity, not hunting: a sprint after any visible creature (even across the screen) from the profile list
 `chases rabbit mouse …`, then `play` and `sniff`. `follow` on the ground = catch up with the
@@ -156,6 +159,14 @@ prop path.walk0  2 -7  8 -8  14 -8  20 -9 …    # walkway along the top of a br
 - In the playground `d` shows the paths (pink = climbing, blue = walkway, orange = hanging,
   yellow = link).
 
+## Big leaves (`point.shelterN`, `leaves`)
+
+A plant with a roof of big leaves (the generated `butterbur`, `butterbur_big`: funnel-shaped leaves on stalks
+24–31 px tall, high enough for a lying dhole) gives `point.shelter0..3` — a spot on the ground under a high leaf
+(a place `PL_SHELTER` at the plant's depth, one creature each) — and `leaves "x0 x1 y …"` — the span and the
+top of every leaf relative to the anchor: raindrops at that depth land on it (a splash, the leaf twitches) and
+it stays dry below. Biome keys: `big_leaves N` (expected clumps per 200 px of width), `big_leaf` (which kinds).
+
 ## Hollow (`point.hollow`, `point.hollow_eye`, `hollow_size`)
 
 - `point.hollow` — where a creature stands that climbs a trunk to get into the hollow (squirrel, dormouse).
@@ -183,7 +194,7 @@ end
 ```
 
 Keys: `label weight trees stumps logs bushes floor fungi plants plants_near plants_far
-plant_density rocks moss puddles ground ground_scale creatures weather` (described in the header of
+plant_density rocks moss puddles big_leaves big_leaf ground ground_scale creatures weather` (described in the header of
 `assets/biomes/biomes.spr`). A missing list = everything allowed. `ground` types: `soil litter
 needles moss grass stone gravel pebbles mud sand` — the floor strip is painted with noise patches
 of these. `--biome auto` (default) picks one by the seed and `weight`, `--biome NAME` forces one,

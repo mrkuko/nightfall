@@ -461,6 +461,7 @@ creature
   speed walk=16 run=46
   anim idle=idle move=hop run=run look=look alert=alert eat=eat groom=groom rest=rest freeze=freeze sniff=sniff
   intents forage=5 wander=3 look=3 groom=2 rest=1 hide=2 leave=1
+  shelter rain            # goes under big leaves when it rains
   homes bush log hollow
   fear 0.6
   curiosity 0.5

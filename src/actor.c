@@ -21,7 +21,7 @@ static const char *ANIM_NAMES[A_COUNT] = {
 
 static const char *INTENT_NAMES[IN_COUNT] = {
     "none", "wander", "forage", "look", "groom", "rest", "hide", "peek", "leave",
-    "climb", "perch", "flee", "follow", "watch", "pass", "hover", "sniff", "emerge", "vanish", "roost", "chase", "frolic", "hunt"
+    "climb", "perch", "flee", "follow", "watch", "pass", "hover", "sniff", "emerge", "vanish", "roost", "chase", "frolic", "hunt", "shelter"
 };
 
 const char *intent_name(int i) { return (i >= 0 && i < IN_COUNT) ? INTENT_NAMES[i] : "?"; }
@@ -106,6 +106,7 @@ void profile_parse(const sprite_t *s, profile_t *p)
     p->pack = sprite_prop(s, "pack") != NULL;
     if ((v = sprite_prop(s, "chases"))) snprintf(p->chases, sizeof p->chases, " %s ", v);
     if ((v = sprite_prop(s, "hunts"))) snprintf(p->hunts, sizeof p->hunts, " %s ", v);
+    p->shelter = (v = sprite_prop(s, "shelter")) && strstr(v, "rain");
     p->lane = (v = sprite_prop(s, "lane")) ? (float)atof(v) : 0.15f;
     p->rare = (v = sprite_prop(s, "rare")) ? atoi(v) : 0;
     p->burrow = (v = sprite_prop(s, "burrow")) ? atoi(v) : 0;
@@ -222,7 +223,7 @@ static int can_reach_place(const actor_t *a, const place_t *p)
     switch (p->type) {
     case PL_HOLLOW: return (m & (NAV_CLIMB | NAV_AIR)) != 0;
     case PL_PERCH:  return (m & (NAV_PERCH | NAV_AIR)) != 0;
-    case PL_ENTRY: case PL_UNDER: case PL_TRUNK: case PL_EDGE: return (m & NAV_GROUND) != 0;
+    case PL_ENTRY: case PL_UNDER: case PL_TRUNK: case PL_EDGE: case PL_SHELTER: return (m & NAV_GROUND) != 0;
     case PL_PEEK:   return a->hidden;
     default:        return 0;
     }
@@ -520,12 +521,16 @@ int actor_pick_lane(world_t *w, const profile_t *p)
     return w->ground_z + (int)lroundf(t * (float)(w->fg_z + 6 - w->ground_z));
 }
 
+/* How far a creature at x can see, 1 = clear air; thick fog cuts it to ~a third. */
+static float sight_at(const world_t *w, float x) { return 1.0f - 0.65f * weather_at(w, WX_FOG, x); }
+
 /* Nearest creature this one chases out of curiosity (on the ground, visible). */
 static int chase_target(world_t *w, actor_t *a, float maxd)
 {
     if (!a->prof.chases[0]) return -1;
     int best = -1;
-    float bd = maxd;
+    /* in fog it notices them only much closer */
+    float bd = fminf(maxd, fmaxf(40.0f, maxd * (1.0f - 0.85f * weather_at(w, WX_FOG, a->x))));
     char key[NF_NAME + 2];
     for (int i = 0; i < w->nact; i++) {
         actor_t *o = &w->act[i];
@@ -552,11 +557,37 @@ static int hunt_target(world_t *w, actor_t *a)
         if (o->x < 12.0f || o->x > (float)w->w - 12.0f) continue;
         snprintf(key, sizeof key, " %s ", o->spr->name);
         if (!strstr(a->prof.hunts, key)) continue;
+        /* in fog it hunts by ear: only prey that rustles (moves, digs, eats), and not too far */
+        if (weather_at(w, WX_FOG, o->x) > 0.3f &&
+            (!(o->anim == A_MOVE || o->anim == A_RUN || o->anim == A_EAT || o->anim == A_SNIFF) ||
+             fabsf(o->x - a->x) > 140.0f)) continue;
         int taken = 0;
         for (int k = 0; k < w->nact; k++)
             if (k != i && w->act[k].alive && w->act[k].intent == IN_HUNT && w->act[k].target == i) taken = 1;
         if (taken) continue;
         float d = fabsf(o->x - a->x) + fabsf(o->y - a->y) * 0.5f + rng_range(&w->rng, 0.0f, 40.0f);   /* not always the very nearest */
+        if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+}
+
+/* A shelter (under big leaves) that this creature may take: free, or held by someone who is no longer
+ * sheltering there (a reservation left behind by an interrupted plan). */
+static int shelter_free(const world_t *w, const actor_t *a, const place_t *p)
+{
+    if (p->occupant < 0 || p->occupant == (int)(a - w->act)) return 1;
+    const actor_t *o = &w->act[p->occupant];
+    return !o->alive || o->intent != IN_SHELTER;
+}
+
+static int find_shelter(world_t *w, actor_t *a, float maxdist)
+{
+    int best = -1;
+    float bd = maxdist;
+    for (int i = 0; i < w->nplace; i++) {
+        place_t *p = &w->place[i];
+        if (p->type != PL_SHELTER || !shelter_free(w, a, p)) continue;
+        float d = fabsf(p->x - a->x);
         if (d < bd) { bd = d; best = i; }
     }
     return best;
@@ -912,6 +943,23 @@ static void plan_intent(world_t *w, actor_t *a, int in)
         if (s) { s->x = screen_x(w, 10); s->y = air_y(w); s->z = cruise_z(w); }
         break;
     }
+    case IN_SHELTER: {
+        /* rain: to the nearest free spot under big leaves, lie down there until it stops, then shake off */
+        int pi = find_shelter(w, a, 400.0f);
+        if (pi < 0) { plan_intent(w, a, IN_WANDER); return; }
+        place_t *p = &w->place[pi];
+        p->occupant = actor_index(w, a);
+        world_log(w, "%s#%u heads for shelter under %s", a->spr->name, a->id,
+                  p->obj >= 0 ? w->obj[p->obj].spr->name : "leaves");
+        plan_ground_move(w, a, p->x + rng_range(&w->rng, -2.0f, 2.0f), weather_at(w, WX_RAIN, a->x) > 0.45f, p->z);
+        s = plan_push(a, ST_FACE);
+        if (s) s->x = p->x + (rng_chance(&w->rng, 0.5f) ? -10.0f : 10.0f);
+        s = plan_push(a, ST_SHELTER);
+        if (s) s->place = pi;
+        push_anim(a, A_GROOM, rng_range(&w->rng, 1.2f, 2.4f));        /* shakes the water off */
+        push_anim(a, A_LOOK, rng_range(&w->rng, 1.0f, 2.5f));
+        break;
+    }
     case IN_FROLIC: {
         /* surrounded by animals: happy, runs into the middle of them, jumps around, sniffs everyone */
         float cx = a->x;
@@ -970,6 +1018,9 @@ static void choose_intent(world_t *w, actor_t *a)
         if (!roost_available(w, a)) score[IN_ROOST] = 0;
         if (!p->hunts[0] || hunt_target(w, a) < 0) score[IN_HUNT] = 0;
         else score[IN_HUNT] *= 0.5f + a->hunger;
+        /* rain: a creature that dislikes it wants to get under the leaves */
+        float rain = weather_at(w, WX_RAIN, a->x);
+        score[IN_SHELTER] = (p->shelter && g && rain > 0.2f && find_shelter(w, a, 400.0f) >= 0) ? 4.0f + rain * 8.0f : 0.0f;
         if (!g) { score[IN_GROOM] *= 0.2f; score[IN_SNIFF] = 0; }
         if (a->nav == NAV_AIR) score[IN_LOOK] *= 0.2f;
         if (a->nav == NAV_PERCH) { score[IN_LOOK] += 2.0f; score[IN_WANDER] *= 0.3f; }
@@ -1028,6 +1079,7 @@ static void perceive(world_t *w, actor_t *a, float dt)
         if (s->src == me) continue;
         float d = fabsf(s->x - a->x) + fabsf(s->y - a->y) * 0.6f;
         if (d > s->r) continue;
+        if (s->kind == ST_DANGER && d > s->r * sight_at(w, a->x)) continue;   /* fog: it sees the predator later */
         if (s->kind == ST_DANGER && s->src >= 0 &&
             (strstr(w->act[s->src].prof.scares, key) || strstr(w->act[s->src].prof.hunts, key))) {
             float k = s->strength * (1.0f - d / s->r);
@@ -1453,6 +1505,24 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         add_molehill(w, a);
         return 1;
     }
+    case ST_SHELTER: {
+        /* lies under the leaves while it rains; a few dry seconds later it comes out */
+        place_t *p = &w->place[s->place];
+        if (first) {
+            a->bob = 0;
+            p->occupant = actor_index(w, a);
+            world_log(w, "%s#%u shelters from the rain", a->spr->name, a->id);
+        }
+        set_anim(a, a->step_t < 1.0f ? A_LOOK : A_REST);
+        if (weather_at(w, WX_RAIN, p->x) < 0.1f) a->bob += dt;
+        else a->bob = 0;
+        if ((a->step_t > 8.0f && a->bob > 4.0f) || a->step_t > 400.0f) {
+            if (p->occupant == actor_index(w, a)) p->occupant = -1;
+            world_log(w, "%s#%u comes out, the rain has stopped", a->spr->name, a->id);
+            return 1;
+        }
+        return 0;
+    }
     case ST_HUNT: {
         /* A bird of prey: glides in silence to a point above and to the side of the prey, stoops on it in
          * a straight dive that gets faster and faster, spreads its talons and strikes. A catch disappears
@@ -1622,12 +1692,21 @@ void actor_update(world_t *w, actor_t *a, float dt)
     if (a->prof.chases[0] && a->nav == NAV_GROUND && !a->hidden && !in_transition(a) &&
         a->intent != IN_CHASE && a->intent != IN_FLEE && a->intent != IN_HIDE && a->intent != IN_LEAVE &&
         a->fear < 0.3f) {
-        int asleep = a->intent == IN_REST;
+        int asleep = a->intent == IN_REST || a->intent == IN_SHELTER;     /* lying under the leaves too */
         float rate = (asleep ? 0.012f : 0.09f) * (0.5f + a->prof.curiosity);
         if (rng_float(&w->rng) < rate * dt && chase_target(w, a, (float)w->w) >= 0) {
             world_log(w, "%s#%u notices something!", a->spr->name, a->id);
             plan_intent(w, a, IN_CHASE);
         }
+    }
+
+    /* rain starts: a creature that dislikes it breaks off a calm activity and heads for the leaves */
+    if (a->prof.shelter && a->nav == NAV_GROUND && !a->hidden && !in_transition(a) &&
+        a->intent != IN_SHELTER && a->intent != IN_FLEE && a->intent != IN_HIDE && a->intent != IN_VANISH &&
+        a->intent != IN_CHASE && a->intent != IN_LEAVE && a->fear < 0.4f &&
+        weather_at(w, WX_RAIN, a->x) > 0.3f && rng_float(&w->rng) < 0.3f * dt && find_shelter(w, a, 400.0f) >= 0) {
+        world_log(w, "%s#%u: rain!", a->spr->name, a->id);
+        plan_intent(w, a, IN_SHELTER);
     }
 
     /* a bird of prey in its hollow or on a branch may spot something below and go for it */

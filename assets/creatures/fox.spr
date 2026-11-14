@@ -690,6 +690,7 @@ creature
   speed walk=14 run=60
   anim idle=idle move=walk run=trot look=look alert=alert eat=sniff sniff=sniff rest=sit sit=sit play=pounce
   intents wander=4 sniff=4 look=3 rest=2 chase=3 leave=2
+  shelter rain            # goes under big leaves when it rains
   homes edge
   fear 0.2
   curiosity 0.6

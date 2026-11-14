@@ -514,6 +514,7 @@ static const char *ALL_PLANTS[] = { "grass", "grass_tall", "fern", "broadleaf", 
                                     "horsetail" };
 static const char *ALL_NEAR[]   = { "fern", "broadleaf", "grass_tall", "nettle", "fern", "horsetail" };
 static const char *ALL_FAR[]    = { "grass_low", "sprouts", "flowers", "grass_low", "grass" };
+static const char *ALL_BIGLEAF[] = { "butterbur", "butterbur", "butterbur_big" };
 static const char *ALL_FUNGI[]  = { "mushrooms", "mushrooms", "mushroom_red", "mushroom_glow" };
 #define BPICK(key, def) bpick(w, r, key, def, (int)NF_COUNT(def))
 
@@ -760,6 +761,23 @@ static void build_scene(world_t *w, uint64_t seed)
     for (int i = 0; i < rng_between(&r, 1, 4); i++) {
         float x = rng_range(&r, 0, (float)W);
         world_add_object(w, BP("fungi", ALL_FUNGI), x, G(x) + 2, 106, 0, SD);
+    }
+    /* butterbur: clumps of huge leaves at the creatures' depth (a dry spot in the rain); expected count
+     * per 200 px of width (biome "big_leaves"), kept apart */
+    {
+        float nb = bnum("big_leaves", 0.7f) * (float)W / 200.0f;
+        int n = (int)nb + rng_chance(&r, nb - floorf(nb));
+        float placed[8];
+        int np = 0;
+        for (int i = 0, tries = 0; i < n && np < 8 && tries < 40; tries++) {
+            float x = rng_range(&r, 24, (float)W - 24);
+            if (too_close(placed, np, x, 70)) continue;
+            int z = rng_between(&r, 100, 106);
+            int o = world_add_object(w, BP("big_leaf", ALL_BIGLEAF), x, world_ground_at(w, x, (float)z) + 1, z, FLIP, SD);
+            if (o >= 0) world_places_from_object(w, o);
+            placed[np++] = x;
+            i++;
+        }
     }
     for (int i = 0; i < (int)lroundf((float)(1 + W / 70) * rocks); i++) {
         float x = rng_range(&r, 0, (float)W);

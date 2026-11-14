@@ -144,6 +144,7 @@ creature
   speed walk=24 run=60
   anim idle=idle move=move run=run look=look alert=look sniff=sniff eat=sniff
   intents wander=5 look=4 forage=2 hide=3 leave=2
+  shelter rain            # goes under big leaves when it rains
   homes log brushwood bush
   fear 0.4
   curiosity 0.9

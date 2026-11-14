@@ -145,6 +145,7 @@ creature
   speed walk=7 run=14
   anim idle=idle move=walk run=walk look=sniff eat=sniff freeze=curl alert=curl sniff=sniff
   intents forage=6 wander=4 rest=1 leave=2
+  shelter rain            # goes under big leaves when it rains
   homes log bush
   fear 0.3
   curiosity 0.3

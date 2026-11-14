@@ -47,6 +47,11 @@ const char *weather_pattern_name(int p) { return p >= 0 && p < NPAT ? PAT[p].nam
 static struct { float x0, x1, y; int z; } g_pud[MAX_PUDDLE];
 static int g_npud;
 
+/* big leaves of the scene (butterbur): rain lands on them, the dry spot is below */
+#define MAX_LEAF 48
+static struct { float x0, x1, y; int z, obj; } g_leaf[MAX_LEAF];
+static int g_nleaf;
+
 /* coarse fog grid (one value per GRID x GRID pixels) */
 #define GRID 4
 static float *g_fog, *g_dark;
@@ -65,8 +70,8 @@ static float cover(const world_t *w, int k, float x, float y)
     float u = L->dir > 0 ? x / (float)w->w : 1.0f - x / (float)w->w;
     float h = (float)w->h;
     /* ragged, slowly changing edges; the fog's lower part leads (it pours in along the ground) */
-    float n = (vnoise2(y * 0.045f + (float)k * 17.0f, w->t * 0.03f, 911u) - 0.5f) * L->soft * 1.2f
-            + (vnoise2(y * 0.16f, w->t * 0.12f, 913u) - 0.5f) * 0.03f;
+    float n = (vnoise2(y * 0.045f + (float)k * 17.0f, w->t * 0.012f, 911u) - 0.5f) * L->soft * 1.2f
+            + (vnoise2(y * 0.16f, w->t * 0.04f, 913u) - 0.5f) * 0.03f;
     if (k == WX_FOG) n += (y / h - 0.6f) * 0.22f;
     float c = L->amount;
     if (L->lead < WX_INF * 0.5f) c *= edge(L->lead + n - u, L->soft);
@@ -91,7 +96,7 @@ static void arrive(world_t *w, int k, float target)
     wx_layer_t *L = &x->layer[k];
     L->dir = wind_sign(w);
     L->soft = k == WX_FOG ? 0.35f : 0.12f;
-    L->speed = 1.0f / (k == WX_FOG ? rng_range(&x->rng, 80.0f, 150.0f) : rng_range(&x->rng, 18.0f, 35.0f));
+    L->speed = 1.0f / (k == WX_FOG ? rng_range(&x->rng, 240.0f, 420.0f) : rng_range(&x->rng, 18.0f, 35.0f));
     L->lead = -L->soft - margin(k);
     L->tail = -WX_INF;
     L->amount = L->target = target;
@@ -126,7 +131,7 @@ static void set_pattern(world_t *w, int p, int instant)
             memset(L, 0, sizeof *L);
             L->dir = wind_sign(w);
             L->soft = k == WX_FOG ? 0.35f : 0.12f;
-            L->speed = k == WX_FOG ? 1.0f / 110.0f : 1.0f / 25.0f;
+            L->speed = k == WX_FOG ? 1.0f / 320.0f : 1.0f / 25.0f;
             L->lead = want[k] > 0 ? WX_INF : -WX_INF;
             L->tail = -WX_INF;
             L->amount = L->target = want[k];
@@ -135,7 +140,8 @@ static void set_pattern(world_t *w, int p, int instant)
             layer_want(w, k, want[k]);
         }
     }
-    float hold = p == 0 ? rng_range(&x->rng, 150.0f, 420.0f) : rng_range(&x->rng, 120.0f, 360.0f);
+    /* long enough for a slow fog front to cross the screen (4–7 min) */
+    float hold = p == 0 ? rng_range(&x->rng, 240.0f, 540.0f) : rng_range(&x->rng, 300.0f, 600.0f);
     x->next_change = hold;
     world_log(w, "weather → %s", PAT[p].name);
 }
@@ -181,6 +187,23 @@ void weather_begin(world_t *w, const char *arg)
         g_pud[g_npud].z = o->z;
         g_npud++;
     }
+    g_nleaf = 0;
+    for (int i = 0; i < w->nobj; i++) {
+        const object_t *o = &w->obj[i];
+        const char *lv = sprite_prop(o->spr, "leaves");
+        if (!lv) continue;
+        int a, b, c, used;
+        while (g_nleaf < MAX_LEAF && sscanf(lv, "%d %d %d%n", &a, &b, &c, &used) == 3) {
+            float fa = o->flip ? (float)-b : (float)a, fb = o->flip ? (float)-a : (float)b;
+            g_leaf[g_nleaf].x0 = o->x + fa;
+            g_leaf[g_nleaf].x1 = o->x + fb;
+            g_leaf[g_nleaf].y = o->y + (float)c;
+            g_leaf[g_nleaf].z = o->z;
+            g_leaf[g_nleaf].obj = i;
+            g_nleaf++;
+            lv += used;
+        }
+    }
     x->fixed = 0;
     if (arg && strcmp(arg, "auto") != 0) {
         for (int i = 0; i < NPAT; i++)
@@ -193,7 +216,7 @@ void weather_begin(world_t *w, const char *arg)
     /* auto: now and then the weather is already there; the first change comes soon */
     int p = rng_chance(&x->rng, 0.35f) ? pick_pattern(w) : 0;
     set_pattern(w, p, 1);
-    x->next_change = rng_range(&x->rng, 40.0f, 160.0f);
+    x->next_change = rng_range(&x->rng, 40.0f, 200.0f);
 }
 
 void weather_next(world_t *w)
@@ -276,8 +299,20 @@ static void update_rain(world_t *w, float dt)
     for (int i = 0; i < x->ndrop; i++) {
         wx_drop_t *d = &x->drop[i];
         d->vx += (world_wind_at(w, d->x) * 45.0f + w->wind_dir * 8.0f - d->vx) * fminf(1.0f, dt * 2.0f);
+        float y0 = d->y;
         d->x += d->vx * dt;
         d->y += d->vy * dt;
+        /* a drop at the depth of a big leaf lands on it: a splash on top, the leaf twitches, dry below */
+        int hit = 0;
+        for (int l = 0; l < g_nleaf && !hit; l++) {
+            if (y0 > g_leaf[l].y || d->y < g_leaf[l].y || d->x < g_leaf[l].x0 || d->x > g_leaf[l].x1) continue;
+            if (d->z > (float)g_leaf[l].z + 6.0f || d->z < (float)g_leaf[l].z - 14.0f) continue;
+            if (rng_chance(&x->rng, 0.7f)) add_splash(w, d->x, g_leaf[l].y, g_leaf[l].z + 3, 0);
+            object_t *o = &w->obj[g_leaf[l].obj];
+            o->bvel += rng_range(&x->rng, -0.25f, 0.25f);
+            hit = 1;
+        }
+        if (hit) { x->drop[i--] = x->drop[--x->ndrop]; continue; }
         if (d->y >= d->floor_y) {
             if (d->z >= (float)w->ground_z - 4.0f) {
                 int ring = 0;
@@ -383,7 +418,8 @@ static void render_air(world_t *w, raster_t *r)
         g_cap = gw * gh;
     }
     float h = (float)r->h;
-    float drift = w->t * (0.6f + 1.4f * fabsf(w->wind)) * (w->wind_dir < 0 ? 1.0f : -1.0f);
+    /* wisps creep with the wind at a few pixels per second (noise units: 1 = ~55 px) */
+    float drift = w->t * (0.035f + 0.06f * fabsf(w->wind)) * (w->wind_dir < 0 ? 1.0f : -1.0f);
     for (int gy = 0; gy < gh; gy++)
         for (int gx = 0; gx < gw; gx++) {
             float X = (float)(gx * GRID), Y = (float)(gy * GRID);
@@ -392,7 +428,7 @@ static void render_air(world_t *w, raster_t *r)
                 float c = cover(w, WX_FOG, X, Y);
                 if (c > 0.002f) {
                     /* wisps drifting with the wind; thicker down at the ground */
-                    float wisp = fbm2(X * 0.018f + drift * 0.9f, Y * 0.05f + w->t * 0.004f, 3, 4242u);
+                    float wisp = fbm2(X * 0.018f + drift, Y * 0.05f + w->t * 0.002f, 3, 4242u);
                     float gy0 = w->ground[(int)clampf(X, 0.0f, (float)(w->w - 1))];
                     float low = clampf(1.0f - (gy0 - Y) / (h * 0.75f), 0.0f, 1.0f);
                     f = c * (0.2f + 1.15f * wisp * wisp + 0.2f * wisp) * (0.6f + 0.5f * low);

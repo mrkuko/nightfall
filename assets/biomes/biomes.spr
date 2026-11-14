@@ -19,6 +19,7 @@
 #   plant_density multiplier of foreground plant density (1 = default)
 #   rocks         multiplier of boulders and stones;  moss: of moss patches
 #   puddles       expected number of puddles (the fraction is a chance)
+#   big_leaves    expected clumps of huge leaves (butterbur) per 200 px of width; big_leaf: which kinds
 #   ground        floor patch types: soil litter needles moss grass stone gravel pebbles mud sand
 #   ground_scale  patch size multiplier (1 = default, 2 = bigger patches)
 #   creatures     who may arrive (the weight multiplies the species' base frequency)
@@ -38,6 +39,7 @@ biome oak_wood
   plants_far  grass_low=3 sprouts=2 flowers=1
   ground      litter=5 soil=3 moss=2 grass=1 pebbles=1
   creatures   rabbit squirrel=1.3 hedgehog mouse dormouse badger fox boar deer wildcat weasel owl bat moth firefly beetle stag_beetle=1.5 snail slug eyes spirit mole
+  big_leaves  0.9
 end
 
 biome beech_hall
@@ -55,6 +57,7 @@ biome beech_hall
   ground      litter=6 soil=2 moss=1 pebbles=1
   ground_scale 1.4
   creatures   squirrel=1.5 dormouse=1.5 mouse hedgehog deer wildcat badger fox owl=1.5 bat moth firefly beetle stag_beetle slug eyes spirit
+  big_leaves  0.8
   weather     fog=1.3
 end
 
@@ -73,6 +76,7 @@ biome taiga
   moss        2
   ground      needles=6 moss=4 soil=1 stone=1
   creatures   squirrel=1.5 mouse owl=1.5 fox dhole weasel boar deer moth firefly beetle bat eyes spirit slug salamander
+  big_leaves  0.4
   weather     fog=1.4 rain=1.1
 end
 
@@ -93,6 +97,7 @@ biome pine_rocks
   ground      stone=4 gravel=3 needles=3 sand=2 grass=1
   ground_scale 1.2
   creatures   fox=1.5 weasel=1.5 wildcat=1.5 dhole mouse rabbit deer owl bat moth firefly beetle salamander eyes
+  big_leaves  0.15
   weather     fog=0.6 rain=0.8
 end
 
@@ -110,6 +115,7 @@ biome birch_grove
   plant_density 1.15
   ground      grass=5 moss=2 soil=2 litter=2
   creatures   rabbit=1.5 mouse hedgehog deer fox mole=1.5 frog snail moth firefly=1.3 owl bat beetle weasel dormouse eyes
+  big_leaves  1.0
   weather     rain=1.2
 end
 
@@ -128,6 +134,8 @@ biome swamp
   puddles     2.5
   ground      mud=5 moss=4 grass=2 soil=1
   creatures   frog=3 salamander=3 snail=2 slug=2 mouse moth=1.5 firefly=2 bat=1.5 owl beetle eyes spirit=1.5 boar
+  big_leaves  2.2
+  big_leaf    butterbur=1 butterbur_big=2
   weather     fog=2.5 rain=1.3
 end
 

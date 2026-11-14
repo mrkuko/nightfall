@@ -172,6 +172,12 @@ void world_places_from_object(world_t *w, int oi)
     if (prop_xy(s, "point.top", &dx, &dy) &&
         (sprite_has_tag(s, "bush") || sprite_has_tag(s, "stump") || sprite_has_tag(s, "large")))
         world_add_place(w, PL_PERCH, o->x + (float)(dx * fl), o->y + (float)dy, o->z + 4, NAV_PERCH, oi, 0);
+    for (int k = 0; k < 4; k++) {
+        snprintf(key, sizeof key, "point.shelter%d", k);
+        if (prop_xy(s, key, &dx, &dy))
+            world_add_place(w, PL_SHELTER, o->x + (float)(dx * fl), world_ground_at(w, o->x + (float)(dx * fl), (float)o->z),
+                            o->z, NAV_GROUND, oi, k);
+    }
     if (prop_xy(s, "point.under", &dx, &dy))
         world_add_place(w, PL_UNDER, o->x + (float)(dx * fl), world_ground(w, o->x + (float)(dx * fl)),
                         o->z - 4, NAV_GROUND, oi, 0);
@@ -607,7 +613,7 @@ void world_render(world_t *w, raster_t *r, int debug)
     if (debug) {
         static const rgb_t pc[PL_COUNT] = {
             {200, 60, 60}, {240, 200, 60}, {60, 200, 240}, {200, 120, 255},
-            {120, 255, 120}, {255, 140, 60}, {255, 255, 255}, {100, 100, 255}
+            {120, 255, 120}, {255, 140, 60}, {255, 255, 255}, {100, 100, 255}, {80, 255, 200}
         };
         for (int k = 0; k < w->npath; k++) {
             const navpath_t *np = &w->path[k];
