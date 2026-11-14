@@ -212,7 +212,24 @@ monitor is anchored at the bottom of the scene, so the ground is at the bottom e
 click or mouse movement quits.
 
 * **Install:** right-click `nightfall.scr` in Explorer, **Install** (it asks for admin rights, copies the
-  file to `System32` and opens the screensaver dialog).
+  file to `System32` and opens the screensaver dialog). **Test** runs it once without installing it.
+
+  ![Right-click nightfall.scr: Test, Configure, Install](docs/images/win-install.png)
+* **Setting it as your screensaver:**
+  1. Open the *Screen Saver Settings* dialog: right-click `nightfall.scr`, **Install** opens it for you.
+     Later you can reach it from *Settings, Personalization, Lock screen, Screen saver*, or by typing
+     "screen saver" into the Start menu.
+  2. Pick **nightfall** in the *Screen saver* drop-down.
+  3. Set **Wait** to the number of idle minutes after which it should start.
+  4. Optional: **Preview** shows it fullscreen (any key or mouse movement quits), **Settings…** opens the
+     Nightfall options (below).
+  5. Click **OK** (or **Apply**).
+
+  <img src="docs/images/win-screensaver-dialog.png" width="330" alt="The Windows Screen Saver Settings dialog with nightfall selected">
+
+  To switch it off, choose *(None)* in the same drop-down. To remove it, delete `nightfall.scr` from
+  `C:\Windows\System32`. A screensaver only starts when the PC is idle: it does not run while a video
+  plays or a presentation is on.
 * **SmartScreen:** the file is not code-signed, so Windows may warn when you open a downloaded `.scr` or
   the ZIP (*Windows protected your PC*): click **More info**, then **Run anyway**. Or right-click the
   downloaded ZIP, **Properties**, tick **Unblock**, before unpacking it.
@@ -220,6 +237,9 @@ click or mouse movement quits.
   art-pixel size of the main monitor, default 300 rows), the foreground plants (`--grass-density`,
   `--grass-spread`, `--grass-zspread`), the biome and the spawn rates (`--spawn-rate`), how often the scene is replaced by a new one (minutes, default 10, `0` = never
   change it) and about how long one weather lasts (minutes, default 6, random around it, `0` = no weather). They are stored in `HKCU\Software\Nightfall`.
+
+  <img src="docs/images/win-nightfall-settings.png" width="320" alt="The Nightfall settings dialog">
+
 * **Trying options:** a `.scr` is started through the shell association, which drops command-line
   arguments, so run the same program as an exe: `make` also leaves `build\nightfall-saver.exe`, and
   `build\nightfall-saver.exe /s --height 400 --grass-density 2 --spawn-rate rabbit=0` runs it with those
