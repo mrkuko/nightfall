@@ -212,9 +212,7 @@ monitor is anchored at the bottom of the scene, so the ground is at the bottom e
 click or mouse movement quits.
 
 * **Install:** right-click `nightfall.scr` in Explorer, **Install** (it asks for admin rights, copies the
-  file to `System32` and opens the screensaver dialog). Without admin rights run
-  `powershell -ExecutionPolicy Bypass -File install-screensaver.ps1` instead (`-Minutes 10` sets the idle
-  time, `-Remove` uninstalls); it uses the file where it is, so do not delete the folder afterwards.
+  file to `System32` and opens the screensaver dialog).
 * **SmartScreen:** the file is not code-signed, so Windows may warn when you open a downloaded `.scr` or
   the ZIP (*Windows protected your PC*): click **More info**, then **Run anyway**. Or right-click the
   downloaded ZIP, **Properties**, tick **Unblock**, before unpacking it.
