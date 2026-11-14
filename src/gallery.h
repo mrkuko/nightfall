@@ -9,6 +9,8 @@ extern float g_fg_density, g_fg_spread, g_fg_zspread;
 extern const char *g_biome_arg;
 /* Weather: "auto" (it comes and goes) or a pattern that stays: clear mist fog drizzle rain rainfog. */
 extern const char *g_weather_arg;
+/* About how long one weather lasts, minutes (random 0.6-1.4x around it); 0 = no weather. Defined in weather.c. */
+extern float g_weather_minutes;
 int biome_cycle(const library_t *lib);
 /* "NAME=F": spawn frequency of a species regardless of the biome (F = share of the commonest species). */
 int spawn_rate_set(const char *spec);

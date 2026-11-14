@@ -38,10 +38,11 @@ static POINT g_home;
 static struct {
     DWORD mode, w, h;
     DWORD scene_min;                                /* a new scene every N minutes, 0 = never change */
+    DWORD weather_min;                              /* about how long one weather lasts, minutes, 0 = no weather */
     char density[16], spread[16], zspread[16];      /* foreground plants, 1 = default */
     char biome[48];                                 /* auto | off | NAME */
     char rates[160];                                /* "rabbit=0 dhole=0.2": spawn chance per species */
-} g_cfg = { 1, 0, 300, 10, "1", "1", "1", "auto", "" };
+} g_cfg = { 1, 0, 300, 10, 6, "1", "1", "1", "auto", "" };
 static float g_scene_override = -1.0f;               /* --scene-time S (seconds) on the command line beats the setting */
 
 /* seconds until the scene is replaced by a new one, 0 = never */
@@ -80,6 +81,7 @@ static void load_cfg(void)
     g_cfg.w = reg_get(k, "Width", g_cfg.w);
     g_cfg.h = reg_get(k, "Height", g_cfg.h);
     g_cfg.scene_min = reg_get(k, "SceneMinutes", g_cfg.scene_min);
+    g_cfg.weather_min = reg_get(k, "WeatherMinutes", g_cfg.weather_min);
     reg_get_str(k, "GrassDensity", g_cfg.density, sizeof g_cfg.density);
     reg_get_str(k, "GrassSpread", g_cfg.spread, sizeof g_cfg.spread);
     reg_get_str(k, "GrassZSpread", g_cfg.zspread, sizeof g_cfg.zspread);
@@ -96,6 +98,7 @@ static void save_cfg(void)
     RegSetValueExA(k, "Width", 0, REG_DWORD, (const BYTE *)&g_cfg.w, 4);
     RegSetValueExA(k, "Height", 0, REG_DWORD, (const BYTE *)&g_cfg.h, 4);
     RegSetValueExA(k, "SceneMinutes", 0, REG_DWORD, (const BYTE *)&g_cfg.scene_min, 4);
+    RegSetValueExA(k, "WeatherMinutes", 0, REG_DWORD, (const BYTE *)&g_cfg.weather_min, 4);
     reg_set_str(k, "GrassDensity", g_cfg.density);
     reg_set_str(k, "GrassSpread", g_cfg.spread);
     reg_set_str(k, "GrassZSpread", g_cfg.zspread);
@@ -106,7 +109,7 @@ static void save_cfg(void)
 
 /* Debug overrides on the command line, they beat the saved settings and are never saved. Same names as
  * the terminal build:  --auto | --width N | --height N (these two imply manual) | --grass-density F |
- * --grass-spread F | --grass-zspread F | --scene-time SECONDS | --biome NAME | --spawn-rate NAME=F [NAME=F ...] */
+ * --grass-spread F | --grass-zspread F | --scene-time SECONDS | --weather-time MINUTES | --biome NAME | --spawn-rate NAME=F [NAME=F ...] */
 static void cfg_from_cmdline(const char *cmd)
 {
     char buf[512], *tok[64];
@@ -122,6 +125,7 @@ static void cfg_from_cmdline(const char *cmd)
         else if (!strcmp(a, "--grass-spread")) { lstrcpynA(g_cfg.spread, v, sizeof g_cfg.spread); i++; }
         else if (!strcmp(a, "--grass-zspread")) { lstrcpynA(g_cfg.zspread, v, sizeof g_cfg.zspread); i++; }
         else if (!strcmp(a, "--scene-time")) { g_scene_override = (float)atof(v); i++; }
+        else if (!strcmp(a, "--weather-time")) { g_cfg.weather_min = (DWORD)atoi(v); i++; }
         else if (!strcmp(a, "--biome")) { lstrcpynA(g_cfg.biome, v, sizeof g_cfg.biome); i++; }
         else if (!strcmp(a, "--spawn-rate")) {
             g_cfg.rates[0] = 0;
@@ -144,6 +148,7 @@ static float fval(const char *s, float def, float lo)
 /* hands the scene options to the engine (the same globals the terminal build sets from its arguments) */
 static void apply_scene_options(void)
 {
+    g_weather_minutes = (float)g_cfg.weather_min;
     g_fg_density = fval(g_cfg.density, 1.0f, 0.05f);
     g_fg_spread = fval(g_cfg.spread, 1.0f, 0.0f);
     g_fg_zspread = fval(g_cfg.zspread, 1.0f, 0.0f);
@@ -154,7 +159,7 @@ static void apply_scene_options(void)
 }
 
 /* --- /c: settings dialog (built by hand, no resource file) --- */
-enum { ID_AUTO = 10, ID_MANUAL, ID_W, ID_H, ID_GD, ID_GS, ID_GZ, ID_BIOME, ID_RATES, ID_SCENE };
+enum { ID_AUTO = 10, ID_MANUAL, ID_W, ID_H, ID_GD, ID_GS, ID_GZ, ID_BIOME, ID_RATES, ID_SCENE, ID_WEATHER };
 static int g_dpi = 96;
 #define PX(v) ((v) * g_dpi / 96)
 
@@ -173,6 +178,7 @@ static LRESULT CALLBACK cfgproc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             GetDlgItemTextA(h, ID_BIOME, g_cfg.biome, sizeof g_cfg.biome);
             GetDlgItemTextA(h, ID_RATES, g_cfg.rates, sizeof g_cfg.rates);
             GetDlgItemTextA(h, ID_SCENE, b, sizeof b); g_cfg.scene_min = (DWORD)atoi(b);
+            GetDlgItemTextA(h, ID_WEATHER, b, sizeof b); g_cfg.weather_min = (DWORD)atoi(b);
             save_cfg();
             DestroyWindow(h);
         } else if (LOWORD(wp) == IDCANCEL) DestroyWindow(h);
@@ -197,7 +203,7 @@ static void run_settings(HINSTANCE inst)
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     RegisterClassA(&wc);
     HWND h = CreateWindowExA(WS_EX_DLGMODALFRAME, wc.lpszClassName, "Nightfall settings",
-                             WS_CAPTION | WS_SYSMENU | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, PX(430), PX(492),
+                             WS_CAPTION | WS_SYSMENU | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, PX(430), PX(534),
                              NULL, NULL, inst, NULL);
 #define CTL(cls, txt, style, x, y, w, hh, id) CreateWindowExA(0, cls, txt, WS_CHILD | WS_VISIBLE | (style), \
         PX(x), PX(y), PX(w), PX(hh), h, (HMENU)(INT_PTR)(id), inst, NULL)
@@ -231,8 +237,12 @@ static void run_settings(HINSTANCE inst)
     CTL("EDIT", "", WS_BORDER | ES_NUMBER | WS_TABSTOP, 118, 383, 50, 24, ID_SCENE);
     CTL("STATIC", "minutes   (0 = never change the scene; default 10)", 0, 176, 386, 240, 20, 0);
 
-    CTL("BUTTON", "OK", BS_DEFPUSHBUTTON | WS_TABSTOP, 250, 422, 76, 26, IDOK);
-    CTL("BUTTON", "Cancel", BS_PUSHBUTTON | WS_TABSTOP, 334, 422, 76, 26, IDCANCEL);
+    CTL("STATIC", "Weather lasts about", 0, 14, 418, 110, 20, 0);
+    CTL("EDIT", "", WS_BORDER | ES_NUMBER | WS_TABSTOP, 128, 415, 50, 24, ID_WEATHER);
+    CTL("STATIC", "minutes   (random 0.6-1.4 x; 0 = no weather, always clear)", 0, 186, 418, 240, 20, 0);
+
+    CTL("BUTTON", "OK", BS_DEFPUSHBUTTON | WS_TABSTOP, 250, 464, 76, 26, IDOK);
+    CTL("BUTTON", "Cancel", BS_PUSHBUTTON | WS_TABSTOP, 334, 464, 76, 26, IDCANCEL);
     char b[16];
     wsprintfA(b, "%u", (unsigned)g_cfg.w); SetDlgItemTextA(h, ID_W, b);
     wsprintfA(b, "%u", (unsigned)g_cfg.h); SetDlgItemTextA(h, ID_H, b);
@@ -242,6 +252,7 @@ static void run_settings(HINSTANCE inst)
     SetDlgItemTextA(h, ID_BIOME, g_cfg.biome);
     SetDlgItemTextA(h, ID_RATES, g_cfg.rates);
     wsprintfA(b, "%u", (unsigned)g_cfg.scene_min); SetDlgItemTextA(h, ID_SCENE, b);
+    wsprintfA(b, "%u", (unsigned)g_cfg.weather_min); SetDlgItemTextA(h, ID_WEATHER, b);
     CheckRadioButton(h, ID_AUTO, ID_MANUAL, g_cfg.mode ? ID_MANUAL : ID_AUTO);
     HFONT f = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
     for (HWND c = GetWindow(h, GW_CHILD); c; c = GetWindow(c, GW_HWNDNEXT)) SendMessageA(c, WM_SETFONT, (WPARAM)f, TRUE);

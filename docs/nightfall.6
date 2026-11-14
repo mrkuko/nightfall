@@ -40,6 +40,11 @@ Biome of the scene. \fBauto\fR picks one by the seed, \fBoff\fR allows everythin
 Weather. \fBauto\fR (default): fog and rain come and go as fronts that travel with the wind.
 A name keeps that weather: \fBclear\fR, \fBmist\fR, \fBfog\fR, \fBdrizzle\fR, \fBrain\fR, \fBrainfog\fR.
 .TP
+.BI \-\-weather\-time " M"
+About how long one weather lasts, in minutes (default 6). The real length is random, 0.6 to 1.4 times
+\fIM\fR. Only the duration changes, the fog and rain fronts always move at the same speed.
+0 means no weather at all.
+.TP
 .BI \-\-spawn\-rate " NAME=F " "[NAME=F ...]"
 Override spawn chances. The biome's chances add up to 1; \fIF\fR replaces the chance of
 that species in the same scale (0 = never).

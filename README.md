@@ -127,6 +127,7 @@ crosses = hideouts and perches. The playground also shows a HUD with every creat
 | `--scene-time S` | compose a new scene every *S* seconds (`0` = never, default `600`) |
 | `--biome auto\|off\|NAME\|list` | pick a biome (`auto`: by the seed, `off`: anything goes) |
 | `--weather auto\|NAME` | `auto` (default): fog and rain come and go; or one that stays: `clear mist fog drizzle rain rainfog` |
+| `--weather-time M` | about how long one weather lasts, in minutes (default `6`, the real length is random, 0.6–1.4 ×; `0` = no weather) |
 | `--spawn-rate NAME=F …` | override spawn chances, e.g. `--spawn-rate dhole=0.3 rabbit=0` |
 | `--grass-density F` | foreground plant density (default `1`) |
 | `--grass-spread F` | randomness of the gaps between plants (`0` even … `2` clumpy) |
@@ -191,8 +192,8 @@ click or mouse movement quits.
   downloaded ZIP, **Properties**, tick **Unblock**, before unpacking it.
 * **Settings:** *Settings…* in the screensaver dialog (or `nightfall.scr /c`): the pixel size (auto, or the
   art-pixel size of the main monitor, default 300 rows), the foreground plants (`--grass-density`,
-  `--grass-spread`, `--grass-zspread`), the biome and the spawn rates (`--spawn-rate`), and how often the scene is replaced by a new one (minutes, default 10, `0` = never
-  change it). They are stored in `HKCU\Software\Nightfall`.
+  `--grass-spread`, `--grass-zspread`), the biome and the spawn rates (`--spawn-rate`), how often the scene is replaced by a new one (minutes, default 10, `0` = never
+  change it) and about how long one weather lasts (minutes, default 6, random around it, `0` = no weather). They are stored in `HKCU\Software\Nightfall`.
 * **Trying options:** a `.scr` is started through the shell association, which drops command-line
   arguments, so run the same program as an exe: `make` also leaves `build\nightfall-saver.exe`, and
   `build\nightfall-saver.exe /s --height 400 --grass-density 2 --spawn-rate rabbit=0` runs it with those

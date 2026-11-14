@@ -329,6 +329,8 @@ float world_wind_at(const world_t *w, float x);
 void  world_render(world_t *w, raster_t *r, int debug);
 
 /* --- weather (weather.c) --- */
+/* About how long one weather lasts (minutes); the real length is random around it. 0 = no weather. */
+extern float g_weather_minutes;
 void  weather_init(world_t *w, uint64_t seed);
 /* Starts the weather of a new scene: "auto" = random changes (sometimes it is already there),
  * a pattern name = that weather, fully there and staying. Unknown names fall back to auto. */

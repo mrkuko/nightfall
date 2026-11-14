@@ -27,6 +27,13 @@
 
 #define WX_INF 1.0e6f
 
+/* About how long one weather lasts, in minutes (--weather-time, the Windows settings). The real length of each
+ * weather is random around it (0.6 … 1.4 ×). Only the duration changes: the fronts always move at the same speed
+ * (a very short weather simply leaves again before its fog front has crossed the screen). 0 = no weather. */
+float g_weather_minutes = 6.0f;
+
+static float wx_base(void) { return g_weather_minutes * 60.0f; }
+
 static const struct {
     const char *name;
     float fog, rain, weight;
@@ -145,9 +152,9 @@ static void set_pattern(world_t *w, int p, int instant)
             layer_want(w, k, want[k]);
         }
     }
-    /* long enough for a slow fog front to cross the screen (4–7 min) */
-    float hold = p == 0 ? rng_range(&x->rng, 240.0f, 540.0f) : rng_range(&x->rng, 300.0f, 600.0f);
-    x->next_change = hold;
+    /* the base length (setting) with a random spread: 0.6 … 1.4 ×; clear spells are a bit shorter */
+    float hold = wx_base() * rng_range(&x->rng, 0.6f, 1.4f) * (p == 0 ? 0.85f : 1.0f);
+    x->next_change = fmaxf(hold, 15.0f);
     world_log(w, "weather → %s", PAT[p].name);
 }
 
@@ -227,6 +234,7 @@ void weather_begin(world_t *w, const char *arg)
     }
     x->wet = 0;
     x->fixed = 0;
+    if (g_weather_minutes <= 0.0f) arg = "clear";             /* weather switched off */
     if (arg && strcmp(arg, "auto") != 0) {
         for (int i = 0; i < NPAT; i++)
             if (!strcmp(arg, PAT[i].name)) {
@@ -238,7 +246,7 @@ void weather_begin(world_t *w, const char *arg)
     /* auto: now and then the weather is already there; the first change comes soon */
     int p = rng_chance(&x->rng, 0.35f) ? pick_pattern(w) : 0;
     set_pattern(w, p, 1);
-    x->next_change = rng_range(&x->rng, 40.0f, 200.0f);
+    x->next_change = fmaxf(20.0f, wx_base() * rng_range(&x->rng, 0.1f, 0.5f));      /* the first change comes sooner */
 }
 
 void weather_next(world_t *w)
