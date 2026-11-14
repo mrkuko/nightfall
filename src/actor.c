@@ -275,42 +275,50 @@ static void push_path(actor_t *a, int path, float t, int z)
 
 /* A climbing path whose start is on the ground (it can be climbed from the ground).
  * Main trunks (closer, with branches) have more weight than trees in the background. */
+static float ground_climb_weight(world_t *w, actor_t *a, int i, float maxdist)
+{
+    navpath_t *p = &w->path[i];
+    if (p->kind != PATH_CLIMB) return 0;
+    if (fabsf(p->y[0] - world_ground(w, p->x[0])) > 6.0f) return 0;
+    if (fabsf(p->x[0] - a->x) > maxdist) return 0;
+    int links = 0;
+    for (int k = 0; k < w->nlink; k++)
+        if ((w->link[k].a == i && w->path[w->link[k].b].kind == PATH_WALK) ||
+            (w->link[k].b == i && w->path[w->link[k].a].kind == PATH_WALK)) links++;
+    return (p->z >= 85 ? 3.0f : 1.0f) * (1.0f + (float)links * 2.0f);
+}
+
 static int pick_ground_climb(world_t *w, actor_t *a, float maxdist)
 {
-    float wsum = 0, wt[MAX_PATH];
-    for (int i = 0; i < w->npath; i++) {
-        navpath_t *p = &w->path[i];
-        wt[i] = 0;
-        if (p->kind != PATH_CLIMB) continue;
-        if (fabsf(p->y[0] - world_ground(w, p->x[0])) > 6.0f) continue;
-        if (fabsf(p->x[0] - a->x) > maxdist) continue;
-        int links = 0;
-        for (int k = 0; k < w->nlink; k++)
-            if ((w->link[k].a == i && w->path[w->link[k].b].kind == PATH_WALK) ||
-                (w->link[k].b == i && w->path[w->link[k].a].kind == PATH_WALK)) links++;
-        wt[i] = (p->z >= 85 ? 3.0f : 1.0f) * (1.0f + (float)links * 2.0f);
-        wsum += wt[i];
-    }
+    /* two passes (sum, then pick) instead of a buffer of weights: the number of paths has no cap */
+    float wsum = 0;
+    for (int i = 0; i < w->npath; i++) wsum += ground_climb_weight(w, a, i, maxdist);
     if (wsum <= 0) return -1;
     float r = rng_range(&w->rng, 0, wsum);
     for (int i = 0; i < w->npath; i++) {
-        r -= wt[i];
-        if (wt[i] > 0 && r <= 0) return i;
+        float wt = ground_climb_weight(w, a, i, maxdist);
+        r -= wt;
+        if (wt > 0 && r <= 0) return i;
     }
     return -1;
 }
 
 /* A link from path `path` to a path of kind want_kind (-1 = any). */
+static int link_matches(const world_t *w, int i, int path, int want_kind)
+{
+    int o = w->link[i].a == path ? w->link[i].b : w->link[i].b == path ? w->link[i].a : -1;
+    return o >= 0 && (want_kind < 0 || w->path[o].kind == want_kind);
+}
+
 static int pick_link_kind(world_t *w, int path, int want_kind, int *other, float *t_here, float *t_other)
 {
-    int c[MAX_LINK], n = 0;
-    for (int i = 0; i < w->nlink; i++) {
-        int o = w->link[i].a == path ? w->link[i].b : w->link[i].b == path ? w->link[i].a : -1;
-        if (o < 0 || (want_kind >= 0 && w->path[o].kind != want_kind)) continue;
-        c[n++] = i;
-    }
+    int n = 0;
+    for (int i = 0; i < w->nlink; i++) n += link_matches(w, i, path, want_kind);
     if (!n) return -1;
-    navlink_t *l = &w->link[c[rng_int(&w->rng, n)]];
+    int k = rng_int(&w->rng, n), li = 0;
+    for (int i = 0; i < w->nlink; i++)
+        if (link_matches(w, i, path, want_kind) && k-- == 0) { li = i; break; }
+    navlink_t *l = &w->link[li];
     if (l->a == path) { *other = l->b; *t_here = l->ta; *t_other = l->tb; }
     else { *other = l->a; *t_here = l->tb; *t_other = l->ta; }
     return 0;
@@ -341,19 +349,26 @@ static void plan_dismount(world_t *w, actor_t *a, int path)
 
 static int has_anim(const actor_t *a, int anim) { return a->prof.anim[anim] != a->prof.anim[A_IDLE]; }
 
+/* Weight of place i as a roost for this creature: 0 = not usable, main trunks (closer) count three times. */
+static int hollow_weight(world_t *w, actor_t *a, int i)
+{
+    place_t *p = &w->place[i];
+    if (p->type != PL_HOLLOW || !p->has_eye) return 0;
+    if (p->occupant >= 0 && p->occupant != actor_index(w, a)) return 0;
+    if (p->ey < (float)w->h * 0.15f || p->ey > (float)w->h * 0.75f || p->ex < 4.0f || p->ex > (float)w->w - 4.0f) return 0;
+    return p->obj >= 0 && w->obj[p->obj].z >= 85 ? 3 : 1;
+}
+
 static int free_hollow(world_t *w, actor_t *a)
 {
     /* only hollows visible on screen; main trunks (closer) take priority */
-    int c[MAX_PLACE], n = 0;
-    for (int i = 0; i < w->nplace; i++) {
-        place_t *p = &w->place[i];
-        if (p->type != PL_HOLLOW || !p->has_eye) continue;
-        if (p->occupant >= 0 && p->occupant != actor_index(w, a)) continue;
-        if (p->ey < (float)w->h * 0.15f || p->ey > (float)w->h * 0.75f || p->ex < 4.0f || p->ex > (float)w->w - 4.0f) continue;
-        int main_trunk = p->obj >= 0 && w->obj[p->obj].z >= 85;
-        for (int k = 0; k < (main_trunk ? 3 : 1); k++) c[n++] = i;
-    }
-    return n ? c[rng_int(&w->rng, n)] : -1;
+    int n = 0;
+    for (int i = 0; i < w->nplace; i++) n += hollow_weight(w, a, i);
+    if (!n) return -1;
+    int k = rng_int(&w->rng, n);
+    for (int i = 0; i < w->nplace; i++)
+        if ((k -= hollow_weight(w, a, i)) < 0) return i;
+    return -1;
 }
 
 /* Is the spot on the hanging path free (no other creature within 6 px)? */
@@ -367,13 +382,21 @@ static int hang_spot_free(world_t *w, actor_t *a, int path, float t)
     return 1;
 }
 
+static int hang_path_ok(const world_t *w, int i)
+{
+    const navpath_t *p = &w->path[i];
+    return p->kind == PATH_HANG && p->y[0] > 4 && p->x[0] > 0 && p->x[0] < (float)w->w;
+}
+
 static int random_hang_path(world_t *w)
 {
-    int c[MAX_PATH], n = 0;
+    int n = 0;
+    for (int i = 0; i < w->npath; i++) n += hang_path_ok(w, i);
+    if (!n) return -1;
+    int k = rng_int(&w->rng, n);
     for (int i = 0; i < w->npath; i++)
-        if (w->path[i].kind == PATH_HANG && w->path[i].y[0] > 4 && w->path[i].x[0] > 0 && w->path[i].x[0] < (float)w->w)
-            c[n++] = i;
-    return n ? c[rng_int(&w->rng, n)] : -1;
+        if (hang_path_ok(w, i) && k-- == 0) return i;
+    return -1;
 }
 
 static int roost_available(world_t *w, actor_t *a)

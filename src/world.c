@@ -39,8 +39,25 @@ void world_free(world_t *w)
     w->bake_ok = 0;
     for (int i = 0; i < w->nobj; i++)
         if (w->obj[i].owned) sprite_free(w->obj[i].spr);
-    w->nobj = 0;
+    free(w->obj);   w->obj = NULL;   w->nobj = w->cap_obj = 0;
+    free(w->place); w->place = NULL; w->nplace = w->cap_place = 0;
+    free(w->path);  w->path = NULL;  w->npath = w->cap_path = 0;
+    free(w->link);  w->link = NULL;  w->nlink = w->cap_link = 0;
 }
+
+/* Makes room for one more element in a growable array (doubles it). 0 = ok, -1 = out of memory
+ * (the array stays as it was). The array may move: pointers into it are no longer valid. */
+static int grow(void **arr, int *cap, int n, size_t elem)
+{
+    if (n < *cap) return 0;
+    int nc = *cap ? *cap * 2 : 64;
+    void *p = realloc(*arr, (size_t)nc * elem);
+    if (!p) return -1;
+    *arr = p;
+    *cap = nc;
+    return 0;
+}
+#define GROW(arr, n, cap) grow((void **)&(arr), &(cap), (n), sizeof *(arr))
 
 float world_ground(const world_t *w, float x)
 {
@@ -87,9 +104,9 @@ static void object_bounds(object_t *o)
 
 int world_add_object(world_t *w, const char *sprite, float x, float y, int z, int flip, uint64_t seed)
 {
-    if (w->nobj >= MAX_OBJ) return -1;
     sprite_t *base = lib_find(w->lib, sprite);
     if (!base) { world_log(w, "missing shape '%s'", sprite); return -1; }
+    if (GROW(w->obj, w->nobj, w->cap_obj)) return -1;
     object_t *o = &w->obj[w->nobj];
     memset(o, 0, sizeof *o);
     if (base->gen && seed) {
@@ -133,7 +150,7 @@ void world_play_object_clip(world_t *w, int obj, const char *clip)
 
 int world_add_place(world_t *w, int type, float x, float y, int z, int nav, int obj, int sub)
 {
-    if (w->nplace >= MAX_PLACE) return -1;
+    if (GROW(w->place, w->nplace, w->cap_place)) return -1;
     place_t *p = &w->place[w->nplace];
     memset(p, 0, sizeof *p);
     p->type = type; p->x = x; p->y = y; p->z = z; p->nav = nav;
@@ -192,7 +209,7 @@ void world_places_from_object(world_t *w, int oi)
             static const char *pk[] = { "path.climb%d", "path.walk%d", "path.hang%d" };
             snprintf(key, sizeof key, pk[kind], k);
             const char *v = sprite_prop(s, key);
-            if (!v || w->npath >= MAX_PATH) continue;
+            if (!v || GROW(w->path, w->npath, w->cap_path)) continue;
             navpath_t *np = &w->path[w->npath];
             memset(np, 0, sizeof *np);
             np->kind = kind;
@@ -286,7 +303,7 @@ void world_link_paths(world_t *w)
     /* endpoints of one path near another path -> link (branch on a trunk, trunk on a trunk …) */
     for (int a = 0; a < w->npath; a++)
         for (int b = 0; b < w->npath; b++) {
-            if (a == b || w->nlink >= MAX_LINK) continue;
+            if (a == b) continue;
             navpath_t *pa = &w->path[a], *pb = &w->path[b];
             if (pa->kind == PATH_HANG || pb->kind == PATH_HANG) continue;
             for (int end = 0; end < 2; end++) {
@@ -298,7 +315,7 @@ void world_link_paths(world_t *w)
                 int dup = 0;
                 for (int i = 0; i < w->nlink; i++)
                     if ((w->link[i].a == b && w->link[i].b == a) || (w->link[i].a == a && w->link[i].b == b)) dup = 1;
-                if (dup) continue;
+                if (dup || GROW(w->link, w->nlink, w->cap_link)) continue;
                 w->link[w->nlink++] = (navlink_t){ a, b, end ? pa->len : 0.0f, tb };
             }
         }

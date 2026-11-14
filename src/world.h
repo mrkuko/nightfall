@@ -21,13 +21,13 @@
 /* widest scene in art pixels (terminal: columns; Windows screensaver: the whole desktop) */
 #define NF_MAX_W   2048
 
-#define MAX_OBJ    1024     /* a 4K scene needs ~600 (trees, branches, the foreground plants last) */
-#define MAX_ACT    32
-#define MAX_PLACE  128
-#define MAX_STIM   48
+/* Objects, places, paths and links grow with the scene (a 4K desktop has several times more than a
+ * terminal), so they live on the heap and grow as needed (world_free releases them). Creatures and
+ * stimuli stay fixed arrays (the code holds pointers to creatures all the time, so they must not move);
+ * their caps are generous: a 4K scene has ~30 creatures. A full array silently refuses a new one. */
+#define MAX_ACT    128
+#define MAX_STIM   256
 #define MAX_PLAN   16
-#define MAX_PATH   64
-#define MAX_LINK   128
 #define PATH_PTS   40
 
 /* --- environment ----------------------------------------------------- */
@@ -269,16 +269,17 @@ typedef struct {
     float      ground_scale;    /* patch size multiplier (1 = default) */
     uint32_t   ground_seed;
     int        fg_z;            /* foreground depth */
-    object_t   obj[MAX_OBJ];
-    int        nobj;
-    place_t    place[MAX_PLACE];
-    int        nplace;
+    /* growable arrays (world.c): pointers into them are valid only until the next world_add_* call */
+    object_t  *obj;
+    int        nobj, cap_obj;
+    place_t   *place;
+    int        nplace, cap_place;
     actor_t    act[MAX_ACT];
     int        nact;
-    navpath_t  path[MAX_PATH];
-    int        npath;
-    navlink_t  link[MAX_LINK];
-    int        nlink;
+    navpath_t *path;
+    int        npath, cap_path;
+    navlink_t *link;
+    int        nlink, cap_link;
     stim_t     stim[MAX_STIM];
     int        nstim;
     float      t, wind, gust;
@@ -305,6 +306,7 @@ typedef struct {
 } world_t;
 
 /* --- world --- */
+/* world_init expects a world that is new or was released with world_free (it does not free anything). */
 void  world_init(world_t *w, library_t *lib, int width, int height, uint64_t seed);
 void  world_free(world_t *w);
 int   world_add_object(world_t *w, const char *sprite, float x, float y, int z, int flip, uint64_t seed);

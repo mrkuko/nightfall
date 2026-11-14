@@ -240,12 +240,20 @@ static int count_species(const world_t *w, const char *name)
     return n;
 }
 
+static int place_ok(const world_t *w, int i, int typemask, int free_only)
+{
+    return (typemask & (1 << w->place[i].type)) && (!free_only || w->place[i].occupant < 0);
+}
+
 static int random_place(world_t *w, int typemask, int free_only)
 {
-    int c[MAX_PLACE], n = 0;
+    int n = 0;
+    for (int i = 0; i < w->nplace; i++) n += place_ok(w, i, typemask, free_only);
+    if (!n) return -1;
+    int k = rng_int(&w->rng, n);
     for (int i = 0; i < w->nplace; i++)
-        if ((typemask & (1 << w->place[i].type)) && (!free_only || w->place[i].occupant < 0)) c[n++] = i;
-    return n ? c[rng_int(&w->rng, n)] : -1;
+        if (place_ok(w, i, typemask, free_only) && k-- == 0) return i;
+    return -1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -767,9 +775,10 @@ static void build_scene(world_t *w, uint64_t seed)
     {
         float nb = bnum("big_leaves", 0.7f) * (float)W / 200.0f;
         int n = (int)nb + rng_chance(&r, nb - floorf(nb));
-        float placed[8];
+        if (n < 1 && W >= 100) n = 1;          /* always one roof, or the rain has nowhere to be waited out */
+        float placed[16];
         int np = 0;
-        for (int i = 0, tries = 0; i < n && np < 8 && tries < 40; tries++) {
+        for (int i = 0, tries = 0; i < n && np < 16 && tries < 60; tries++) {
             float x = rng_range(&r, 24, (float)W - 24);
             if (too_close(placed, np, x, 70)) continue;
             int z = rng_between(&r, 100, 106);

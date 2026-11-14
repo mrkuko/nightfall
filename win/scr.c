@@ -11,7 +11,6 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
-#undef MAX_PATH                         /* world.h has its own */
 #include "../src/gallery.c"
 #include "../src/gen.h"
 #include <time.h>
