@@ -253,6 +253,7 @@ typedef struct {
     float      next_change;     /* seconds to the next pattern */
     float      bias[WX_COUNT];  /* biome: how likely fog / rain is (1 = normal) */
     float      spawn_acc;       /* fractional raindrops to spawn */
+    float      wet;             /* how wet the leaves are (they drip for a while after the rain) */
     wx_drop_t  drop[MAX_DROP];
     int        ndrop;
     wx_splash_t splash[MAX_SPLASH];

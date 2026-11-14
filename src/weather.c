@@ -52,6 +52,11 @@ static int g_npud;
 static struct { float x0, x1, y; int z, obj; } g_leaf[MAX_LEAF];
 static int g_nleaf;
 
+/* drip points (leaf tips): while the leaves are wet a drop swells there and falls */
+#define MAX_DRIP 64
+static struct { float x, y; int z; float t, hang; } g_drip[MAX_DRIP];
+static int g_ndrip;
+
 /* coarse fog grid (one value per GRID x GRID pixels) */
 #define GRID 4
 static float *g_fog, *g_dark;
@@ -204,6 +209,23 @@ void weather_begin(world_t *w, const char *arg)
             lv += used;
         }
     }
+    g_ndrip = 0;
+    for (int i = 0; i < w->nobj; i++) {
+        const object_t *o = &w->obj[i];
+        const char *dp = sprite_prop(o->spr, "drips");
+        if (!dp) continue;
+        int a, b, used;
+        while (g_ndrip < MAX_DRIP && sscanf(dp, "%d %d%n", &a, &b, &used) == 2) {
+            g_drip[g_ndrip].x = o->x + (float)(o->flip ? -a : a);
+            g_drip[g_ndrip].y = o->y + (float)b;
+            g_drip[g_ndrip].z = o->z + 4;
+            g_drip[g_ndrip].t = 0;
+            g_drip[g_ndrip].hang = rng_range(&x->rng, 0.8f, 3.0f);
+            g_ndrip++;
+            dp += used;
+        }
+    }
+    x->wet = 0;
     x->fixed = 0;
     if (arg && strcmp(arg, "auto") != 0) {
         for (int i = 0; i < NPAT; i++)
@@ -329,6 +351,25 @@ static void update_rain(world_t *w, float dt)
         }
         if (d->x < -40.0f || d->x > (float)w->w + 40.0f) x->drop[i--] = x->drop[--x->ndrop];
     }
+    /* the leaves get wet in the rain and keep dripping for a while after it (~1.5 min) */
+    float rain_here = 0;
+    for (int i = 0; i < 8; i++) rain_here += cover(w, WX_RAIN, ((float)i + 0.5f) * (float)w->w / 8.0f, 0.0f);
+    rain_here /= 8.0f;
+    if (rain_here > 0.15f) x->wet = fminf(1.0f, x->wet + dt * 0.08f);
+    else x->wet = fmaxf(0.0f, x->wet - dt * 0.011f);
+    for (int i = 0; i < g_ndrip; i++) {
+        if (x->wet <= 0.02f) { g_drip[i].t = 0; continue; }
+        g_drip[i].t += dt * (0.4f + x->wet);
+        if (g_drip[i].t < g_drip[i].hang) continue;
+        /* the drop lets go */
+        g_drip[i].t = 0;
+        g_drip[i].hang = rng_range(&x->rng, 0.8f, 3.0f) / (0.3f + x->wet);
+        if (x->ndrop >= MAX_DROP) continue;
+        wx_drop_t *d = &x->drop[x->ndrop++];
+        d->x = g_drip[i].x; d->y = g_drip[i].y + 1.0f; d->z = (float)g_drip[i].z;
+        d->vx = 0; d->vy = 70.0f; d->len = 2.0f;
+        d->floor_y = world_ground_at(w, d->x, d->z);
+    }
     for (int i = 0; i < x->nsplash; i++) {
         x->splash[i].age += dt;
         if (x->splash[i].age >= x->splash[i].life) x->splash[i--] = x->splash[--x->nsplash];
@@ -381,6 +422,14 @@ static void render_rain(world_t *w, raster_t *r)
             float yy = d->y - (float)k;
             blend(r, (int)floorf(d->x - sx * (float)k + 0.5f), (int)floorf(yy), (int)d->z, rc, a * (1.0f - (float)k / (d->len + 1.0f)));
         }
+    }
+    /* drops swelling at the leaf tips */
+    for (int i = 0; i < g_ndrip; i++) {
+        if (x->wet <= 0.02f || g_drip[i].t <= 0) continue;
+        float grow = clampf(g_drip[i].t / g_drip[i].hang, 0.0f, 1.0f);
+        int dx = (int)floorf(g_drip[i].x + 0.5f), dy = (int)floorf(g_drip[i].y + 0.5f);
+        blend(r, dx, dy, g_drip[i].z, mkrgb(170, 190, 200), 0.35f + 0.4f * grow);
+        if (grow > 0.6f) blend(r, dx, dy + 1, g_drip[i].z, mkrgb(190, 205, 215), 0.5f * grow);
     }
     for (int i = 0; i < x->nsplash; i++) {
         const wx_splash_t *s = &x->splash[i];

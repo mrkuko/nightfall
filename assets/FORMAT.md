@@ -159,13 +159,15 @@ prop path.walk0  2 -7  8 -8  14 -8  20 -9 …    # walkway along the top of a br
 - In the playground `d` shows the paths (pink = climbing, blue = walkway, orange = hanging,
   yellow = link).
 
-## Big leaves (`point.shelterN`, `leaves`)
+## Big leaves (`point.shelterN`, `leaves`, `drips`)
 
-A plant with a roof of big leaves (the generated `butterbur`, `butterbur_big`: funnel-shaped leaves on stalks
-24–31 px tall, high enough for a lying dhole) gives `point.shelter0..3` — a spot on the ground under a high leaf
+A plant with a roof of big leaves (the generated `butterbur`, `butterbur_big`: round leaves on stalks 23–31 px
+tall; `hosta`, `hosta_big`: 3–5 huge arching, ribbed, pointed leaves from one base — both high enough for a
+lying dhole) gives `point.shelter0..3` — a spot on the ground under a high leaf
 (a place `PL_SHELTER` at the plant's depth, one creature each) — and `leaves "x0 x1 y …"` — the span and the
 top of every leaf relative to the anchor: raindrops at that depth land on it (a splash, the leaf twitches) and
-it stays dry below. Biome keys: `big_leaves N` (expected clumps per 200 px of width), `big_leaf` (which kinds).
+it stays dry below. `drips "x y …"` (hosta: the leaf tips): while the leaves are wet, a drop swells there
+and falls — also for about a minute and a half after the rain. Biome keys: `big_leaves N` (expected clumps per 200 px of width), `big_leaf` (which kinds).
 
 ## Hollow (`point.hollow`, `point.hollow_eye`, `hollow_size`)
 

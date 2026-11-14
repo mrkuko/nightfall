@@ -514,7 +514,7 @@ static const char *ALL_PLANTS[] = { "grass", "grass_tall", "fern", "broadleaf", 
                                     "horsetail" };
 static const char *ALL_NEAR[]   = { "fern", "broadleaf", "grass_tall", "nettle", "fern", "horsetail" };
 static const char *ALL_FAR[]    = { "grass_low", "sprouts", "flowers", "grass_low", "grass" };
-static const char *ALL_BIGLEAF[] = { "butterbur", "butterbur", "butterbur_big" };
+static const char *ALL_BIGLEAF[] = { "butterbur", "butterbur", "butterbur_big", "hosta", "hosta", "hosta_big" };
 static const char *ALL_FUNGI[]  = { "mushrooms", "mushrooms", "mushroom_red", "mushroom_glow" };
 #define BPICK(key, def) bpick(w, r, key, def, (int)NF_COUNT(def))
 

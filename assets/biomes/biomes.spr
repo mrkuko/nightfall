@@ -135,7 +135,7 @@ biome swamp
   ground      mud=5 moss=4 grass=2 soil=1
   creatures   frog=3 salamander=3 snail=2 slug=2 mouse moth=1.5 firefly=2 bat=1.5 owl beetle eyes spirit=1.5 boar
   big_leaves  2.2
-  big_leaf    butterbur=1 butterbur_big=2
+  big_leaf    butterbur=1 butterbur_big=2 hosta=1.5 hosta_big=1
   weather     fog=2.5 rain=1.3
 end
 

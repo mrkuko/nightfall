@@ -1650,8 +1650,8 @@ typedef struct {
     uint32_t ns;
 } bb_leaf_t;
 
-#define BB_MAXW 160
-#define BB_MAXH 90
+#define BB_MAXW 260
+#define BB_MAXH 120
 static float g_bbdepth[BB_MAXW * BB_MAXH];
 
 /* local blade point (u along the midrib, v across, h up) -> 3D (X right, Y up, Z towards the viewer) */
@@ -1820,6 +1820,261 @@ static void gen_butterbur_scaled(sprite_t *s, uint64_t seed, float scale)
     }
     sprite_set_prop(s, "leaves", leaves);
 }
+
+/* ------------------------------------------------------------------ */
+/* hosta: a bush-sized clump of huge arching ribbed leaves             */
+/* ------------------------------------------------------------------ */
+
+/* A leaf is a surface over (s, t): s from the base at the ground (0) to the tip (1) — a long thick stalk
+ * first, then the blade — and t across it (-1 … 1). The midline rises steeply from the base, arches out
+ * and droops so the tip nearly reaches the ground. The blade is broad, ovate and pointed; its width is
+ * turned towards the viewer (twist) and rolls over more towards the tip (curl), so we see the upper side
+ * and, where it rolls, the paler underside. Diagonal ribs run from the midrib forward to the margin, the
+ * rim is bright yellow-green, the edge gently wavy. Same camera / depth buffer as the butterbur. */
+typedef struct {
+    float yaw, reach, peak, tip;    /* direction; horizontal reach, height of the arch, height of the tip */
+    float wmax, fold, wave, twist, curl, s0, stalk_w;
+    float ts, tb, ls;               /* stalk angle from vertical and length, blade's rising angle */
+    float blen;                     /* length of the blade's rising part (0 = reach) */
+    float mirror;                   /* -1: the other face is the upper side (a leaf facing the viewer) */
+    int   z;
+    uint32_t ns;
+} hosta_leaf_t;
+
+static void hosta_point(const hosta_leaf_t *L, float bx, float by, float bend, float s, float t,
+                        float *sx, float *sy, float *depth, float *qo)
+{
+    const float ce = cosf(0.3f), se = sinf(0.3f);            /* a lower camera than for the butterbur */
+    float u = 1.0f - s;
+    /* the stalk leans outwards from the base (slightly bowed); the blade rises on outwards from its top,
+     * arches over and droops to the tip near the ground (a quadratic curve) */
+    float hd, ht;
+    float shx = L->ls * sinf(L->ts), shy = L->ls * cosf(L->ts);
+    if (s < L->s0) {
+        float k = s / L->s0, bow = sinf(3.14159265f * k) * L->ls * 0.08f;
+        hd = shx * k - bow * cosf(L->ts);
+        ht = shy * k + bow * sinf(L->ts);
+    } else {
+        float q0 = (s - L->s0) / (1.0f - L->s0), v0 = 1.0f - q0;
+        float bl = L->blen > 0 ? L->blen : L->reach;
+        float chx = shx + bl * 0.5f * sinf(L->tb), chy = shy + bl * 0.5f * cosf(L->tb);
+        float thx = shx + L->reach, thy = L->tip;
+        hd = v0 * v0 * shx + 2.0f * v0 * q0 * chx + q0 * q0 * thx;
+        ht = v0 * v0 * shy + 2.0f * v0 * q0 * chy + q0 * q0 * thy;
+    }
+    (void)u;
+    float dx = cosf(L->yaw), dz = sinf(L->yaw);
+    float w, q = 0.0f;
+    if (s < L->s0) w = L->stalk_w;
+    else {
+        q = (s - L->s0) / (1.0f - L->s0);
+        w = L->wmax * powf(fmaxf(0.0f, sinf(3.14159265f * powf(q, 0.72f))), 0.58f) + L->stalk_w * (1.0f - q);   /* full, broad body */
+        w *= 1.0f + L->wave * 0.5f * sinf(q * 8.0f + (float)L->z * 1.7f);
+    }
+    /* across: horizontal, perpendicular to the leaf, then turned to face the camera; rolls more to the tip */
+    float px = -dz, pz = dx;
+    float tw = L->twist + L->curl * q * q;
+    float r = tw * (pz >= 0 ? -1.0f : 1.0f);
+    float ax = px * cosf(r), ay = sinf(r), az = pz * cosf(r);
+    float a = t * w * (L->mirror < 0 ? -1.0f : 1.0f);
+    float X = dx * hd + ax * a, Z = dz * hd + az * a, Y = ht + ay * a;
+    if (s >= L->s0) Y -= L->fold * w * t * t + 0.4f * L->wave * w * sinf(q * 13.0f + (float)L->z * 3.0f) * t * t * t * t;
+    X += bend * Y / 40.0f;
+    *sx = bx + X;
+    *sy = by - (Y * ce - Z * se);
+    *depth = Z * ce + Y * se;
+    if (qo) *qo = q;
+}
+
+static void hosta_draw_leaf(frame_t *f, const hosta_leaf_t *L, float bx, float by, float bend,
+                            rgb_t top, rgb_t under, rgb_t stalk)
+{
+    const float ce = cosf(0.3f), se = sinf(0.3f);
+    const float lx = 0.5f, ly = 0.78f, lz = 0.38f;
+    const float Ly = ly * ce - lz * se, Lz = lz * ce + ly * se;
+    float len = L->reach + L->peak;
+    int ns = (int)(len * 2.6f) + 20, nt = (int)(L->wmax * 3.2f) + 7;
+    for (int is = 0; is <= ns; is++) {
+        float s = (float)is / (float)ns;
+        int blade = s >= L->s0;
+        int ntt = blade ? nt : 4;
+        for (int it = 0; it <= ntt; it++) {
+            float t = -1.0f + 2.0f * (float)it / (float)ntt;
+            float sx, sy, d, q, sx1, sy1, d1, sx2, sy2, d2;
+            hosta_point(L, bx, by, bend, s, t, &sx, &sy, &d, &q);
+            int px = (int)floorf(sx), py = (int)floorf(sy);
+            if (px < 0 || py < 0 || px >= f->w || py >= f->h || px >= BB_MAXW || py >= BB_MAXH) continue;
+            float *db = &g_bbdepth[py * BB_MAXW + px];
+            if (d < *db) continue;
+            hosta_point(L, bx, by, bend, fminf(1.0f, s + 0.008f), t, &sx1, &sy1, &d1, NULL);
+            hosta_point(L, bx, by, bend, s, fminf(1.0f, t + 0.03f), &sx2, &sy2, &d2, NULL);
+            float e1x = sx1 - sx, e1y = -(sy1 - sy), e1z = d1 - d;
+            float e2x = sx2 - sx, e2y = -(sy2 - sy), e2z = d2 - d;
+            float nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+            float nl = sqrtf(nx * nx + ny * ny + nz * nz) + 1e-5f;
+            nx /= nl; ny /= nl; nz /= nl;
+            int upper = nz <= 0.0f;                             /* e1 x e2 points out of the underside */
+            if (nz < 0) { nx = -nx; ny = -ny; nz = -nz; }        /* light the side we see */
+            float lit = clampf(nx * lx + ny * Ly + nz * Lz, 0.0f, 1.0f);
+            rgb_t c;
+            float at = fabsf(t);
+            if (!blade) {
+                /* thick stalk: lit side lighter, a groove down the middle */
+                c = rgb_scale(stalk, 0.5f + 0.7f * lit);
+                if (at < 0.3f) c = rgb_scale(c, 0.85f);
+            } else {
+                float grain = (hash2f(px, py, L->ns) - 0.5f) * 0.06f;
+                /* diagonal ribs: from the midrib forward towards the margin and the tip */
+                float ph = (q - 0.22f * powf(at, 1.25f)) * (11.0f + L->wmax * 0.25f);
+                float fr = ph - floorf(ph);
+                float rib = fr < 0.32f ? 0.72f : fr < 0.5f ? 1.12f : 1.0f;
+                if (upper) {
+                    c = rgb_scale(top, (0.3f + 0.72f * lit) * rib + grain);
+                    if (at < 0.06f) c = rgb_mix(c, mkrgb(84, 112, 66), 0.35f);                  /* midrib */
+                } else {
+                    c = rgb_scale(under, (0.45f + 0.75f * lit) * (rib > 1.0f ? 1.08f : rib < 1.0f ? 0.88f : 1.0f) + grain);
+                }
+                if (at > 0.9f) c = rgb_mix(c, mkrgb(112, 138, 70), 0.10f + 0.12f * lit);      /* a muted rim */
+            }
+            *db = d;
+            cv_force(f, px, py, c, L->z + (int)clampf(d * 0.15f, -6.0f, 6.0f));
+        }
+    }
+}
+
+static void gen_hosta_scaled(sprite_t *s, uint64_t seed, float scale)
+{
+    rng_t r = rng_seed(seed);
+    /* A fixed 5-leaf archetype (only small variation): a tall narrower central leaf rolling over, two dominant
+     * upper side leaves — the sheltering roofs, widest and reaching furthest — and two lower front leaves
+     * filling the canopy below. All from one base. */
+    enum { HL_CENTER, HL_LEFT_UP, HL_RIGHT_UP, HL_LEFT_LOW, HL_RIGHT_LOW, HL_N };
+    int n = HL_N;
+    hosta_leaf_t L[7];
+    int W = (int)(200.0f * scale), H = (int)(84.0f * scale);
+    if (W > BB_MAXW) W = BB_MAXW;
+    if (H > BB_MAXH) H = BB_MAXH;
+    float bx = (float)W * 0.5f, by = (float)(H - 1);
+    uint32_t ns = rng_u32(&r);
+    int mid = HL_CENTER;
+    const float PI_ = 3.14159265f;
+    for (int i = 0; i < n; i++) {
+        hosta_leaf_t *l = &L[i];
+        memset(l, 0, sizeof *l);
+        float side = (i == HL_LEFT_UP || i == HL_LEFT_LOW) ? -1.0f : 1.0f;
+        if (i == HL_CENTER) {
+            /* rises nearly upright with its face to the viewer, rolls over at the top towards us */
+            l->yaw = PI_ * 0.5f + rng_range(&r, -0.15f, 0.15f);
+            l->peak = rng_range(&r, 64.0f, 72.0f) * scale;
+            l->ls = l->peak * rng_range(&r, 0.38f, 0.45f);
+            l->ts = rng_range(&r, 0.05f, 0.15f);
+            l->tb = rng_range(&r, 0.08f, 0.22f);
+            l->blen = l->peak * rng_range(&r, 1.55f, 1.75f);
+            l->reach = rng_range(&r, 12.0f, 18.0f) * scale;
+            l->tip = l->peak * rng_range(&r, 0.9f, 1.0f);
+            l->curl = rng_range(&r, 0.7f, 1.0f);
+            l->wmax = rng_range(&r, 14.0f, 17.0f) * scale;
+            l->mirror = -1.0f;
+            l->twist = rng_range(&r, 0.05f, 0.2f);
+            l->s0 = rng_range(&r, 0.38f, 0.46f);
+            l->fold = rng_range(&r, 0.05f, 0.10f);
+            l->z = 0;
+        } else if (i == HL_LEFT_UP || i == HL_RIGHT_UP) {
+            /* raised awnings: turned slightly away from the viewer, little twist, stalks climb higher, the blade
+             * rises outwards and only its outer end curves down over the space below */
+            float toward = rng_range(&r, -0.25f, 0.0f);
+            l->yaw = side > 0 ? toward : PI_ - toward;
+            l->peak = rng_range(&r, 42.0f, 50.0f) * scale;
+            /* a dome: the stalk leans out diagonally, the blade peaks soon after it and then arcs down
+             * continuously (the rising part is short, so the bend starts near the centre) */
+            l->ls = l->peak * rng_range(&r, 0.8f, 0.9f);
+            l->ts = rng_range(&r, 0.34f, 0.48f);
+            l->tb = rng_range(&r, 0.5f, 0.7f);
+            l->reach = rng_range(&r, 72.0f, 88.0f) * scale;
+            l->blen = l->reach * rng_range(&r, 0.45f, 0.55f);
+            l->tip = l->peak * rng_range(&r, 0.3f, 0.42f);
+            l->curl = rng_range(&r, 0.12f, 0.28f);
+            l->wmax = rng_range(&r, 20.0f, 25.0f) * scale;
+            l->twist = rng_range(&r, 0.18f, 0.34f);
+            l->s0 = rng_range(&r, 0.38f, 0.46f);
+            l->fold = rng_range(&r, 0.04f, 0.09f);
+            l->z = -1;
+        } else {
+            /* lower leaves: smaller, behind the sheltering creature, so the space under the roofs stays readable */
+            float toward = rng_range(&r, -0.45f, -0.15f);
+            l->yaw = side > 0 ? toward : PI_ - toward;
+            l->peak = rng_range(&r, 22.0f, 28.0f) * scale;
+            l->ls = l->peak * rng_range(&r, 0.78f, 0.88f);
+            l->ts = rng_range(&r, 0.38f, 0.55f);
+            l->tb = rng_range(&r, 0.95f, 1.15f);
+            l->reach = rng_range(&r, 36.0f, 46.0f) * scale;
+            l->tip = l->peak * rng_range(&r, 0.18f, 0.30f);
+            l->curl = rng_range(&r, 0.05f, 0.18f);
+            l->wmax = rng_range(&r, 14.0f, 18.0f) * scale;
+            l->twist = rng_range(&r, 0.4f, 0.55f);
+            l->s0 = rng_range(&r, 0.36f, 0.44f);
+            l->fold = rng_range(&r, 0.05f, 0.10f);
+            l->z = -3;
+        }
+        l->wave = rng_range(&r, 0.09f, 0.16f);
+        l->stalk_w = rng_range(&r, 1.4f, 1.9f) * scale;
+        l->ns = ns + (uint32_t)i * 613u;
+    }
+    rgb_t top = vary(mkrgb(32, 74, 44), &r, 0.05f), under = vary(mkrgb(74, 100, 58), &r, 0.05f);
+    rgb_t stalk = mkrgb(68, 96, 56);
+    float sx_mid[7], sy_mid[7], x0[7], x1[7], tipx[7], tipy[7];
+
+    for (int fi = 0; fi < SWAY_FRAMES; fi++) {
+        float bend = sway_bend(fi) * 2.0f * scale;
+        char name[16];
+        snprintf(name, sizeof name, "bend%d", fi);
+        frame_t *f = sprite_add_frame(s, name, W, H, W / 2, H - 1);
+        for (int k = 0; k < BB_MAXW * BB_MAXH; k++) g_bbdepth[k] = -1e9f;
+        for (int i = 0; i < n; i++) hosta_draw_leaf(f, &L[i], bx, by, bend, top, under, stalk);
+        frame_rimlight(f, C_MOON, 0.1f);
+        if (fi == SWAY_FRAMES / 2) {
+            for (int i = 0; i < n; i++) {
+                float sx, sy, d;
+                hosta_point(&L[i], bx, by, 0, L[i].s0 + (1.0f - L[i].s0) * 0.45f, 0, &sx, &sy, &d, NULL);
+                sx_mid[i] = sx; sy_mid[i] = sy;
+                hosta_point(&L[i], bx, by, 0, 1.0f, 0, &tipx[i], &tipy[i], &d, NULL);
+                x0[i] = 1e9f; x1[i] = -1e9f;
+                for (int k = 0; k <= 20; k++) {
+                    float ss = L[i].s0 + (1.0f - L[i].s0) * (float)k / 20.0f;
+                    for (int j = -1; j <= 1; j++) {
+                        hosta_point(&L[i], bx, by, 0, ss, (float)j, &sx, &sy, &d, NULL);
+                        if (sx < x0[i]) x0[i] = sx;
+                        if (sx > x1[i]) x1[i] = sx;
+                    }
+                }
+            }
+        }
+    }
+    add_sway_clips(s, 0);
+
+    /* rain lands on the blades; drops hang from the tips; creatures shelter under the side roofs */
+    char leaves[320] = "", drips[256] = "", key[24];
+    int nsh = 0;
+    float shx[2] = { 0, 0 };
+    for (int i = 0; i < n; i++) {
+        size_t l = strlen(leaves);
+        snprintf(leaves + l, sizeof leaves - l, "%d %d %d ", (int)x0[i] + 3 - W / 2, (int)x1[i] - 3 - W / 2,
+                 (int)sy_mid[i] - 2 - (H - 1));
+        l = strlen(drips);
+        snprintf(drips + l, sizeof drips - l, "%d %d ", (int)tipx[i] - W / 2, (int)tipy[i] + 1 - (H - 1));
+        float clear = by - sy_mid[i];
+        if (i == mid || clear < 18.0f || nsh >= 2 || fabsf(sx_mid[i] - bx) < 14.0f) continue;
+        if (nsh == 1 && fabsf(shx[0] - sx_mid[i]) < 24.0f) continue;
+        shx[nsh] = sx_mid[i];
+        snprintf(key, sizeof key, "shelter%d", nsh++);
+        set_point(s, key, (int)sx_mid[i] - W / 2, 0);
+    }
+    sprite_set_prop(s, "leaves", leaves);
+    sprite_set_prop(s, "drips", drips);
+}
+
+static void gen_hosta(sprite_t *s, uint64_t seed) { gen_hosta_scaled(s, seed, 0.8f); }
+static void gen_hosta_big(sprite_t *s, uint64_t seed) { gen_hosta_scaled(s, seed, 0.95f); }
 
 static void gen_butterbur(sprite_t *s, uint64_t seed) { gen_butterbur_scaled(s, seed, 1.0f); }
 static void gen_butterbur_big(sprite_t *s, uint64_t seed) { gen_butterbur_scaled(s, seed, 1.3f); }
@@ -2622,6 +2877,8 @@ static const genreg_t GENS[] = {
     { "broadleaf_big",  gen_broadleaf_big,  "plant ground foreground sway big" },
     { "butterbur",      gen_butterbur,      "plant ground sway big shelter" },
     { "butterbur_big",  gen_butterbur_big,  "plant ground sway big shelter" },
+    { "hosta",          gen_hosta,          "plant ground sway big shelter" },
+    { "hosta_big",      gen_hosta_big,      "plant ground sway big shelter" },
     { "tree_far",       gen_tree_far,       "tree background far" },
     { "stump",          gen_stump,          "tree stump ground perch" },
     { "canopy",         gen_canopy,         "plant hanging canopy sway" },
