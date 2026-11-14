@@ -5,6 +5,8 @@
 #   sh tools/make_screenshots.sh biomes     # just the biome stills (also: hero creatures sheets)
 set -e
 NF=./nightfall
+# every image uses the same lush foreground: density 1, spread 1, z-spread 3 (down to the bottom edge)
+GRASS="--grass-density 1 --grass-spread 1 --grass-zspread 3"
 OUT=docs/images
 TMP=${TMPDIR:-/tmp}/nightfall-shots.$$
 mkdir -p "$OUT" "$TMP"
@@ -15,19 +17,19 @@ want() { [ "$WHAT" = all ] || [ "$WHAT" = "$1" ]; }
 # still: name biome seed warm-up [extra args...]
 still() {
     name=$1; biome=$2; seed=$3; t=$4; shift 4
-    $NF --snap "$TMP/$name.ppm" --seed "$seed" --time "$t" --width 200 --shot-scale 5 --biome "$biome" "$@" >/dev/null
+    $NF $GRASS --snap "$TMP/$name.ppm" --seed "$seed" --time "$t" --width 200 --shot-scale 5 --biome "$biome" "$@" >/dev/null
     magick "$TMP/$name.ppm" "$OUT/$name.png"
 }
 
 # gif: name biome seed warm-up seconds fps cropW cropH follow pixel-scale [extra args...]
-# (the camera follows the first creature called $follow; empty = fixed camera)
+# (PLAY=N plays the frames back at N fps instead of the recorded rate; the camera follows the first creature called $follow; empty = fixed camera)
 gif() {
     name=$1; biome=$2; seed=$3; t=$4; secs=$5; fps=$6; cw=$7; ch=$8; follow=$9; ss=${10}; shift 10
     d="$TMP/$name"; rm -rf "$d"; mkdir -p "$d"
-    $NF --snap /dev/null --seed "$seed" --time "$t" --width 200 --biome "$biome" \
+    $NF $GRASS --snap /dev/null --seed "$seed" --time "$t" --width 200 --biome "$biome" \
         --record "$d" --record-time "$secs" --record-fps "$fps" --crop "$cw" "$ch" \
         ${follow:+--follow "$follow"} --shot-scale "$ss" "$@" >/dev/null
-    ffmpeg -loglevel error -y -framerate "$fps" -i "$d/f%04d.ppm" \
+    ffmpeg -loglevel error -y -framerate "${PLAY:-$fps}" -i "$d/f%04d.ppm" \
         -vf "split[a][b];[a]palettegen=max_colors=112:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" \
         -loop 0 "$OUT/$name.gif"
 }
@@ -54,13 +56,38 @@ if want creatures; then
     gif deer     beech_hall  1 8  12 10 140 84 deer     3 --spawn-rate deer=0 --spawn deer
 fi
 
+if want weather; then
+    # the six weather patterns side by side: the same scene (seed 4, swamp), only the weather differs
+    for p in clear mist fog drizzle rain rainfog; do
+        $NF $GRASS --snap "$TMP/w_$p.ppm" --seed 4 --time 20 --width 200 --shot-scale 3 --biome swamp --weather $p >/dev/null
+    done
+    magick montage -font DejaVu-Sans -pointsize 18 -fill '#cfd8d4' -background '#06090a' \
+        -label clear "$TMP/w_clear.ppm" -label mist "$TMP/w_mist.ppm" -label fog "$TMP/w_fog.ppm" \
+        -label drizzle "$TMP/w_drizzle.ppm" -label rain "$TMP/w_rain.ppm" -label 'rain + fog' "$TMP/w_rainfog.ppm" \
+        -tile 2x3 -geometry 600x+4+4 "$OUT/weather-patterns.png"
+    # rain: the front comes in from the right, first single drops, then thicker; a dhole pack (seed 3 swamp) runs
+    # under the hosta leaves
+    gif weather-rain swamp 3 0 24 12 200 84 "" 2 --spawn-rate dhole=0 --spawn dhole --spawn dhole --weather-in rain
+    # fog at its natural pace: the 80 s while the front crosses the middle of the screen (it starts entering at ~3 min);
+    # before that there is nothing to see, after it the screen is just evenly grey
+    gif weather-fog swamp 4 230 80 8 200 84 "" 2 --weather-in fog
+fi
+
+if want events; then
+    # the owl hunt: glide, stoop, strike, flies off with the mouse (beech hall, seed 10; hunts are random, so this
+    # seed was picked by scanning the --snap log for "owl#N catches mouse#M"; the warm-up of 23.3 s ends just before the
+    # owl leaves its hollow. Seeds depend on the --grass-* settings above)
+    gif owl-hunt beech_hall 10 23.3 9 15 110 64 owl 4 --spawn-rate owl=0 --spawn owl --spawn mouse --spawn mouse \
+        --spawn mouse --weather clear
+fi
+
 if want sheets; then
     $NF --sheet "$TMP/sheet.ppm" --filter creature --scale 3 --width 1100 >/dev/null
     magick "$TMP/sheet.ppm" -fuzz 2% -trim +repage -bordercolor '#06090a' -border 12 "$OUT/creatures-sheet.png"
     $NF --sheet "$TMP/g1.ppm" --filter dhole --scale 4 --width 700 >/dev/null
     $NF --sheet "$TMP/g2.ppm" --filter dhole --scale 4 --width 700 --depth >/dev/null
     magick "$TMP/g1.ppm" "$TMP/g2.ppm" -background '#0a0e10' -append "$OUT/gallery.png"
-    NF_DEBUG=1 $NF --snap "$TMP/pg.ppm" --seed 3 --time 30 --width 200 --shot-scale 5 --biome oak_wood \
+    NF_DEBUG=1 $NF $GRASS --snap "$TMP/pg.ppm" --seed 3 --time 30 --width 200 --shot-scale 5 --biome oak_wood \
         --spawn squirrel --spawn owl --spawn rabbit >/dev/null
     magick "$TMP/pg.ppm" "$OUT/playground.png"
 fi

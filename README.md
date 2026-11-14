@@ -61,6 +61,34 @@ Every scene is different. A frame takes about half a millisecond.
 |:---:|:---:|:---:|
 | ![Dhole pack](docs/images/dhole.gif)<br>A dhole pack plays and chases | ![Owl](docs/images/owl.gif)<br>An owl roosts in a hollow | ![Squirrel](docs/images/squirrel.gif)<br>A squirrel climbs, peeks out |
 | ![Mole](docs/images/mole.gif)<br>A mole leaves molehills | ![Bat](docs/images/bat.gif)<br>A bat hangs under a branch | ![Deer](docs/images/deer.gif)<br>A deer grazes in the wind |
+| ![Owl hunting a mouse](docs/images/owl-hunt.gif)<br>An owl catches a mouse and flies off with it | | |
+
+## Weather
+
+Fog and rain are two independent layers, each with a strength and a **front** that travels with the wind. A fog bank
+pours in from the side along the forest floor (the lower part leads) and rolls out the same way. A rain front sweeps
+across with slanted streaks, splashes and rings in the puddles. Because the layers are separate, fog can leave while
+rain is arriving. A weather lasts a few minutes by default (`--weather-time`), and the biome tilts the odds: the swamp
+is foggy, the rocky pine wood rarely.
+
+![The six weather patterns: clear, mist, fog, drizzle, rain, rain and fog](docs/images/weather-patterns.png)
+
+Animals react to it instead of just being drawn under it:
+
+- **Rain.** Dholes, foxes, wildcats, badgers, weasels, rabbits and hedgehogs run to the nearest free spot under the big
+  leaves of butterbur or hosta, lie there until it has been dry for a few seconds, shake themselves off and carry on.
+  Drops land on the leaves (a splash, the leaf twitches), it stays dry underneath, and the hosta tips keep dripping
+  for a while after the rain stops.
+- **Fog.** Predators are noticed later, chases only start nearby, and the owl hunts by ear: it goes only for prey that
+  moves, sniffs or eats.
+
+![The rain front sweeps in and a dhole pack runs under the hosta leaves](docs/images/weather-rain.gif)
+Rain comes in from the side: a drop here and there, then thicker. The dhole pack runs under the hosta leaves and lies down there.
+
+![Fog rolling in from the left, a timelapse](docs/images/weather-fog.gif)
+Fog pours in along the forest floor, at its real pace (a front needs several minutes to cross the screen).
+
+Try it: `./nightfall --play --biome swamp --weather rainfog`, `--weather-in fog` starts clear and lets the fog roll in. Press `W` in the playground to roll in the next weather.
 
 ## Install
 
