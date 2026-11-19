@@ -9,6 +9,7 @@
  * Options:
  *   --seed N        seed for procedural shapes and behaviour
  *   --scene-time S  (screensaver) after how many seconds to swap the scene (0 = never, default 600)
+ *   --spawn-freq F      how often creatures arrive (1 = default, 0 = none); --max-creatures N = how many at once
  *   --spawn-rate N=F …  overrides the spawn chance of species N in any biome (the biome's chances
  *                       add up to 1; e.g. --spawn-rate dhole=0.2 rabbit=0; 0 = never)
  *   --biome B           auto (default: random by seed) | off (no recommendations) | NAME | list
@@ -58,6 +59,8 @@ static void usage(void)
            "  --weather-timelapse K            fronts move K times faster (for recording timelapses)\n"
            "  --weather-time M                 a weather lasts about M minutes, randomly 0.6-1.4x\n"
            "                                   (default 6, 0 = no weather)\n"
+           "  --spawn-freq F                   how often creatures arrive (1 = default, 2 = twice as often, 0 = none)\n"
+           "  --max-creatures N                most creatures about at once (0 = automatic, by screen width)\n"
            "  --spawn-rate NAME=F [NAME=F ...] override spawn chances (biome chances sum to 1)\n"
            "  --grass-density F                foreground plant density (default 1)\n"
            "  --grass-spread F                 randomness of the gaps between plants (default 1)\n"
@@ -109,6 +112,8 @@ int main(int argc, char **argv)
         else if (!strcmp(a, "--play")) play = 1;
         else if (!strcmp(a, "--gallery") || !strcmp(a, "--galery")) gallery = 1;
         else if (!strcmp(a, "-v") || !strcmp(a, "--version")) { printf("nightfall %s\n", NF_VERSION); return 0; }
+        else if (!strcmp(a, "--spawn-freq") && i + 1 < argc) { g_spawn_freq = (float)atof(argv[++i]); if (g_spawn_freq < 0) g_spawn_freq = 0; }
+        else if (!strcmp(a, "--max-creatures") && i + 1 < argc) { g_max_creatures = atoi(argv[++i]); if (g_max_creatures < 0) g_max_creatures = 0; }
         else if (!strcmp(a, "--spawn-rate") && i + 1 < argc) {
             /* --spawn-rate dhole=1 rabbit=0.2 ...: takes every following NAME=F */
             while (i + 1 < argc && strncmp(argv[i + 1], "--", 2) != 0 && strchr(argv[i + 1], '=')) {

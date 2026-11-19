@@ -157,6 +157,8 @@ crosses = hideouts and perches. The playground also shows a HUD with every creat
 | `--weather auto\|NAME` | `auto` (default): fog and rain come and go; or one that stays: `clear mist fog drizzle rain rainfog` |
 | `--weather-time M` | about how long one weather lasts, in minutes (default `6`, the real length is random, 0.6–1.4 ×; `0` = no weather) |
 | `--event NAME` | start an event right away (also in `--play` and the screensaver): `fireflies` |
+| `--spawn-freq F` | how often creatures arrive (`1` default, `2` twice as often, `0` none) |
+| `--max-creatures N` | most creatures about at once (`0` = automatic, grows with the screen width) |
 | `--spawn-rate NAME=F …` | override spawn chances, e.g. `--spawn-rate dhole=0.3 rabbit=0` |
 | `--grass-density F` | foreground plant density (default `1`) |
 | `--grass-spread F` | randomness of the gaps between plants (`0` even … `2` clumpy) |

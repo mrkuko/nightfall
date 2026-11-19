@@ -16,6 +16,8 @@ extern float g_weather_timelapse;   /* fronts K times faster (recording timelaps
 int biome_cycle(const library_t *lib);
 /* "NAME=F": spawn frequency of a species regardless of the biome (F = share of the commonest species). */
 int spawn_rate_set(const char *spec);
+extern float g_spawn_freq;
+extern int g_max_creatures;
 /* Headless capture for docs (--snap + --record): see main.c */
 extern const char *g_rec_dir, *g_rec_follow;
 extern float g_rec_secs, g_rec_fps;

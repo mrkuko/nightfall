@@ -472,12 +472,18 @@ static int spawn_species(world_t *w, const char *name)
     return i;
 }
 
+/* --spawn-freq F: how often creatures arrive (1 = default, 2 = twice as often, 0 = none);
+ * --max-creatures N: how many may be about at once (0 = automatic, by the width of the screen). */
+float g_spawn_freq = 1.0f;
+int g_max_creatures = 0;
+
 static void director(world_t *w, float dt)
 {
+    if (g_spawn_freq <= 0.0f) return;
     w->next_spawn -= dt;
     if (w->next_spawn > 0) return;
-    w->next_spawn = rng_range(&w->rng, 2.5f, 8.0f);
-    int cap = 5 + w->w / 40;
+    w->next_spawn = rng_range(&w->rng, 2.5f, 8.0f) / g_spawn_freq;
+    int cap = g_max_creatures > 0 ? g_max_creatures : 5 + w->w / 40;
     if (w->population >= cap) return;
     /* Every species has a chance: 0 unless the biome lists it, the biome sets it (base weight × its
      * multiplier, normalised so that all biome chances add up to 1). --spawn-rate replaces the
