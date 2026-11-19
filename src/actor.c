@@ -204,13 +204,15 @@ static void plan_ground_move(world_t *w, actor_t *a, float tx, int run, int z)
     }
     float x = a->x;
     for (int guard = 0; guard < 6 && fabsf(tx - x) > 1.0f; guard++) {
-        float seg = rng_range(&w->rng, 14, 40);
+        /* at most 6 short hops; the last one goes straight to the target, otherwise a long way (to the screen edge)
+         * ends early and a creature that is leaving would vanish in the middle of the screen */
+        float seg = guard == 5 ? 1.0e6f : rng_range(&w->rng, 14, 40);
         float nx = fabsf(tx - x) <= seg ? tx : x + sgnf(tx - x) * seg;
         step_t *s = plan_push(a, ST_MOVE);
         if (!s) return;
         s->x = nx; s->z = z;
         x = nx;
-        if (fabsf(tx - x) > 1.0f && rng_chance(&w->rng, 0.55f)) {
+        if (guard < 4 && fabsf(tx - x) > 1.0f && rng_chance(&w->rng, 0.55f)) {
             static const int pause_anims[] = { A_IDLE, A_SNIFF, A_LOOK, A_IDLE };
             push_anim(a, pause_anims[rng_int(&w->rng, 4)], rng_range(&w->rng, 0.4f, 1.6f));
         }
