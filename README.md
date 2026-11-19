@@ -88,7 +88,7 @@ Rain comes in from the side: a drop here and there, then thicker. The dhole pack
 ![Fog rolling in from the left, a timelapse](docs/images/weather-fog.gif)
 Fog pours in along the forest floor, at its real pace (a front needs several minutes to cross the screen).
 
-Try it: `./nightfall --play --biome swamp --weather rainfog`, `--weather-in fog` starts clear and lets the fog roll in. Press `W` in the playground to roll in the next weather.
+Try it: `./nightfall --play --biome swamp --weather rainfog`, `--weather-in fog` starts clear and lets the fog roll in. Press `W` in the playground to roll in the next weather, `1`–`6` to choose one (it stays), `0` for auto again.
 
 ## Install
 
@@ -176,7 +176,8 @@ nightfall --seed 42 --scene-time 0 --grass-density 0.6
 | `l` | new scene | `+` / `-` | simulation speed |
 | `B` | next biome | `n` | someone arrives now |
 | `h` | toggle HUD | `d` | show places, paths, links |
-| `W` | next weather (the fronts start moving) | | |
+| `W` | next weather (the fronts start moving) | `1`–`6` | pick a weather and keep it: clear, mist, fog, drizzle, rain, rainfog |
+| `0` | weather back to auto | | |
 
 Spawn a creature: `r` rabbit · `s` squirrel · `x` fox · `o` owl · `v` bat · `e` eyes ·
 `g` spirit · `j` deer · `b` boar · `c` wildcat · `m` mole · `w` weasel · `p` dhole

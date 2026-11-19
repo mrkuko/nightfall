@@ -341,6 +341,8 @@ void  weather_init(world_t *w, uint64_t seed);
 void  weather_begin(world_t *w, const char *arg);
 /* Changes to the next pattern now (playground 'W'): the fronts start moving. */
 void  weather_next(world_t *w);
+void  weather_set(world_t *w, int pattern);   /* roll in pattern and keep it; -1 = auto again */
+int   weather_count(void);
 void  weather_update(world_t *w, float dt);
 /* Draws rain, splashes and fog over the finished frame (uses the z-buffer). */
 void  weather_render(world_t *w, raster_t *r);

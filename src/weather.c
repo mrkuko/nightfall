@@ -276,6 +276,22 @@ void weather_next(world_t *w)
     set_pattern(w, pick_pattern(w), 0);
 }
 
+/* Playground keys: pattern number p rolls in as fronts and stays (no automatic change); p < 0 = back to auto. */
+void weather_set(world_t *w, int p)
+{
+    if (p < 0) {
+        w->wx.fixed = 0;
+        w->wx.next_change = fmaxf(15.0f, wx_base() * rng_range(&w->wx.rng, 0.6f, 1.4f));
+        world_log(w, "weather → auto");
+        return;
+    }
+    if (p >= NPAT) return;
+    set_pattern(w, p, 0);
+    w->wx.fixed = 1;
+}
+
+int weather_count(void) { return NPAT; }
+
 /* --- update ------------------------------------------------------------ */
 
 static void update_layer(world_t *w, int k, float dt)
