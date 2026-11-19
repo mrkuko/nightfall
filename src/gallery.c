@@ -651,6 +651,7 @@ static int tree_height_for(int h)
 static void build_scene(world_t *w, uint64_t seed)
 {
     gen_set_tree_height(tree_height_for(w->h));
+    w->ext_frac = fminf(1.0f, fmaxf(0.0f, (g_fg_zspread - 1.0f) * 0.5f));     /* creatures use the extended ground too */
     rng_t r = rng_seed(seed ^ 0x5eedu);
     int W = w->w;
     int ar = rng_int(&r, AR_COUNT);

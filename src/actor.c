@@ -533,6 +533,13 @@ static int nearest_mover(world_t *w, actor_t *a, float maxd)
     return best;
 }
 
+/* Depth of the ground row t (0 = standard lane … 1 = the front row). With a wide --grass-zspread the front row
+ * is further forward: the creatures use the whole ground, down to the bottom edge. */
+static int lane_depth(const world_t *w, float t)
+{
+    return w->ground_z + (int)lroundf(t * ((float)(w->fg_z + 6 - w->ground_z) + 60.0f * w->ext_frac));
+}
+
 /* Ground rows span from the standard lane (ground_z, where trunks can be climbed)
  * to just in front of the middle undergrowth band (fg_z + 6). */
 int actor_pick_lane(world_t *w, const profile_t *p)
@@ -541,7 +548,7 @@ int actor_pick_lane(world_t *w, const profile_t *p)
     if (rng_chance(&w->rng, 0.12f)) t = p->lane + rng_range(&w->rng, -0.55f, 0.55f);   /* now and then far from its usual row */
     else t = p->lane + (rng_float(&w->rng) + rng_float(&w->rng) - 1.0f) * 0.3f;
     t = clampf(t, -0.15f, 1.0f);
-    return w->ground_z + (int)lroundf(t * (float)(w->fg_z + 6 - w->ground_z));
+    return lane_depth(w, t);
 }
 
 /* How far a creature at x can see, 1 = clear air; thick fog cuts it to ~a third. */
@@ -796,7 +803,7 @@ static void plan_intent(world_t *w, actor_t *a, int in)
                 s->x = clampf(a->x + dir * dist, 8, (float)w->w - 8);
                 float t = rng_chance(&w->rng, 0.7f) ? rng_range(&w->rng, 0.0f, 1.0f) : -1.0f;
                 s->z = t < 0 ? actor_pick_lane(w, &a->prof)
-                             : w->ground_z + (int)lroundf(t * (float)(w->fg_z + 6 - w->ground_z));
+                             : lane_depth(w, t);
             }
             push_anim(a, A_APPEAR, -1.0f);
             push_anim(a, A_SNIFF, rng_range(&w->rng, 1.0f, 3.0f));

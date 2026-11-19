@@ -74,6 +74,15 @@ float world_ground_at(const world_t *w, float x, float z)
     if (off < 0) off = 0;
     if (off > 14) off = 14;
     float y = world_ground(w, x) + off;
+    /* in front of the usual rows (fg_z + 6) the ground goes on down the dirt to the bottom edge, as far as the
+     * foreground plants are spread (--grass-zspread): depth + 60 reaches it when ext_frac is 1 */
+    float z0 = (float)(w->fg_z + 6);
+    if (w->ext_frac > 0 && z > z0) {
+        float t = fminf((z - z0) / 60.0f, w->ext_frac);
+        float y0 = world_ground(w, x) + fminf(14.0f, (z0 - (float)w->ground_z) * 0.3f);
+        float room = (float)w->h - 2 - y0;
+        y = y0 + (room > 0 ? t * room : 0.0f);
+    }
     return y > (float)w->h - 2 ? (float)w->h - 2 : y;
 }
 

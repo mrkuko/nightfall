@@ -292,6 +292,7 @@ typedef struct {
     float      ground_scale;    /* patch size multiplier (1 = default) */
     uint32_t   ground_seed;
     int        fg_z;            /* foreground depth */
+    float      ext_frac;        /* --grass-zspread > 1: 0..1, the ground extends this far down towards the bottom edge (depth + 60 * ext_frac) */
     /* growable arrays (world.c): pointers into them are valid only until the next world_add_* call */
     object_t  *obj;
     int        nobj, cap_obj;
