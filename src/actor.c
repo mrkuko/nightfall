@@ -1672,6 +1672,13 @@ void actor_set_intent(world_t *w, actor_t *a, int intent) { plan_intent(w, a, in
 void actor_update(world_t *w, actor_t *a, float dt)
 {
     a->ct += dt;
+    if (a->hold) {
+        /* an event holds it: it hangs in the air, bobbing a little, and keeps lighting its surroundings */
+        a->bob += dt * 2.0f;
+        a->y += cosf(a->bob) * 1.2f * dt;
+        if (sprite_has_tag(a->spr, "glow")) world_stimulus(w, a->x, a->y, 70, ST_GLOW, 0.5f, 0.4f, actor_index(w, a));
+        return;
+    }
     if (a->clip_after && a->ct >= clip_duration(&a->spr->clips[a->clip])) {
         int next = a->clip_after - 1;
         a->clip_after = 0;

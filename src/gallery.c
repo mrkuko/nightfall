@@ -260,6 +260,7 @@ static int random_place(world_t *w, int typemask, int free_only)
 /* biomes: recommendation lists (whitelists with weights) from "biome" blocks in assets/biomes/ */
 /* ------------------------------------------------------------------ */
 
+const char *g_event_arg = NULL;         /* --event NAME: start that event at the beginning (snap / record) */
 const char *g_weather_arg = "auto";     /* auto | clear | mist | fog | drizzle | rain | rainfog (--weather) */
 const char *g_biome_arg = "auto";       /* auto | off | NAME (command line, 'B' in the playground) */
 static const sprite_t *g_biome;         /* biome of the current scene, NULL = no recommendations */
@@ -962,6 +963,7 @@ int play_snapshot(library_t *lib, uint64_t seed, int cols, int rows, float secon
     build_scene(w, seed);
     for (int i = 0; i < 3; i++) director(w, 100.0f);
     for (int i = 0; i < nspawn; i++) spawn_species(w, spawn[i]);
+    if (g_event_arg && !event_start(w, g_event_arg)) fprintf(stderr, "nightfall: could not start event '%s'\n", g_event_arg);
     int logged = 0;
     for (float t = 0; t < seconds; t += 1.0f / 15.0f) {
         director(w, 1.0f / 15.0f);
@@ -1070,6 +1072,7 @@ int play_run(library_t *lib, const char *assets_dir, uint64_t seed)
             case '-': speed = fmaxf(0.25f, speed * 0.5f); break;
             case 'n': w->next_spawn = 0; director(w, 0); break;
             case 'W': weather_next(w); break;      /* the next weather pattern now (its fronts start moving) */
+            case 'f': event_start(w, "fireflies"); break;   /* the fireflies blink in step, brighter, flash, gone */
             case '0': weather_set(w, -1); break;   /* weather: auto again */
             case '1': case '2': case '3': case '4': case '5': case '6':
                 weather_set(w, k - '1'); break;    /* that weather rolls in and stays: clear mist fog drizzle rain rainfog */
@@ -1117,7 +1120,7 @@ int play_run(library_t *lib, const char *assets_dir, uint64_t seed)
             char line[512], head[720], wxd[64];
             weather_describe(w, wxd, sizeof wxd);
             snprintf(head, sizeof head, " NIGHTFALL playground  seed %llu (%s)  weather %s  creatures %d  %.2gx%s  %dx%d cells (%dx%d px)   "
-                     "q quit  l new scene  B biome  W weather  1-6 pick  0 auto  h hud  d places/paths  space pause  +/- time  n spawn  r s x o v e g j b c m w p = rabbit squirrel fox owl bat eyes spirit deer boar cat mole weasel dhole ",
+                     "q quit  l new scene  B biome  W weather  1-6 pick  0 auto  f fireflies event  h hud  d places/paths  space pause  +/- time  n spawn  r s x o v e g j b c m w p = rabbit squirrel fox owl bat eyes spirit deer boar cat mole weasel dhole ",
                      (unsigned long long)seed, g_scene_desc, wxd, w->population, (double)speed, paused ? " PAUSED" : "",
                      sc.w, sc.h, r.w, r.h);
             /* the header wraps at word boundaries when the terminal is narrow */

@@ -156,6 +156,7 @@ crosses = hideouts and perches. The playground also shows a HUD with every creat
 | `--biome auto\|off\|NAME\|list` | pick a biome (`auto`: by the seed, `off`: anything goes) |
 | `--weather auto\|NAME` | `auto` (default): fog and rain come and go; or one that stays: `clear mist fog drizzle rain rainfog` |
 | `--weather-time M` | about how long one weather lasts, in minutes (default `6`, the real length is random, 0.6–1.4 ×; `0` = no weather) |
+| `--event NAME` | (with `--snap` / `--record`) start an event right away: `fireflies` |
 | `--spawn-rate NAME=F …` | override spawn chances, e.g. `--spawn-rate dhole=0.3 rabbit=0` |
 | `--grass-density F` | foreground plant density (default `1`) |
 | `--grass-spread F` | randomness of the gaps between plants (`0` even … `2` clumpy) |
@@ -177,7 +178,7 @@ nightfall --seed 42 --scene-time 0 --grass-density 0.6
 | `B` | next biome | `n` | someone arrives now |
 | `h` | toggle HUD | `d` | show places, paths, links |
 | `W` | next weather (the fronts start moving) | `1`–`6` | pick a weather and keep it: clear, mist, fog, drizzle, rain, rainfog |
-| `0` | weather back to auto | | |
+| `0` | weather back to auto | `f` | the fireflies event now |
 
 Spawn a creature: `r` rabbit · `s` squirrel · `x` fox · `o` owl · `v` bat · `e` eyes ·
 `g` spirit · `j` deer · `b` boar · `c` wildcat · `m` mole · `w` weasel · `p` dhole

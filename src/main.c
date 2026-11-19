@@ -51,6 +51,7 @@ static void usage(void)
            "  --seed N                         reproducible scene and behaviour\n"
            "  --scene-time S                   new scene every S seconds (0 = never, default 600)\n"
            "  --biome auto|off|NAME|list       biome (default: random by seed)\n"
+           "  --event NAME                     (with --snap / --record) start an event now: fireflies\n"
            "  --weather auto|NAME              weather: auto comes and goes, or one that stays:\n"
            "                                   clear mist fog drizzle rain rainfog\n"
            "  --weather-in NAME                start clear, then NAME rolls in as a front and stays\n"
@@ -124,6 +125,7 @@ int main(int argc, char **argv)
         else if (!strcmp(a, "--rows") && i + 1 < argc) snap_rows = clampi(atoi(argv[++i]), 10, 400);
         else if (!strcmp(a, "--shot-scale") && i + 1 < argc) g_shot_scale = clampi(atoi(argv[++i]), 1, 12);
         else if (!strcmp(a, "--biome") && i + 1 < argc) g_biome_arg = argv[++i];
+        else if (!strcmp(a, "--event") && i + 1 < argc) g_event_arg = argv[++i];
         else if (!strcmp(a, "--weather") && i + 1 < argc) g_weather_arg = argv[++i];
         else if (!strcmp(a, "--weather-timelapse") && i + 1 < argc) { g_weather_timelapse = (float)atof(argv[++i]); if (g_weather_timelapse < 0.01f) g_weather_timelapse = 1; }
         else if (!strcmp(a, "--weather-in") && i + 1 < argc) { static char in[48]; snprintf(in, sizeof in, "in:%s", argv[++i]); g_weather_arg = in; }

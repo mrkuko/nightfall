@@ -2212,23 +2212,32 @@ static void gen_firefly(sprite_t *s, uint64_t seed)
     rng_t r = rng_seed(seed);
     rgb_t core = vary(mkrgb(250, 232, 120), &r, 0.06f);
     rgb_t halo = mkrgb(200, 220, 90);
-    static const float lv[] = { 0.0f, 0.35f, 0.7f, 1.0f };
-    for (int k = 0; k < 4; k++) {
+    /* frames 0..3 are the normal blink; 4 and 5 only exist for the "synchronize" event (brighter, white core,
+     * a wide halo): they build up to the flash */
+    static const float lv[] = { 0.0f, 0.35f, 0.7f, 1.0f, 1.7f, 2.5f };
+    static const int hs[] = { 4, 4, 4, 4, 7, 10 };
+    for (int k = 0; k < 6; k++) {
         char name[16];
         snprintf(name, sizeof name, "glow%d", k);
-        frame_t *f = sprite_add_frame(s, name, 9, 9, 4, 4);
+        int c = hs[k];
+        frame_t *f = sprite_add_frame(s, name, 2 * c + 1, 2 * c + 1, c, c);
         float l = lv[k];
         if (l <= 0.01f) {
-            cv_set(f, 4, 4, mkrgb(46, 44, 30), 0);
+            cv_set(f, c, c, mkrgb(46, 44, 30), 0);
             continue;
         }
-        cv_glow(f, 4, 4, rgb_mix(mkrgb(90, 86, 40), core, l), 0);
-        for (int dy = -4; dy <= 4; dy++)
-            for (int dx = -4; dx <= 4; dx++) {
+        float l1 = fminf(l, 1.0f);
+        rgb_t cc = rgb_mix(mkrgb(90, 86, 40), core, l1);
+        if (l > 1.0f) cc = rgb_mix(core, mkrgb(255, 252, 235), clampf((l - 1.0f) / 1.2f, 0.0f, 1.0f));
+        cv_glow(f, c, c, cc, 0);
+        float R = 1.0f + 3.0f * l;
+        for (int dy = -c; dy <= c; dy++)
+            for (int dx = -c; dx <= c; dx++) {
                 float d = sqrtf((float)(dx * dx + dy * dy));
-                if (d < 0.5f || d > 1.0f + 3.0f * l) continue;
-                int a = (int)((1.0f - d / (1.0f + 3.0f * l)) * 150.0f * l);
-                if (a > 3) cv_halo(f, 4 + dx, 4 + dy, halo, a);
+                if (d < 0.5f || d > R) continue;
+                int a = (int)((1.0f - d / R) * 150.0f * fminf(l, 1.6f));
+                if (a > 230) a = 230;
+                if (a > 3) cv_halo(f, c + dx, c + dy, halo, a);
             }
     }
     int16_t blink[] = { 0, 0, 0, 0, 0, 0, 1, 2, 3, 3, 3, 3, 2, 3, 3, 2, 1 };

@@ -31,6 +31,7 @@ void world_init(world_t *w, library_t *lib, int width, int height, uint64_t seed
     for (int x = 0; x < w->w; x++)
         w->ground[x] = base + (fbm2((float)x * 0.02f, 0.5f, 3, ns) - 0.5f) * amp;
     weather_init(w, seed);
+    events_init(w, seed);
 }
 
 void world_free(world_t *w)
@@ -485,6 +486,7 @@ void world_update(world_t *w, float dt)
     w->t += dt;
     update_wind(w, dt);
     weather_update(w, dt);
+    events_update(w, dt);
 
     for (int i = 0; i < w->nstim; i++) {
         w->stim[i].ttl -= dt;
@@ -614,7 +616,7 @@ void world_render(world_t *w, raster_t *r, int debug)
     for (int i = 0; i < w->nact; i++) {
         const actor_t *a = &w->act[i];
         if (!a->alive || a->hidden) continue;
-        int fi = clip_frame_at(&a->spr->clips[a->clip], a->ct);
+        int fi = a->ov_frame ? a->ov_frame - 1 : clip_frame_at(&a->spr->clips[a->clip], a->ct);
         if (a->mask_place > 0) {
             float cx, cy, rx, ry;
             world_hollow_opening(w, a->mask_place - 1, &cx, &cy, &rx, &ry);
@@ -627,6 +629,7 @@ void world_render(world_t *w, raster_t *r, int debug)
         r->mask_on = 0;
     }
     weather_render(w, r);
+    events_render(w, r);
     if (debug) {
         static const rgb_t pc[PL_COUNT] = {
             {200, 60, 60}, {240, 200, 60}, {60, 200, 240}, {200, 120, 255},

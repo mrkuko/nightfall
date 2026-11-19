@@ -221,6 +221,8 @@ typedef struct {
     int        carry;           /* carries its catch in the talons (clip "carry") */
     int        hphase;          /* ST_HUNT: 0 approach, 1 stoop, 2 strike, 3 pull up */
     float      hx, hy;          /* ST_HUNT: the point it aims at */
+    int        hold;            /* an event keeps it in place (it only bobs) */
+    int        ov_frame;        /* an event picks its frame: 1 + frame, 0 = the clip decides */
     uint32_t   id;
 } actor_t;
 
@@ -261,6 +263,27 @@ typedef struct {
     rng_t      rng;             /* its own stream: the weather does not change how a seed builds the scene */
 } weather_t;
 
+/* --- events (src/event.c): rare, mysterious happenings; one at a time, with their own rng stream --- */
+enum { EV_NONE, EV_FIREFLIES };
+#define EV_MAX_FF 16
+typedef struct {
+    int      kind;              /* EV_* running now */
+    float    t;                 /* seconds since it started */
+    float    next;              /* seconds until the director picks the next one */
+    int      pending;           /* EV_* picked, being prepared (the scene is made ready first) */
+    float    prep;              /* seconds left until the pending event starts */
+    float    prep_next;         /* seconds until the next preparation step (e.g. one more firefly) */
+    int      prep_left;         /* preparation steps still to do */
+    int      n;                 /* fireflies taking part */
+    int      id[EV_MAX_FF];     /* their actor ids (the slot may be reused: compare a->id) */
+    float    off[EV_MAX_FF];    /* each one's starting phase (0..1), converges to 0 = in sync */
+    float    phase;             /* common blink phase (cycles) */
+    float    cx, cy;            /* centre of the swarm (where the flash is brightest) */
+    float    flash;             /* 0..1 whole-scene flash */
+    int      gone;              /* the fireflies have vanished */
+    rng_t    rng;
+} event_t;
+
 typedef struct {
     int        w, h;            /* raster dimensions */
     float      ground[NF_MAX_W];    /* ground height for x (y of the feet) */
@@ -300,6 +323,7 @@ typedef struct {
     raster_t   bake;
     int        bake_ok;
     weather_t  wx;
+    event_t    ev;
     /* director */
     float      next_spawn;
     int        population;
@@ -340,6 +364,10 @@ void  weather_init(world_t *w, uint64_t seed);
  * a pattern name = that weather, fully there and staying. Unknown names fall back to auto. */
 void  weather_begin(world_t *w, const char *arg);
 /* Changes to the next pattern now (playground 'W'): the fronts start moving. */
+void  events_init(world_t *w, uint64_t seed);
+void  events_update(world_t *w, float dt);
+void  events_render(world_t *w, raster_t *r);        /* the flash over the finished frame */
+int   event_start(world_t *w, const char *name);     /* by name ("fireflies"); 0 = could not start */
 void  weather_next(world_t *w);
 void  weather_set(world_t *w, int pattern);   /* roll in pattern and keep it; -1 = auto again */
 int   weather_count(void);
