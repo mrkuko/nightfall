@@ -855,6 +855,7 @@ int saver_run(library_t *lib, uint64_t seed, float scene_time)
     world_init(w, lib, cols, rows * 2, seed);
     build_scene(w, seed);
     for (int i = 0; i < 3; i++) director(w, 100.0f);
+    if (g_event_arg) event_start(w, g_event_arg);
     float scene_age = 0;
     double last = term_now();
     while (!term_quit_requested()) {
@@ -1048,6 +1049,7 @@ int play_run(library_t *lib, const char *assets_dir, uint64_t seed)
     world_init(w, lib, cols, rows * 2, seed);
     build_scene(w, seed);
     for (int i = 0; i < 3; i++) director(w, 100.0f);
+    if (g_event_arg) event_start(w, g_event_arg);
 
     int hud = 1, debug = 0, paused = 0;
     float speed = 1.0f;

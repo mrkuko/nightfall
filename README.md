@@ -156,7 +156,7 @@ crosses = hideouts and perches. The playground also shows a HUD with every creat
 | `--biome auto\|off\|NAME\|list` | pick a biome (`auto`: by the seed, `off`: anything goes) |
 | `--weather auto\|NAME` | `auto` (default): fog and rain come and go; or one that stays: `clear mist fog drizzle rain rainfog` |
 | `--weather-time M` | about how long one weather lasts, in minutes (default `6`, the real length is random, 0.6–1.4 ×; `0` = no weather) |
-| `--event NAME` | (with `--snap` / `--record`) start an event right away: `fireflies` |
+| `--event NAME` | start an event right away (also in `--play` and the screensaver): `fireflies` |
 | `--spawn-rate NAME=F …` | override spawn chances, e.g. `--spawn-rate dhole=0.3 rabbit=0` |
 | `--grass-density F` | foreground plant density (default `1`) |
 | `--grass-spread F` | randomness of the gaps between plants (`0` even … `2` clumpy) |
