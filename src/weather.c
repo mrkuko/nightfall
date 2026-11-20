@@ -136,7 +136,10 @@ static void layer_want(world_t *w, int k, float target)
         L->target = 0.0f;
         if (active && L->state != WXS_LEAVE) {
             L->state = WXS_LEAVE;
-            L->tail = -L->soft;              /* the trailing edge starts thinning it right away */
+            /* the trailing edge starts where it thins nothing yet (its ragged noise and the fog's ground lead
+             * reach a margin further in; starting at -soft cut a visible step at the screen side in one frame).
+             * Until it reaches -soft it moves faster (update_layer), so the thinning still starts soon. */
+            L->tail = -L->soft - margin(k);
         }
         return;
     }
@@ -307,7 +310,7 @@ static void update_layer(world_t *w, int k, float dt)
         }
     }
     if (L->state == WXS_LEAVE) {
-        L->tail += L->speed * dt;
+        L->tail += L->speed * dt * (L->tail < -L->soft ? 4.0f : 1.0f);
         if (L->tail > end) {
             /* gone; if a pattern wants it back in the meantime, a new front comes */
             float again = L->target;
@@ -430,6 +433,10 @@ void weather_update(world_t *w, float dt)
         if (x->next_change <= 0) weather_next(w);
     }
     for (int k = 0; k < WX_COUNT; k++) update_layer(w, k, dt * g_weather_timelapse);
+    /* the wisps' offset is the integral of their speed: with `t * speed` a small wind change (or the wind
+     * turning) would move the whole fog pattern by t × the difference in a single frame. The wind's sign is
+     * smoothed so the creep slows down, stops and turns instead of flipping. */
+    x->drift += dt * (0.035f + 0.06f * fabsf(w->wind)) * clampf(-w->wind_dir * 4.0f, -1.0f, 1.0f);
     update_rain(w, dt);
 }
 
@@ -514,7 +521,7 @@ static void render_air(world_t *w, raster_t *r)
     }
     float h = (float)r->h;
     /* wisps creep with the wind at a few pixels per second (noise units: 1 = ~55 px) */
-    float drift = w->t * (0.035f + 0.06f * fabsf(w->wind)) * (w->wind_dir < 0 ? 1.0f : -1.0f);
+    float drift = w->wx.drift;
     for (int gy = 0; gy < gh; gy++)
         for (int gx = 0; gx < gw; gx++) {
             float X = (float)(gx * GRID), Y = (float)(gy * GRID);
