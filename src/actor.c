@@ -408,6 +408,27 @@ static int roost_available(world_t *w, actor_t *a)
     return 0;
 }
 
+/* How far the climbing pose reaches below the anchor (px): the head of a creature that climbs down head first,
+ * the tail of one that climbs up. Climbing creatures must not go lower than ground - this, or the sprite
+ * sinks into the ground. Larger of the "climb" / "climb_down" clips (0 = it does not climb). */
+static float climb_depth(const actor_t *a)
+{
+    float depth = 0;
+    int ids[2] = { a->prof.anim[A_CLIMB], a->prof.anim[A_CLIMB_DOWN] };
+    for (int k = 0; k < 2; k++) {
+        if (ids[k] < 0 || ids[k] >= a->spr->nclips || ids[k] == a->prof.anim[A_IDLE]) continue;
+        const clip_t *c = &a->spr->clips[ids[k]];
+        for (int i = 0; i < c->n; i++) {
+            if (i > 0 && c->seq[i] == c->seq[i - 1]) continue;
+            const frame_t *f = &a->spr->frames[c->seq[i]];
+            for (int y = f->h - 1; y > f->ay + (int)depth; y--)
+                for (int x = 0; x < f->w; x++)
+                    if (f->px[y * f->w + x].a) { depth = (float)(y - f->ay); break; }
+        }
+    }
+    return depth;
+}
+
 /* safe flight depth: in front of trunks and bushes, behind the foreground */
 static int cruise_z(const world_t *w) { return w->ground_z + 14; }
 
@@ -1229,6 +1250,13 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
             if (fabsf(s->y - world_ground(w, a->x)) < 1.0f) a->nav = NAV_GROUND;
             return 1;
         }
+        /* down to the ground: stop when the head touches it (not with the anchor, the head would sink into the ground) */
+        float gl = world_ground(w, a->x) - climb_depth(a);
+        if (s->y > gl && s->y >= world_ground(w, a->x) - 1.0f && a->y >= gl - 0.6f) {
+            a->y = gl;
+            a->nav = NAV_GROUND;
+            return 1;
+        }
         float spd = clip_speed(a, dy < 0 ? A_CLIMB : A_CLIMB_DOWN, a->prof.climb) * a->speed_mul;
         /* short stops while climbing */
         if (fmodf(a->step_t, 2.6f) > 2.2f) { set_anim(a, A_CLING); return 0; }
@@ -1246,7 +1274,7 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         float d = target - a->path_t;
         if (fabsf(d) < 0.4f) {
             a->path_t = target;
-            if (fabsf(a->y - world_ground(w, a->x)) < 2.0f) a->nav = NAV_GROUND;
+            if (fabsf(a->y - world_ground(w, a->x)) < 2.0f + (climb ? climb_depth(a) : 0.0f)) a->nav = NAV_GROUND;
             return 1;
         }
         /* movement direction from the path geometry -> animation */
@@ -1260,6 +1288,11 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         if (climb && fmodf(a->step_t, 2.6f) > 2.2f) { set_anim(a, A_CLING); return 0; }
         a->path_t = approach(a->path_t, target, spd * dt);
         path_point(p, a->path_t, &a->x, &a->y);
+        if (climb) {
+            /* the climbing pose reaches below the anchor: at the foot of the trunk it stays this far above the ground */
+            float gl = world_ground(w, a->x) - climb_depth(a);
+            if (a->y > gl) a->y = gl;
+        }
         a->nav = climb ? NAV_CLIMB : NAV_PERCH;
         a->zf = approach(a->zf, (float)s->z, dt * 12.0f);
         return 0;

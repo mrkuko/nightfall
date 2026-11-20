@@ -633,8 +633,17 @@ void world_render(world_t *w, raster_t *r, int debug)
             r->mask_cx = cx; r->mask_cy = cy; r->mask_rx = rx; r->mask_ry = ry;
             r->mask_floor = a->mask_floor;
         }
+        /* climbing past a tree hollow the creature must be in front of the rim (a swollen lip stands out up to
+         * 3 above the trunk surface and would be drawn over its body): lift it above while it is near the opening */
+        int zb = 0;
+        if (a->mask_place > 0) zb = 4;
+        else if (a->nav == NAV_CLIMB)
+            for (int k = 0; k < w->nplace && !zb; k++) {
+                const place_t *pl = &w->place[k];
+                if (pl->type == PL_HOLLOW && fabsf(pl->climb_x - a->x) < 14.0f && fabsf(pl->y - a->y) < 44.0f) zb = 4;
+            }
         raster_blit(r, &a->spr->frames[fi], (int)floorf(a->x + 0.5f), (int)floorf(a->y + 0.5f),
-                    (int)floorf(a->zf + 0.5f), a->facing < 0 ? BLIT_FLIPX : 0, 1, NULL);
+                    (int)floorf(a->zf + 0.5f) + zb, a->facing < 0 ? BLIT_FLIPX : 0, 1, NULL);
         r->mask_on = 0;
     }
     weather_render(w, r);
