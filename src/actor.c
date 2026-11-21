@@ -21,10 +21,12 @@ static const char *ANIM_NAMES[A_COUNT] = {
 
 static const char *INTENT_NAMES[IN_COUNT] = {
     "none", "wander", "forage", "look", "groom", "rest", "hide", "peek", "leave",
-    "climb", "perch", "flee", "follow", "watch", "pass", "hover", "sniff", "emerge", "vanish", "roost", "chase", "frolic", "hunt", "shelter"
+    "climb", "perch", "flee", "follow", "watch", "pass", "hover", "sniff", "emerge", "vanish", "roost", "chase", "frolic", "hunt", "shelter", "wallow"
 };
 
 const char *intent_name(int i) { return (i >= 0 && i < IN_COUNT) ? INTENT_NAMES[i] : "?"; }
+
+static int find_puddle(const world_t *w, const actor_t *a);
 
 /* ------------------------------------------------------------------ */
 /* profile                                                             */
@@ -108,6 +110,7 @@ void profile_parse(const sprite_t *s, profile_t *p)
     if ((v = sprite_prop(s, "hunts"))) snprintf(p->hunts, sizeof p->hunts, " %s ", v);
     p->shelter = (v = sprite_prop(s, "shelter")) && strstr(v, "rain");
     p->wary = (v = sprite_prop(s, "wary")) ? (float)atof(v) : 0.0f;
+    p->roots = (v = sprite_prop(s, "roots")) ? atoi(v) : 0;
     p->bound_len = 50.0f; p->bound_h = 8.0f;
     if ((v = sprite_prop(s, "bound"))) sscanf(v, "%f %f", &p->bound_len, &p->bound_h);
     for (int k = 0; k < 4; k++) {
@@ -723,6 +726,23 @@ static void plan_intent(world_t *w, actor_t *a, int in)
         }
         break;
     case IN_FORAGE: {
+        if (a->prof.roots && ground && rng_chance(&w->rng, 0.65f)) {
+            /* a rooting trail: to a spot, then ploughing slowly along a line with the snout down */
+            float sx = clampf(a->x + rng_range(&w->rng, -40, 40), 16, (float)w->w - 16);
+            float dir = rng_chance(&w->rng, 0.5f) ? -1.0f : 1.0f;
+            if ((dir > 0 && sx > (float)w->w - 70.0f) || (dir < 0 && sx < 70.0f)) dir = -dir;
+            if (rng_chance(&w->rng, 0.3f)) a->lane_z = actor_pick_lane(w, &a->prof);
+            plan_ground_move(w, a, sx, 0, a->lane_z);
+            s = plan_push(a, ST_ROOT);
+            if (s) {
+                s->x = clampf(sx + dir * rng_range(&w->rng, 30, 70), 16, (float)w->w - 16);
+                s->y = rng_range(&w->rng, 5.0f, 8.0f);
+                s->z = a->lane_z + rng_between(&w->rng, -3, 3);
+            }
+            if (rng_chance(&w->rng, 0.5f)) push_anim(a, A_LOOK, rng_range(&w->rng, 1.0f, 2.5f));
+            a->hunger = fmaxf(0, a->hunger - 0.5f);
+            break;
+        }
         float tx = clampf(a->x + rng_range(&w->rng, -60, 60), 12, (float)w->w - 12);
         if (ground && rng_chance(&w->rng, 0.3f)) a->lane_z = actor_pick_lane(w, &a->prof);
         plan_ground_move(w, a, tx, 0, a->lane_z);
@@ -1009,6 +1029,21 @@ static void plan_intent(world_t *w, actor_t *a, int in)
         if (s) { s->x = screen_x(w, 10); s->y = air_y(w); s->z = cruise_z(w); }
         break;
     }
+    case IN_WALLOW: {
+        /* a wallow: to the puddle, into the mud on its side, rolling; then up and a good shake */
+        int pi = find_puddle(w, a);
+        if (pi < 0 || !ground) { plan_intent(w, a, IN_WANDER); return; }
+        const object_t *o = &w->obj[pi];
+        int z = clampi(w->ground_z + (int)lroundf((o->y - 1.0f - world_ground(w, o->x)) / 0.3f), w->ground_z, w->ground_z + 40);
+        if (z <= o->z) z = o->z + 1;
+        a->lane_z = z;
+        plan_ground_move(w, a, o->x + rng_range(&w->rng, -3.0f, 3.0f), 0, z);
+        push_anim(a, A_SNIFF, rng_range(&w->rng, 0.8f, 1.6f));
+        push_anim(a, A_PLAY, rng_range(&w->rng, 5.0f, 10.0f));
+        push_anim(a, A_GROOM, rng_range(&w->rng, 1.4f, 2.2f));
+        world_log(w, "%s#%u heads for the mud", a->spr->name, a->id);
+        break;
+    }
     case IN_SHELTER: {
         /* rain: to the nearest free spot under big leaves, lie down there until it stops, then shake off */
         int pi = find_shelter(w, a, 400.0f);
@@ -1087,6 +1122,8 @@ static void choose_intent(world_t *w, actor_t *a)
         /* rain: a creature that dislikes it wants to get under the leaves */
         float rain = weather_at(w, WX_RAIN, a->x);
         score[IN_SHELTER] = (p->shelter && g && rain > 0.2f && find_shelter(w, a, 400.0f) >= 0) ? 4.0f + rain * 8.0f : 0.0f;
+        if (!g || find_puddle(w, a) < 0) score[IN_WALLOW] = 0;
+        else score[IN_WALLOW] *= 1.0f + w->wx.wet * 2.0f;          /* fresh mud after the rain */
         if (!g) { score[IN_GROOM] *= 0.2f; score[IN_SNIFF] = 0; }
         if (a->nav == NAV_AIR) score[IN_LOOK] *= 0.2f;
         if (a->nav == NAV_PERCH) { score[IN_LOOK] += 2.0f; score[IN_WANDER] *= 0.3f; }
@@ -1212,6 +1249,41 @@ static void add_molehill(world_t *w, actor_t *a)
     if (n >= 12) return;
     world_add_object(w, "molehill", a->x, world_ground_at(w, a->x, a->zf) + 1.0f, (int)a->zf + 2,
                      rng_chance(&w->rng, 0.5f), rng_next(&w->rng) | 1);
+}
+
+/* Turned earth where the boar's snout is: a new patch, or (once there are enough) the oldest one moves here. */
+#define MAX_ROOTED 24
+static void add_rooted(world_t *w, actor_t *a)
+{
+    float hx = a->x + (float)a->facing * (float)a->prof.head_dx;
+    if (hx < -4.0f || hx > (float)w->w + 4.0f) return;
+    float y = world_ground_at(w, hx, a->zf) + 1.0f;
+    int z = (int)a->zf + 1;
+    int list[MAX_ROOTED], n = 0;
+    for (int i = 0; i < w->nobj && n < MAX_ROOTED; i++) {
+        if (strcmp(w->obj[i].spr->name, "rooted") != 0) continue;
+        if (fabsf(w->obj[i].x - hx) < 4.0f && fabsf(w->obj[i].y - y) < 2.0f) return;   /* already turned here */
+        list[n++] = i;
+    }
+    if (n >= MAX_ROOTED) {
+        world_move_object(w, list[w->rooted_ring++ % n], hx, y, z);
+        return;
+    }
+    world_add_object(w, "rooted", hx, y, z, rng_chance(&w->rng, 0.5f), rng_next(&w->rng) | 1);
+}
+
+/* A puddle on the screen to wallow in (nearest), or -1. */
+static int find_puddle(const world_t *w, const actor_t *a)
+{
+    int best = -1;
+    float bd = 1e9f;
+    for (int i = 0; i < w->nobj; i++) {
+        const object_t *o = &w->obj[i];
+        if (strcmp(o->spr->name, "puddle") != 0 || o->x < 20.0f || o->x > (float)w->w - 20.0f) continue;
+        float d = fabsf(o->x - a->x);
+        if (d < bd) { bd = d; best = i; }
+    }
+    return best;
 }
 
 /* Takes the creature out of the scene (it left, or it was caught). */
@@ -1597,6 +1669,31 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         a->zf = approach(a->zf, (float)s->z, dt * 8.0f);
         a->lane_z = s->z;
         a->y = world_ground_at(w, a->x, a->zf) - lift;
+        return 0;
+    }
+    case ST_ROOT: {
+        /* ploughing: slowly along the ground, the snout down (eat = the rooting clip); every few px of the way
+         * the snout leaves a patch of turned earth that stays (bob = distance since the last one) */
+        set_anim(a, A_EAT);
+        if (in_transition(a)) return 0;
+        if (first) { a->bob = s->y; }
+        float dx = s->x - a->x;
+        if (fabsf(dx) < 0.6f) return 1;
+        a->facing = dx < 0 ? -1 : 1;
+        float spd = a->prof.walk * a->speed_mul * 0.3f;
+        float st = sgnf(dx) * fminf(fabsf(dx), spd * dt);
+        a->x += st;
+        a->moved = st;
+        a->nav = NAV_GROUND;
+        a->path = -1;
+        a->zf = approach(a->zf, (float)s->z, dt * 4.0f);
+        a->lane_z = s->z;
+        a->bob += fabsf(st);
+        if (a->bob >= s->y) {
+            a->bob = 0;
+            add_rooted(w, a);
+            world_stimulus(w, a->x, a->y, 50, ST_NOISE, 0.3f, 0.5f, actor_index(w, a));
+        }
         return 0;
     }
     case ST_PURSUE: {

@@ -1873,76 +1873,429 @@ end
     emit_quad(out, header, c, poses, 6, 36, 18, clips, profile, 0.3, 1.0, 0.3)
 
 
+# --------------------------------------------------------------------------
+# texture mapping from a painted reference sheet (used by the boar; the deer has its own copy)
+# --------------------------------------------------------------------------
+
+def seg_uv(seg, x, y):
+    """(u along, v across / radius) of a point relative to a segment ((x0, y0), (x1, y1), r0, r1)."""
+    (x0, y0), (x1, y1), r0, r1 = seg
+    vx, vy = x1 - x0, y1 - y0
+    L = math.hypot(vx, vy) or 1e-6
+    u = ((x - x0) * vx + (y - y0) * vy) / (L * L)
+    d = ((x - x0) * -vy + (y - y0) * vx) / L
+    r = r0 + (r1 - r0) * min(1.0, max(0.0, u))
+    return u, d / max(r, 0.3)
+
+
+def seg_at(seg, u, v):
+    (x0, y0), (x1, y1), r0, r1 = seg
+    vx, vy = x1 - x0, y1 - y0
+    L = math.hypot(vx, vy) or 1e-6
+    r = r0 + (r1 - r0) * min(1.0, max(0.0, u))
+    return x0 + vx * u - vy / L * v * r, y0 + vy * u + vx / L * v * r
+
+
+def seg_map(gseg, sseg):
+    return lambda x, y: seg_at(sseg, *seg_uv(gseg, x, y))
+
+
+class RefSheet:
+    """A painted reference: cells of frames on a dark background. cells = {name: (x0, y0, px)}: where the cell's
+    sprite pixel (0, 0) starts and how many reference pixels one sprite pixel is. Colours are median-sampled
+    (keeps crisp pixel-art detail); off the painted silhouette the nearest painted spot is used."""
+    def __init__(s, path, cells, bg=(12, 16, 18), thresh=22):
+        from PIL import Image
+        here = os.path.dirname(os.path.abspath(__file__))
+        full = path if os.path.exists(path) else os.path.join(here, '..', path)
+        s.im = Image.open(full).convert('RGB')
+        s.px, (s.w, s.h) = s.im.load(), s.im.size
+        s.cells, s.bg, s.thresh = cells, bg, thresh
+
+    def opaque(s, c):
+        return abs(c[0] - s.bg[0]) + abs(c[1] - s.bg[1]) + abs(c[2] - s.bg[2]) > s.thresh
+
+    def sample(s, cell, X, Y, reach=2.8):
+        x0, y0, P_ = s.cells[cell]
+        rads = [0.0] + [0.7 * k for k in range(1, int(reach / 0.7) + 1)]
+        for rad in rads:
+            for ang in ((0,) if rad == 0 else range(0, 360, 45)):
+                cx = x0 + (X + rad * math.cos(math.radians(ang))) * P_
+                cy = y0 + (Y + rad * math.sin(math.radians(ang))) * P_
+                got = []
+                for ddx in (-1, 0, 1):
+                    for ddy in (-1, 0, 1):
+                        rx, ry = int(cx + ddx * P_ * 0.2), int(cy + ddy * P_ * 0.2)
+                        if 0 <= rx < s.w and 0 <= ry < s.h and s.opaque(s.px[rx, ry]):
+                            got.append(s.px[rx, ry])
+                if len(got) >= 5:
+                    got.sort(key=lambda c: c[0] * 3 + c[1] * 6 + c[2])
+                    return got[len(got) // 2]
+        return None
+
+
+def textured_frame(parts_list, w, h):
+    """Render the parts (their order = the depth inside the sprite) and colour every pixel from its owner's
+    reference mapping: part.cls (depth class), part.src(x, y) -> (X, Y) in part.cell of part.sheet, or
+    part.src None = a special key (eye, glow ...)."""
+    owner = [[None] * w for _ in range(h)]
+    render(parts_list, w, h, 0.0, (w / 2, h / 2), 1, owner)
+    out = [[None] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            oi = owner[y][x]
+            if oi is None:
+                continue
+            part = parts_list[oi]
+            if part.src is None:
+                out[y][x] = (part.cls, None)
+                continue
+            X, Y = part.src(x + 0.5, y + 0.5)
+            out[y][x] = (part.cls, part.sheet.sample(part.cell, X, Y, getattr(part, 'reach', 2.8)))
+    return out
+
+
+def emit_textured(out, header, tex, classes, specials, clips, profile):
+    """Quantize every class's colours to its own small palette (median cut), write palette + frames.
+    classes = {cls: (colours, ' z+N')}, specials = {cls: (key, 'hex [opts]')}; header has a PALETTE line."""
+    from PIL import Image
+    taken = {k for k, _ in specials.values()}
+    pool = iter(k for k in 'abcdfghijklmoprstuvxyzABCDFGHIJKLMNOPQRSTUVWXYZ0123456789' if k not in taken)
+    keymap, lines = {}, []
+    for cls, (ncol, z) in classes.items():
+        cols = [e[1] for _, f in tex for row in f for e in row if e and e[0] == cls and e[1]]
+        if not cols:
+            continue
+        im = Image.new('RGB', (len(cols), 1))
+        im.putdata(cols)
+        q = im.quantize(colors=ncol, method=Image.Quantize.MEDIANCUT)
+        pal = q.getpalette()[:3 * ncol]
+        keymap[cls] = []
+        for i in range(ncol):
+            c = tuple(pal[3 * i:3 * i + 3])
+            k = next(pool)
+            keymap[cls].append((c, k))
+            lines.append('  %s %02x%02x%02x%s' % (k, c[0], c[1], c[2], z))
+    for cls, (k, spec) in specials.items():
+        lines.append('  %s %s' % (k, spec))
+
+    def nearest(cls, c):
+        if c is None:
+            c = keymap[cls][len(keymap[cls]) // 2][0]
+        return min(keymap[cls], key=lambda e: (e[0][0] - c[0]) ** 2 + (e[0][1] - c[1]) ** 2 + (e[0][2] - c[2]) ** 2)[1]
+
+    out.append(header.replace('PALETTE', '\n'.join(lines)))
+    for name, f in tex:
+        out.append('frame %s' % name)
+        for row in f:
+            out.append('|' + ''.join('.' if e is None else specials[e[0]][0] if e[0] in specials else nearest(e[0], e[1])
+                                     for e in row).rstrip('.').ljust(1, '.'))
+        out.append('')
+    out.append(clips)
+    out.append(profile)
+
+
 def boar(out):
-    G = 25.4
-    def head_extra(hx, hy, ha, tx, ty):
-        return [P(round(tx - 1.6), round(ty + 0.6), 'T'), P(round(tx - 2.4), round(ty - 0.4), 'T'),
-                E(tx + 0.4, ty, 1.0, 1.4, 0.3, 'nnn')]
-    c = dict(G=G, body=[(19.0, 12.6, 12.4, 7.0, -0.08), (25.6, 10.4, 7.0, 7.4, 0.0), (9.8, 13.8, 6.0, 6.4, 0.0)],
-             hx=33.0, hy=13.8, hang=0.5, hrx=4.8, hry=4.0, snout=(5.2, 2.6, 1.5),
-             ear=(-2.6, -3.0, 3.4, 1.3), headextra=head_extra,
-             bodyextra=[C(9.0, 7.0, 29.0, 3.8, 1.3, 1.8, 'zzz', 0.5)],
-             hips=dict(nf=(27.0, 17.0), ff=(29.0, 17.0), nh=(11.0, 18.0), fh=(9.0, 18.0)),
-             legr=(2.2, 1.0), tail=[(5.0, 9.4), (3.6, 12.0), (3.2, 14.6)], trad=[0.7, 0.6, 1.0],
-             tailkeys='zzz', fuzz=0.45)
-    header = """# boar — generated by tools/sketch_rig.py (shared quadruped skeleton)
+    """Wild boar — one sculpted silhouette (like the deer): a high bristly shoulder hump sloping down to the
+    rump, a deep chest, short slim legs, a wedge-shaped head with a flat nose disc, tusks curving up, small
+    erect ears. Dark grey-brown, a black bristle mane along the spine, a pale moonlit rim on the back."""
+    FW, FH = 56, 36
+    G = 35.4
+    PIV = (26.0, 16.0)             # the torso pitches around this point
+    HP = (41.0, 12.0)              # where the head sits on the body (moves with it)
+
+    def rot(px, py, cx, cy, ang):
+        c_, s_ = math.cos(ang), math.sin(ang)
+        dx, dy = px - cx, py - cy
+        return cx + dx * c_ - dy * s_, cy + dx * s_ + dy * c_
+
+    TORSO = [(9.0, 15.0),   # rump, by the tail
+             (11.4, 11.4),  # croup
+             (17.0, 10.2),
+             (23.0, 8.4),   # the back rises to the hump
+             (29.0, 6.4),
+             (33.6, 5.4),   # shoulder hump (the mane stands up here)
+             (37.8, 6.4),
+             (41.0, 9.2),   # nape
+             (43.0, 14.0),
+             (42.2, 19.6),  # jowl / throat
+             (39.6, 23.8),  # chest
+             (33.0, 25.4),  # belly
+             (24.0, 25.2),
+             (17.6, 24.4),  # flank
+             (13.6, 25.0),  # thigh
+             (9.6, 22.8),   # buttock
+             (8.2, 18.6)]
+    HEAD = [(-1.5, -3.6),   # behind the ears
+            (3.4, -2.8),    # forehead
+            (8.8, 0.6),     # bridge of the snout
+            (12.8, 4.4),
+            (13.9, 6.4),    # nose disc
+            (13.6, 8.6),
+            (11.4, 8.9),    # chin
+            (7.2, 9.8),     # lower jaw
+            (3.2, 10.2),    # jowl
+            (-0.8, 9.2),    # throat
+            (-2.6, 5.0)]
+    HIPS = dict(nf=(37.0, 21.0), ff=(38.6, 21.0), nh=(14.6, 21.0), fh=(12.8, 21.0))
+    LENS = {True: (7.2, 8.0), False: (7.8, 8.0)}
+    EYE = (5.0, 1.4)               # in head coordinates
+    GS = {}                        # geometry of the reference pose (stand)
+    # the painted reference: 6 x 2 cells of 58 x 38 sprite px (the grid tools/ref/boar_grid.png, painted over);
+    # one sprite px = 4 * 1.52 reference px, the stand cell fitted at (8, 6)
+    REFS = RefSheet('tools/ref/boar_ref.png', {'stand': (8.0, 126.0 + 6.0, 4 * 1.52)})
+
+    def tf(dy, pitch):
+        def f(x, y):
+            x, y = rot(x, y, PIV[0], PIV[1], pitch)
+            return x, y + dy
+        return f
+
+    def hips(dy=0.0, pitch=0.0):
+        t = tf(dy, pitch)
+        return {k: t(*v) for k, v in HIPS.items()}
+
+    def ik_legs(feet, dy=0.0, pitch=0.0):
+        hp = hips(dy, pitch)
+        return {k: leg_ik(hp[k], feet[k], *LENS[k[1] == 'f'], 1 if k[1] == 'f' else -1) for k in feet}
+
+    def stand_legs(dy=0.0, pitch=0.0):
+        hp = hips(dy, pitch)
+        return ik_legs({k: (x + (0.4 if k[1] == 'f' else 0.8), G) for k, (x, y) in hp.items()}, dy, pitch)
+
+    def draw_leg(L, near, front):
+        hx, hy, kx, ky, fx, fy = L
+        r0, rk, r1 = (2.3, 1.3, 0.9) if front else (3.0, 1.5, 0.9)
+        keys, hoof = ('BAD', 'kKK') if near else ('gfF', 'jJJ')
+        return [C(hx, hy, kx, ky, r0, rk, keys),
+                C(kx, ky, fx, fy, rk * 0.85, r1, keys),
+                C(kx + (fx - kx) * 0.55, ky + (fy - ky) * 0.55, fx, fy, r1 * 1.15, r1, hoof)]
+
+    def geom(pose):
+        dy, pitch = pose.get('dy', 0.0), pose.get('pitch', 0.0)
+        t = tf(dy, pitch)
+        ha = pose.get('ha', 0.0)
+        hox, hoy = pose.get('hoff', (0.0, 0.0))
+        px_, py_ = t(*HP)
+        px_, py_ = px_ + hox, py_ + hoy
+        hang = ha + pitch
+        ca, sa = math.cos(hang), math.sin(hang)
+
+        def hr(x, y):
+            return px_ + x * ca - y * sa, py_ + x * sa + y * ca
+
+        def hinv(x, y):                             # back to head-local coordinates
+            dx, dy_ = x - px_, y - py_
+            return dx * ca + dy_ * sa, -dx * sa + dy_ * ca
+
+        def tinv(x, y):
+            return rot(x, y - dy, PIV[0], PIV[1], -pitch)
+        g = dict(t=t, tinv=tinv, hr=hr, hinv=hinv, legs=pose['legs'])
+        g['torso'] = Poly([t(*q) for q in TORSO])
+        g['head'] = Poly([hr(*q) for q in HEAD])
+        legs = pose['legs']
+        g['thighs'] = {}
+        for k in ('nh', 'fh'):
+            lhx, lhy, lkx, lky = legs[k][:4]
+            g['thighs'][k] = ((lhx + 0.4, lhy - 1.6), (lhx + (lkx - lhx) * 0.5, lhy + (lky - lhy) * 0.5), 3.8, 2.4)
+        g['shoulders'] = {}
+        for k in ('nf', 'ff'):
+            lhx, lhy, lkx, lky = legs[k][:4]
+            g['shoulders'][k] = ((lhx - 0.4, lhy - 2.0), (lhx + (lkx - lhx) * 0.4, lhy + (lky - lhy) * 0.4), 3.2, 2.2)
+        ex0, ey0 = hr(1.6, -3.0)
+        ex1, ey1 = hr(*pose.get('ear', (0.4, -6.2)))
+        g['ear_near'] = ((ex0, ey0), (ex1, ey1), 1.4, 0.5)
+        g['ear_far'] = ((ex0 + 0.8, ey0 + 0.2), (ex1 + 0.8, ey1 + 0.4), 1.3, 0.5)
+        tw = pose.get('tail', 0.0)
+        g['tail'] = (t(9.4, 14.4), t(8.0 - tw, 19.6 - abs(tw) * 0.6), 0.7, 0.5)
+        return g
+
+    def tagged(part, cls, src, cell='stand', reach=2.8):
+        part.cls, part.src, part.cell, part.sheet, part.reach = cls, src, cell, REFS, reach
+        return part
+
+    def parts(pose, seed=1):
+        g, sg = geom(pose), GS
+        torso, head = g['torso'], g['head']
+        thighs = {k: C(a[0], a[1], b[0], b[1], r0, r1) for k, (a, b, r0, r1) in g['thighs'].items()}
+        shoulders = {k: C(a[0], a[1], b[0], b[1], r0, r1) for k, (a, b, r0, r1) in g['shoulders'].items()}
+        smaps = {k: seg_map(g['thighs'][k], sg['thighs'][k]) for k in thighs}
+        smaps.update({k: seg_map(g['shoulders'][k], sg['shoulders'][k]) for k in shoulders})
+        pieces = dict(thighs, **shoulders)
+
+        def head_src(x, y):
+            return sg['hr'](*g['hinv'](x, y))
+
+        def body_src(x, y):
+            if head.inside(x, y):
+                return head_src(x, y)
+            if torso.inside(x, y):
+                return g['tinv'](x, y)
+            for k, pc in pieces.items():
+                if pc.inside(x, y):
+                    return smaps[k](x, y)
+            return g['tinv'](x, y)
+
+        ps = []
+        a, b, r0, r1 = g['ear_far']
+        ps.append(tagged(C(a[0], a[1], b[0], b[1], r0, r1, 'gfF'), 'far', seg_map(g['ear_far'], sg['ear_far'])))
+        order = [('ff', False), ('fh', False)] + ([] if pose.get('legs_front') else [('nf', True), ('nh', True)])
+
+        def add_leg(k, near):
+            L, S_ = g['legs'][k], sg['legs'][k]
+            up_g, up_s = ((L[0], L[1]), (L[2], L[3]), 1, 1), ((S_[0], S_[1]), (S_[2], S_[3]), 1, 1)
+            lo_g, lo_s = ((L[2], L[3]), (L[4], L[5]), 1, 1), ((S_[2], S_[3]), (S_[4], S_[5]), 1, 1)
+            pcs = draw_leg(L, near, k[1] == 'f')
+            cls = 'near' if near else 'far'
+            ps.append(tagged(pcs[0], cls, seg_map(up_g, up_s), reach=4.2))
+            ps.append(tagged(pcs[1], cls, seg_map(lo_g, lo_s), reach=4.2))
+            ps.append(tagged(pcs[2], cls, seg_map(lo_g, lo_s), reach=4.2))
+        for k, near in order:
+            add_leg(k, near)
+        a, b, r0, r1 = g['tail']
+        ps.append(tagged(C(a[0], a[1], b[0], b[1], r0 + 0.2, r1 + 0.1, 'zzz'), 'body', seg_map(g['tail'], sg['tail']), reach=3.5))
+        ps.append(tagged(Merge([torso, head] + list(pieces.values()), 'bad', pose.get('fuzz', 0.18)), 'body', body_src))
+        # the bristles poking up from the ridge (coloured from the painted mane)
+        rng_ = seed * 7919
+        for x in range(14, 42, 2):
+            tx, ty = g['t'](float(x), 0.0)
+            top = None
+            for yy in range(0, FH):
+                if torso.inside(tx + 0.5, yy + 0.5):
+                    top = yy
+                    break
+            if top is None:
+                continue
+            rng_ = (rng_ * 1103515245 + 12345) & 0x7fffffff
+            hgt = 1 + (rng_ >> 16) % 2 + (1 if 26 <= x <= 38 else 0)
+            for hh in range(1, hgt + 1):
+                ps.append(tagged(P(round(tx) + (hh > 1 and (rng_ >> 8) % 2), top - hh, 'z'), 'body', g['tinv'], reach=3.5))
+        a, b, r0, r1 = g['ear_near']
+        ps.append(tagged(C(a[0], a[1], b[0], b[1], r0, r1, 'BAD'), 'near', seg_map(g['ear_near'], sg['ear_near'])))
+        # the snout and the tusk drawn over the painted coat, a little larger than life so they read at this size:
+        # a pink nose disc with a dark nostril, an ivory tusk curving up out of the mouth (darker at its root)
+        hr = g['hr']
+        nd = hr(13.7, 7.3)
+        ps.append(tagged(E(nd[0], nd[1], 1.3, 2.0, pose.get('ha', 0.0) + pose.get('pitch', 0.0)), 'snout', None))
+        nn = hr(14.3, 7.9)
+        ps.append(tagged(P(round(nn[0]), round(nn[1]), 'x'), 'nostril', None))
+        t0, t1, t2, t3 = hr(10.4, 8.6), hr(11.2, 6.6), hr(10.8, 4.4), hr(9.4, 3.0)
+        ps.append(tagged(C(t0[0], t0[1], t1[0], t1[1], 0.6, 0.55), 'tuskd', None))
+        ps.append(tagged(C(t1[0], t1[1], t2[0], t2[1], 0.55, 0.5), 'tusk', None))
+        ps.append(tagged(C(t2[0], t2[1], t3[0], t3[1], 0.5, 0.35), 'tusk', None))
+        if pose.get('legs_front'):                  # on its side: the near legs point at the viewer, over the belly
+            for k in ('nf', 'nh'):
+                add_leg(k, True)
+        if not pose.get('eye', 1):                  # a closed eye: a dark line over the painted one
+            ox, oy = g['hr'](*EYE)
+            ps.append(tagged(P(round(ox), round(oy), 'q'), 'shut', None))
+        for (mx, my) in pose.get('drops', ()):      # mud flying off when it shakes
+            ps.append(tagged(P(round(mx), round(my), 'm'), 'mud', None))
+        return ps
+
+    header = """# boar — generated by tools/sketch_rig.py (one sculpted silhouette, jointed legs, coat from tools/ref/boar_ref.png)
 sprite boar
 tags creature ground large mammal rare noisy
-anchor 21 25
+anchor 28 35
 palette
-  b 5e5044 ~8
-  a 44382e ~6
-  d 2a221c ~4
-  B 5e5044 ~8 z+1
-  A 44382e ~6 z+1
-  D 2a221c ~4 z+1
-  g 3c3228 ~4 z-2
-  f 2c241e ~3 z-2
-  F 1e1814 z-2
-  c 6e604e ~4
-  C 54483a ~3
-  z 1c1612 ~4
-  k 1a1410 z+1
-  K 100c0a z+1
-  j 16120e z-2
-  J 0e0a08 z-2
-  T c8bea8 z+1
-  n 6a4e48
-  e 060404
-  w b0b8c0 glow
+PALETTE
 end
 """
+    SL = stand_legs()
+    stand = dict(legs=SL, ha=0.0)
+    LR = 0.12
+    root_legs = ik_legs({k: (x + (1.6 if k[1] == 'f' else 0.8), G) for k, (x, y) in hips(1.0, LR).items()}, 1.0, LR)
+    root = dict(dy=1.0, pitch=LR, legs=root_legs, ha=0.95, hoff=(1.0, 4.0), tail=0.6)
     poses = [
-        ('stand', {}),
-        ('stand_blink', dict(eye=0)),
-        ('root', dict(hx=33.4, hy=19.0, hang=1.0)),
-        ('root2', dict(hx=33.8, hy=19.6, hang=1.1)),
-        ('alert', dict(hx=32.6, hy=10.6, hang=0.2)),
+        ('stand', stand),
+        ('stand_blink', dict(stand, eye=0)),
+        ('alert', dict(stand, ha=-0.28, ear=(0.9, -6.8), tail=-0.8)),
+        ('root', root),
+        ('root2', dict(root, ha=1.05, hoff=(1.4, 4.4), tail=-0.6)),
+    ]
+    # walk: a four-beat walk
+    NW = 6
+    for i in range(NW):
+        ph = i * 2 * math.pi / NW
+        bob = 0.25 * math.sin(2 * ph)
+        feet = {}
+        for k, off in (('nh', 0.0), ('nf', math.pi / 2), ('fh', math.pi), ('ff', 3 * math.pi / 2)):
+            hx_, hy_ = HIPS[k]
+            feet[k] = legs_walk(ph + off, hx_ + (0.4 if k[1] == 'f' else 0.8), hy_ + bob, G, G - hy_, 0.34, 1.6)
+        poses.append(('walk%d' % i, dict(dy=bob, legs=ik_legs(feet, bob), ha=0.05 + 0.05 * math.sin(2 * ph),
+                                         tail=0.5 * math.sin(ph))))
+    # run: a heavy gallop
+    NR = 6
+    for i in range(NR):
+        legs, bob = quad_gallop(dict(hips=HIPS), i / NR, G, lens=LENS,
+                                offs=dict(fh=0.0, nh=0.12, ff=0.48, nf=0.60),
+                                land={True: 0.40, False: 0.26}, push={True: -0.34, False: -0.42},
+                                swing={True: [(0.2, -0.6, 0.96), (0.5, -0.05, 0.6), (0.8, 0.66, 0.97)],
+                                       False: [(0.22, -0.8, 0.98), (0.58, -0.1, 0.62), (0.85, 0.36, 0.95)]})
+        poses.append(('run%d' % i, dict(dy=bob * 0.8, legs=legs, ha=0.12, tail=-1.2)))
+    # lying (belly down), wallowing in the mud (on its side, legs kicking), shaking the mud off
+    LD = 9.6
+    lie_legs = ik_legs({k: (x + (5.0 if k[1] == 'f' else 6.0), G - 0.4) for k, (x, y) in hips(LD).items()}, LD)
+    lie = dict(dy=LD, legs=lie_legs, ha=0.25, tail=0.3)
+    # on its side: the legs stick out from the belly (towards the viewer), kicking as it rolls
+    w0 = ik_legs({k: (x + (9.0 if k[1] == 'f' else 10.0), y - (2.0 if k[0] == 'n' else 4.0)) for k, (x, y) in hips(LD + 0.6, -0.06).items()},
+                 LD + 0.6, -0.06)
+    w1 = ik_legs({k: (x + (5.0 if k[1] == 'f' else 7.0), y - (9.0 if k[0] == 'n' else 10.0)) for k, (x, y) in hips(LD + 1.0, 0.04).items()},
+                 LD + 1.0, 0.04)
+    rnd = [((k * 37) % 53) / 53.0 for k in range(1, 40)]
+    drops1 = [(6 + rnd[i] * 40, 2 + rnd[i + 1] * 18) for i in range(0, 16, 2)]
+    drops2 = [(4 + rnd[i] * 46, 1 + rnd[i + 1] * 20) for i in range(16, 34, 2)]
+    poses += [
+        ('lie', lie),
+        ('lie_blink', dict(lie, eye=0)),
+        ('wallow0', dict(dy=LD + 0.6, pitch=-0.06, legs=w0, ha=-0.2, tail=0.8, eye=0, legs_front=True)),
+        ('wallow1', dict(dy=LD + 1.0, pitch=0.04, legs=w1, ha=-0.4, tail=-0.8, legs_front=True)),
+        ('shake1', dict(stand, pitch=0.03, ha=0.18, ear=(-0.8, -5.6), tail=1.2, fuzz=0.5, drops=drops1)),
+        ('shake2', dict(stand, pitch=-0.03, ha=-0.16, ear=(1.6, -6.0), tail=-1.2, fuzz=0.5, drops=drops2)),
     ]
     clips = """
 clip idle loop fps=5 : stand*12 stand_blink stand*6 root root2 root root2 stand*4
 clip root loop fps=6 : root root2 root root2 root*3 root2
 clip alert loop fps=4 : alert*10
 clip walk loop fps=8 speed=11 : walk0 walk1 walk2 walk3 walk4 walk5
-clip run loop fps=14 speed=40 : walk0 walk1 walk2 walk3 walk4 walk5
+clip run loop fps=12 speed=40 : run0 run1 run2 run3 run4 run5
+clip lie loop fps=3 : lie*14 lie_blink lie*10
+clip lie_in once fps=5 : lie
+clip lie_out once fps=5 : lie
+clip wallow loop fps=4 : wallow0*3 wallow1*2 wallow0*2 wallow1*3 wallow0 wallow1
+clip wallow_in once fps=5 : lie lie
+clip wallow_out once fps=5 : lie
+clip shake loop fps=12 : stand shake1 shake2 shake1 shake2 shake1 shake2 stand*4
 """
     profile = """creature
   move ground
   lane 0.05
   speed walk=11 run=40
-  anim idle=idle move=walk run=run eat=root sniff=root alert=alert look=alert
-  intents forage=7 wander=3 look=2 leave=3
+  anim idle=idle move=walk run=run eat=root sniff=root alert=alert look=alert rest=lie play=wallow groom=shake
+  intents forage=7 wander=3 look=2 leave=3 rest=1 wallow=1.5
+  roots 1           # rooting leaves turned-earth patches along its way
   homes edge
   fear 0.15
   curiosity 0.3
   size large
   rare 1
   scares rabbit mouse squirrel hedgehog frog weasel badger
-  point head 14 -10
+  point head 17 -21
 end
 end
 """
-    emit_quad(out, header, c, poses, 6, 44, 26, clips, profile, 0.32, 1.4, 0.4)
+    GS.update(geom(dict(poses)['stand']))
+    tex = [(name, textured_frame(parts(pose, n_ + 1), FW, FH)) for n_, (name, pose) in enumerate(poses)]
+
+    # small bright accents (the white tusk, the eye glint, the pink snout and inner ear) get their own palette,
+    # or the median cut of the whole brown coat would swallow them
+    def accent(c):
+        return c and (c[0] + c[1] + c[2] > 470 or (c[0] > 140 and c[0] - c[2] > 55 and c[1] < c[0] - 30))
+    tex = [(name, [[('hi', e[1]) if e and e[0] in ('body', 'near') and accent(e[1]) else e for e in row] for row in f])
+           for name, f in tex]
+    emit_textured(out, header, tex, dict(body=(24, ''), hi=(6, ''), near=(9, ' z+1'), far=(7, ' z-2')),
+                  dict(shut=('q', '1a1410'), mud=('M', '3c2c1c z+1'), snout=('S', 'c98a7c'), nostril=('x', '3a2220'),
+                       tusk=('T', 'f2ead6'), tuskd=('U', 'b8a888')), clips, profile)
 
 
 def wildcat(out):

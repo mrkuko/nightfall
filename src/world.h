@@ -133,7 +133,7 @@ enum {
 enum {
     IN_NONE, IN_WANDER, IN_FORAGE, IN_LOOK, IN_GROOM, IN_REST, IN_HIDE, IN_PEEK, IN_LEAVE,
     IN_CLIMB, IN_PERCH, IN_FLEE, IN_FOLLOW, IN_WATCH, IN_PASS, IN_HOVER, IN_SNIFF, IN_EMERGE,
-    IN_VANISH, IN_ROOST, IN_CHASE, IN_FROLIC, IN_HUNT, IN_SHELTER, IN_COUNT
+    IN_VANISH, IN_ROOST, IN_CHASE, IN_FROLIC, IN_HUNT, IN_SHELTER, IN_WALLOW, IN_COUNT
 };
 
 /* plan steps */
@@ -156,6 +156,7 @@ enum {
     ST_HUNT,        /* (owl) stoop on creature `place` from above; z = 1: it will catch it, 0: it misses */
     ST_SHELTER,     /* wait under big leaves (place) until the rain stops */
     ST_BOUND,       /* long leaps along arcs to x (frames bound0..3 by the leap phase), depth to z */
+    ST_ROOT,        /* (boar) plough along the ground to x with the snout, turned earth every y px, depth z */
     ST_PURSUE,      /* (event) run after creature `place` (id `anim`) x px behind it, z deeper/closer; when it is gone, runs on off the screen */
     ST_DESPAWN
 };
@@ -189,6 +190,7 @@ typedef struct {
     char  chases[128];          /* " rabbit mouse " — runs after them out of curiosity */
     char  hunts[128];           /* " mouse " — a bird of prey stoops on them (and may catch them) */
     int   shelter;              /* "shelter rain": goes under big leaves when it rains */
+    int   roots;                /* rooting leaves turned-earth patches (boar) */
     float wary;                 /* grazing, it lifts its head now and then to listen (and may bolt); 0 = never */
     float bound_len, bound_h;   /* "bound LEN H": it bolts in leaps this long and high (px) */
     int   bound_f[4];           /* frames bound0..bound3 (gather, launch, flight, landing); -1 = no leaps */
@@ -333,6 +335,7 @@ typedef struct {
     weather_t  wx;
     event_t    ev;
     /* director */
+    int        rooted_ring;     /* which turned-earth patch is recycled next once there are enough */
     float      next_spawn;
     int        population;
 } world_t;
@@ -346,6 +349,8 @@ int   world_add_place(world_t *w, int type, float x, float y, int z, int nav, in
 /* Adds interaction places from the object's properties (point.peek0, point.entry, point.hollow …). */
 void  world_places_from_object(world_t *w, int obj);
 void  world_play_object_clip(world_t *w, int obj, const char *clip);
+/* Moves a placed object (e.g. recycling the oldest turned-earth patch); the baked layer is redrawn. */
+void  world_move_object(world_t *w, int obj, float x, float y, int z);
 float world_ground(const world_t *w, float x);
 /* Opening of a hollow (place): centre and radii of the ellipse. */
 void  world_hollow_opening(const world_t *w, int place, float *cx, float *cy, float *rx, float *ry);

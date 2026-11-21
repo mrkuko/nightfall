@@ -112,6 +112,15 @@ static void object_bounds(object_t *o)
     o->bx1 = r;
 }
 
+void world_move_object(world_t *w, int obj, float x, float y, int z)
+{
+    if (obj < 0 || obj >= w->nobj) return;
+    object_t *o = &w->obj[obj];
+    o->x = x; o->y = y; o->z = z;
+    object_bounds(o);
+    w->bake_ok = 0;
+}
+
 int world_add_object(world_t *w, const char *sprite, float x, float y, int z, int flip, uint64_t seed)
 {
     sprite_t *base = lib_find(w->lib, sprite);
