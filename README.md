@@ -88,7 +88,7 @@ Rain comes in from the side: a drop here and there, then thicker. The dhole pack
 ![Fog rolling in from the left, a timelapse](docs/images/weather-fog.gif)
 Fog pours in along the forest floor, at its real pace (a front needs several minutes to cross the screen).
 
-Try it: `./nightfall --play --biome swamp --weather rainfog`, `--weather-in fog` starts clear and lets the fog roll in. Press `W` in the playground to roll in the next weather, `1`–`6` to choose one (it stays), `0` for auto again.
+Try it: `./nightfall --play --biome swamp --weather rainfog`, `--weather-in fog` starts clear and lets the fog roll in. Press `W` in the playground to roll in the next weather, `1`–`7` to choose one (it stays), `0` for auto again.
 
 ## Install
 
@@ -154,9 +154,9 @@ crosses = hideouts and perches. The playground also shows a HUD with every creat
 | `--seed N` | reproducible scene and behaviour |
 | `--scene-time S` | compose a new scene every *S* seconds (`0` = never, default `600`) |
 | `--biome auto\|off\|NAME\|list` | pick a biome (`auto`: by the seed, `off`: anything goes) |
-| `--weather auto\|NAME` | `auto` (default): fog and rain come and go; or one that stays: `clear mist fog drizzle rain rainfog` |
+| `--weather auto\|NAME` | `auto` (default): fog and rain come and go; or one that stays: `clear mist fog drizzle rain rainfog storm` |
 | `--weather-time M` | about how long one weather lasts, in minutes (default `6`, the real length is random, 0.6–1.4 ×; `0` = no weather) |
-| `--event NAME` | start an event right away (also in `--play` and the screensaver): `fireflies`, `dholes`, `bats` |
+| `--event NAME` | start an event right away (also in `--play` and the screensaver): `fireflies`, `dholes`, `bats`, `lightning`, `stag` |
 | `--spawn-freq F` | how often creatures arrive (`1` default, `2` twice as often, `0` none) |
 | `--max-creatures N` | most creatures about at once (`0` = automatic, grows with the screen width) |
 | `--spawn-rate NAME=F …` | override spawn chances, e.g. `--spawn-rate dhole=0.3 rabbit=0` |
@@ -179,7 +179,8 @@ nightfall --seed 42 --scene-time 0 --grass-density 0.6
 | `l` | new scene | `+` / `-` | simulation speed |
 | `B` | next biome | `n` | someone arrives now |
 | `h` | toggle HUD | `d` | show places, paths, links |
-| `W` | next weather (the fronts start moving) | `1`–`6` | pick a weather and keep it: clear, mist, fog, drizzle, rain, rainfog |
+| `W` | next weather (the fronts start moving) | `1`–`7` | pick a weather and keep it: clear, mist, fog, drizzle, rain, rainfog, storm |
+| `L` | a lightning strike now | `S` | a strike that brings the spirit stag |
 | `0` | weather back to auto | `f` | the fireflies event now |
 | `P` | dhole pack chases a deer now | `V` | a bat swarm pours out now |
 

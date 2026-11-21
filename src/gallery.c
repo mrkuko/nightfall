@@ -1085,8 +1085,10 @@ int play_run(library_t *lib, const char *assets_dir, uint64_t seed)
             case 'P': event_start(w, "dholes"); break;      /* a deer runs across, a pack of dholes on its heels */
             case 'V': event_start(w, "bats"); break;        /* bats pour out of a hollow and scatter */
             case '0': weather_set(w, -1); break;   /* weather: auto again */
-            case '1': case '2': case '3': case '4': case '5': case '6':
-                weather_set(w, k - '1'); break;    /* that weather rolls in and stays: clear mist fog drizzle rain rainfog */
+            case '1': case '2': case '3': case '4': case '5': case '6': case '7':
+                weather_set(w, k - '1'); break;    /* that weather rolls in and stays: clear mist fog drizzle rain rainfog storm */
+            case 'L': weather_strike(w, 0); break;  /* a lightning strike now */
+            case 'S': weather_strike(w, 1); break;  /* a strike that brings the spirit stag */
             case 'B':                       /* next biome: auto -> each biome -> off */
                 biome_cycle(lib);
                 world_free(w);
@@ -1131,7 +1133,7 @@ int play_run(library_t *lib, const char *assets_dir, uint64_t seed)
             char line[512], head[720], wxd[64];
             weather_describe(w, wxd, sizeof wxd);
             snprintf(head, sizeof head, " NIGHTFALL playground  seed %llu (%s)  weather %s  creatures %d  %.2gx%s  %dx%d cells (%dx%d px)   "
-                     "q quit  l new scene  B biome  W weather  1-6 pick  0 auto  f fireflies event  P dhole chase  V bat swarm  h hud  d places/paths  space pause  +/- time  n spawn  r s x o v e g j b c m w p = rabbit squirrel fox owl bat eyes spirit deer boar cat mole weasel dhole ",
+                     "q quit  l new scene  B biome  W weather  1-7 pick  0 auto  L lightning  S spirit stag  f fireflies event  P dhole chase  V bat swarm  h hud  d places/paths  space pause  +/- time  n spawn  r s x o v e g j b c m w p = rabbit squirrel fox owl bat eyes spirit deer boar cat mole weasel dhole ",
                      (unsigned long long)seed, g_scene_desc, wxd, w->population, (double)speed, paused ? " PAUSED" : "",
                      sc.w, sc.h, r.w, r.h);
             /* the header wraps at word boundaries when the terminal is narrow */

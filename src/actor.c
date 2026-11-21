@@ -111,6 +111,7 @@ void profile_parse(const sprite_t *s, profile_t *p)
     p->shelter = (v = sprite_prop(s, "shelter")) && strstr(v, "rain");
     p->wary = (v = sprite_prop(s, "wary")) ? (float)atof(v) : 0.0f;
     p->roots = (v = sprite_prop(s, "roots")) ? atoi(v) : 0;
+    p->aura = (v = sprite_prop(s, "aura")) ? (float)atof(v) : 0.0f;
     p->bound_len = 50.0f; p->bound_h = 8.0f;
     if ((v = sprite_prop(s, "bound"))) sscanf(v, "%f %f", &p->bound_len, &p->bound_h);
     for (int k = 0; k < 4; k++) {
@@ -1207,7 +1208,8 @@ static void perceive(world_t *w, actor_t *a, float dt)
         plan_intent(w, a, IN_VANISH);
         return;
     }
-    if (a->fear > 0.55f && !a->hidden && a->intent != IN_HIDE && a->intent != IN_FLEE && a->nav == NAV_GROUND) {
+    /* (a burrower only digs in, above: it must not flip between digging in and running every tick) */
+    if (a->fear > 0.55f && !a->prof.burrow && !a->hidden && a->intent != IN_HIDE && a->intent != IN_FLEE && a->nav == NAV_GROUND) {
         plan_clear(a);
         a->intent = IN_HIDE;
         if (a->prof.anim[A_FREEZE] != a->prof.anim[A_IDLE] && rng_chance(&w->rng, 0.7f)) {
@@ -1966,6 +1968,7 @@ void actor_update(world_t *w, actor_t *a, float dt)
             float r = fast ? 110.0f : moving ? 50.0f : 35.0f;
             float k = fast ? 1.0f : moving ? 0.6f : 0.5f;
             if (a->intent == IN_FROLIC && !fast) { r = 25.0f; k = 0.3f; }
+            if (a->prof.aura > 0) { r = a->prof.aura; k = 0.9f; }     /* awe: felt from afar, even standing still */
             world_stimulus(w, a->x, a->y, r, ST_DANGER, k, 0.4f, actor_index(w, a));
         }
         if (sprite_has_tag(a->spr, "glow")) world_stimulus(w, a->x, a->y, 70, ST_GLOW, 0.5f, 0.4f, actor_index(w, a));

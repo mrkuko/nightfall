@@ -13,7 +13,7 @@
  *   --spawn-rate N=F …  overrides the spawn chance of species N in any biome (the biome's chances
  *                       add up to 1; e.g. --spawn-rate dhole=0.2 rabbit=0; 0 = never)
  *   --biome B           auto (default: random by seed) | off (no recommendations) | NAME | list
- *   --weather W         auto (default: fog and rain come and go) | clear | mist | fog | drizzle | rain | rainfog
+ *   --weather W         auto (default: fog and rain come and go) | clear | mist | fog | drizzle | rain | rainfog | storm
  *   --weather-in NAME   start clear and let NAME (fog, rain, …) roll in as a front, then keep it
  *   --weather-timelapse K  (recording) fronts move K times faster, everything else in real time
  *   --weather-time M    about how long one weather lasts in minutes (default 6, random 0.6–1.4 ×, 0 = no weather)
@@ -53,8 +53,9 @@ static void usage(void)
            "  --scene-time S                   new scene every S seconds (0 = never, default 600)\n"
            "  --biome auto|off|NAME|list       biome (default: random by seed)\n"
            "  --event NAME                     start an event right away: fireflies dholes bats\n"
+           "                                   lightning stag (a strike; one that brings the spirit stag)\n"
            "  --weather auto|NAME              weather: auto comes and goes, or one that stays:\n"
-           "                                   clear mist fog drizzle rain rainfog\n"
+           "                                   clear mist fog drizzle rain rainfog storm\n"
            "  --weather-in NAME                start clear, then NAME rolls in as a front and stays\n"
            "  --weather-timelapse K            fronts move K times faster (for recording timelapses)\n"
            "  --weather-time M                 a weather lasts about M minutes, randomly 0.6-1.4x\n"

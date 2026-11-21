@@ -2782,7 +2782,200 @@ end
 # DEER — a full animal with the shared quadruped skeleton
 # ==========================================================================
 
-def deer(out):
+def spirit_stag(out):
+    """The spirit stag (thunderstorm): the deer made of electric blue energy. Built from the deer's own frames
+    (their per-pixel classes): a bright glowing outline, a translucent deep-blue body lit from within by the
+    deer's shading, veins of light drifting through it, antlers of white-blue fire with a crackle at the tips,
+    sparks lifting off the back. Every pose comes in three shimmer variants (the veins and sparks move), so it is
+    never still. Appear / vanish frames for the lightning that brings it and the one that takes it away.
+    Everything glows (no fog) and is translucent (it does not hide what is behind it)."""
+    cap = {}
+    deer([], cap)
+    tex = dict(cap['tex'])
+    FW, FH = 64, 74
+
+    def h2_(x, y, s_):
+        return h2(x, y, s_)
+
+    def vnoise(x, y, s_):
+        x0, y0 = math.floor(x), math.floor(y)
+        fx, fy = x - x0, y - y0
+        fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+        a = h2_(x0, y0, s_) * (1 - fx) + h2_(x0 + 1, y0, s_) * fx
+        b = h2_(x0, y0 + 1, s_) * (1 - fx) + h2_(x0 + 1, y0 + 1, s_) * fx
+        return a * (1 - fy) + b * fy
+
+    def energize(f, var, mode=None, k=1.0):
+        """f = the deer frame (class, colour) per pixel -> spirit keys. mode: None / 'appear' / 'vanish',
+        k = 0..1 how far it is in."""
+        g = [['.'] * FW for _ in range(FH)]
+        solid = [[f[y][x] is not None for x in range(FW)] for y in range(FH)]
+        # distance to the edge (inside): the energy glows brightest at the rim, a dim translucent core
+        INF = 99
+        dist = [[0 if not solid[y][x] else INF for x in range(FW)] for y in range(FH)]
+        for _ in range(2):
+            for y in range(FH):
+                for x in range(FW):
+                    if dist[y][x]:
+                        for dx, dy in ((-1, 0), (0, -1), (-1, -1), (1, -1)):
+                            xx, yy = x + dx, y + dy
+                            d = dist[yy][xx] + 1 if 0 <= xx < FW and 0 <= yy < FH else 1
+                            dist[y][x] = min(dist[y][x], d)
+            for y in range(FH - 1, -1, -1):
+                for x in range(FW - 1, -1, -1):
+                    if dist[y][x]:
+                        for dx, dy in ((1, 0), (0, 1), (1, 1), (-1, 1)):
+                            xx, yy = x + dx, y + dy
+                            d = dist[yy][xx] + 1 if 0 <= xx < FW and 0 <= yy < FH else 1
+                            dist[y][x] = min(dist[y][x], d)
+        lums = [sum(e[1]) for row in f for e in row if e and e[1] and e[0] in ('body', 'near', 'far')]
+        lo, hi = (min(lums), max(lums)) if lums else (0, 1)
+        ph = var * 2.1
+        for y in range(FH):
+            for x in range(FW):
+                e = f[y][x]
+                if e is None:
+                    continue
+                cls, col = e
+                edge = dist[y][x] <= 1
+                top = not (y > 0 and solid[y - 1][x])
+                if cls in ('glow', 'eye'):
+                    g[y][x] = 'E'
+                    continue
+                if cls == 'nose':
+                    g[y][x] = 'O'
+                    continue
+                if cls in ('ant_far', 'ant_near'):
+                    crack = h2_(x, y, 77 + var) > (0.80 if y > 8 else 0.55)
+                    g[y][x] = 'A' if crack else 'a'
+                    continue
+                if edge:
+                    g[y][x] = 'W' if top else 'o'
+                    continue
+                # inner light: strong just inside the rim, fading to a dim core; a hint of the deer's own
+                # shading for the form; veins of light drifting through (two crossing currents)
+                L = (sum(col) - lo) / max(1, hi - lo) if col else 0.5
+                rim = max(0.0, 1.0 - (dist[y][x] - 2) / 4.0)
+                n1 = vnoise(x * 0.2 + ph, y * 0.24 - ph * 0.6, 5)
+                n2 = vnoise(x * 0.31 - ph * 0.7, y * 0.17 + ph * 0.4, 9)
+                if abs(n1 - 0.5) < 0.03 or abs(n2 - 0.5) < 0.022:
+                    g[y][x] = 'v'
+                    continue
+                if h2_(x, y, 313 + var) > 0.992:                 # a star-like point of light
+                    g[y][x] = 'S'
+                    continue
+                v = rim * 0.75 + L * 0.25 + (n1 - 0.5) * 0.5
+                lvl = min(5, max(0, int(v * 5.5)))
+                if cls == 'far':
+                    lvl = max(0, lvl - 2)
+                g[y][x] = '012345'[lvl]
+        # sparks lifting off the back and from the antler tips
+        rnd = (var + 1) * 2654435761 & 0xffffffff
+        tops = [(x, y) for y in range(FH) for x in range(FW) if solid[y][x] and not (y > 0 and solid[y - 1][x])]
+        for i in range(7):
+            rnd = (rnd * 1103515245 + 12345) & 0x7fffffff
+            if not tops:
+                break
+            x, y = tops[rnd % len(tops)]
+            up = 2 + (rnd >> 8) % 5
+            sx, sy = x + ((rnd >> 12) % 3) - 1, y - up
+            if 0 <= sx < FW and 0 <= sy < FH and g[sy][sx] == '.':
+                g[sy][sx] = 'S' if (rnd >> 16) % 3 else 's'
+        if mode:
+            # appear: sparks gather, the outline draws itself, the body fills in; vanish: the reverse, brighter
+            for y in range(FH):
+                for x in range(FW):
+                    c = g[y][x]
+                    if c == '.':
+                        continue
+                    r = h2_(x, y, 991)
+                    if mode == 'appear':
+                        keep = r < k * 1.25 - (0.0 if c in 'WoAaE' else 0.35)
+                    else:
+                        keep = r > k * 1.1 - (0.25 if c in 'WoAaE' else 0.0)
+                        if keep and mode == 'vanish' and k < 0.3 and c in '012345v':
+                            c = 'W'                          # the strike: it flares up first
+                    g[y][x] = c if keep else ('s' if r > 0.985 else '.')
+            # loose sparks around the figure
+            for i in range(int(18 * (1 - abs(k - 0.5) * 1.4))):
+                rnd = (rnd * 1103515245 + 12345) & 0x7fffffff
+                x, y = tops[rnd % len(tops)] if tops else (32, 40)
+                sx, sy = x + ((rnd >> 8) % 11) - 5, y + ((rnd >> 12) % 13) - 8
+                if 0 <= sx < FW and 0 <= sy < FH and g[sy][sx] == '.':
+                    g[sy][sx] = 'S'
+        return g
+
+    header = """# spirit stag (thunderstorm) — generated by tools/sketch_rig.py from the deer's frames
+sprite spirit_stag
+tags creature ground large glow
+anchor 31 73
+palette
+  0 1c3c8c glow a=45
+  1 22489e glow a=60
+  2 2a58b4 glow a=75
+  3 3470c8 glow a=92
+  4 4488dc glow a=110
+  5 5aa2ee glow a=130
+  v 9ad6ff glow a=180
+  o 78c8ff glow a=225
+  W c8eeff glow a=245
+  a b8e2ff glow a=240
+  A f0faff glow
+  S e0f6ff glow
+  s 6aa8ff glow a=160
+  E ffffff glow
+  O 3a78d0 glow a=160
+end
+"""
+    out.append(header)
+    poses = ['stand', 'look', 'alert', 'alert_earl', 'alert_earr', 'graze', 'graze_up',
+             'walk0', 'walk1', 'walk2', 'walk3', 'walk4', 'walk5', 'lie', 'lie_look', 'kneel', 'lie_prop']
+    for name in poses:
+        for v in range(3):
+            emit_rows(out, '%s_%d' % (name, v), energize(tex[name], v))
+    for i, k in enumerate((0.15, 0.4, 0.7, 1.0)):
+        emit_rows(out, 'appear%d' % i, energize(tex['stand'], i, 'appear', k))
+    for i, k in enumerate((0.1, 0.35, 0.6, 0.85)):
+        emit_rows(out, 'vanish%d' % i, energize(tex['stand'], i, 'vanish', k))
+    out.append("""
+clip idle loop fps=5 : stand_0*3 stand_1*3 stand_2*3 stand_1*2 stand_0*3 look_0*3 look_1*3 look_2*3 look_1*2 stand_2*3
+clip look loop fps=5 : look_0*3 look_1*3 look_2*3 look_1*3
+clip alert loop fps=5 : alert_0*2 alert_earl_1*3 alert_2*2 alert_earr_0*3 alert_1*2
+clip graze loop fps=4 : graze_0*3 graze_1*3 graze_2*3 graze_up_1*2 graze_0*2
+clip walk loop fps=5 speed=6 : walk0_0 walk1_1 walk2_2 walk3_0 walk4_1 walk5_2
+clip lie loop fps=3 : lie_0*4 lie_1*4 lie_2*4 lie_look_0*4 lie_look_1*4 lie_look_2*3 lie_1*3
+clip lie_in once fps=4 : kneel_0 kneel_1 lie_prop_0 lie_prop_1
+clip lie_out once fps=4 : lie_prop_1 lie_prop_0 kneel_1 kneel_0
+clip appear once fps=6 : appear0 appear1 appear2 appear3 appear3
+clip vanish once fps=8 : vanish0 vanish0 vanish1 vanish2 vanish3
+""")
+    out.append("""creature
+  move ground
+  lane 0.1
+  speed walk=6 run=6
+  anim idle=idle move=walk run=walk look=look|alert alert=alert eat=graze sniff=graze rest=lie appear=appear vanish=vanish
+  intents look=3 wander=3 forage=1.2 rest=1
+  rest_time 5 12
+  fear 0
+  curiosity 0.7
+  scares rabbit squirrel mouse dormouse hedgehog mole frog salamander weasel fox badger wildcat boar deer dhole
+  aura 150          # the forest falls still: the creatures hide while it is there
+  size large
+  rare 1
+  point head 20 -65
+end
+end
+""")
+
+
+def emit_rows(out, name, grid):
+    out.append('frame %s' % name)
+    for row in grid:
+        out.append('|' + ''.join(row).rstrip('.').ljust(1, '.'))
+    out.append('')
+
+
+def deer(out, capture=None):
     """Deer — one sculpted silhouette instead of ellipses: the torso is a smooth outline through anatomical
     points (croup, back, withers, brisket, deep girth, tucked belly, haunch), the neck and the head join it in the
     same piece (no seams). Volume comes from shading clipped to the body: a light band along the back and the
@@ -3215,6 +3408,8 @@ end
     GS.update(geom(pd['stand']))
     GG.update(geom(pd['gal3']))
     tex = [(name, textured(pose)) for name, pose in poses]
+    if capture is not None:                       # the spirit stag is made from these frames
+        capture['tex'] = tex
 
     # per class: the colours -> a small palette (median cut), each class its own depth
     CLS = dict(body=(28, ''), near=(10, ' z+1'), far=(8, ' z-2'), ant_far=(5, ' z-1'), ant_near=(6, ''))   # antlers at the body's depth: a deer behind must not poke them through one in front
@@ -3513,7 +3708,7 @@ end
 CREATURES = {
     'rabbit': rabbit, 'squirrel': squirrel, 'fox': fox, 'owl': owl, 'hedgehog': hedgehog,
     'mouse': mouse, 'frog': frog, 'snail': snail, 'beetle': beetle, 'moth': moth, 'bat': bat,
-    'eyes': eyes, 'spirit': spirit, 'deer': deer,
+    'eyes': eyes, 'spirit': spirit, 'deer': deer, 'spirit_stag': spirit_stag,
     'badger': badger, 'boar': boar, 'wildcat': wildcat, 'weasel': weasel, 'dormouse': dormouse,
     'dhole': dhole, 'mole': mole, 'salamander': salamander, 'slug': slug, 'stag_beetle': stag_beetle, 'spider': spider,
 }

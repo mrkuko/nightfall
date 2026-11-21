@@ -337,6 +337,8 @@ int event_start(world_t *w, const char *name)
     if (!strcmp(name, "fireflies")) return start_fireflies(w, 1);
     if (!strcmp(name, "dholes")) return start_dholes(w);
     if (!strcmp(name, "bats")) return start_bats(w);
+    if (!strcmp(name, "lightning")) return weather_strike(w, 0);
+    if (!strcmp(name, "stag")) return weather_strike(w, 1);
     return 0;
 }
 

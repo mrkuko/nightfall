@@ -12,6 +12,12 @@
  * transitions mix naturally: fog rolls out while rain sweeps in, and "12 % fog, 88 % rain" is just two
  * layers at different strengths.
  *
+ * Storm: steady heavy rain, no extra wind; this is a screensaver, so the lightning is calm: mostly distant
+ * sheet flashes (a dim blue-white glow from the sky, sometimes low on the horizon, sometimes high, now and then
+ * a double or triple flicker), every so often a strike into the scene (a jagged bolt behind the trunks, a bit
+ * brighter, the creatures turn to the thunder). Rarely a strike leaves the spirit stag standing where it hit;
+ * 2-20 s later another strike takes it away. At most once per storm.
+ *
  * Rain = particles (streaks slanted by the local wind, closer ones longer and faster, depth-tested
  * against the frame), splashes on the ground and rings on puddles. Fog = an overlay over the finished
  * frame: wisps of noise drifting with the wind, thicker at the ground and in the distance (by z),
@@ -52,6 +58,7 @@ static const struct {
     { "drizzle", 0.25f, 0.35f, 1.4f },
     { "rain",    0.00f, 0.85f, 1.2f },
     { "rainfog", 0.55f, 0.65f, 0.7f },
+    { "storm",   0.12f, 0.80f, 1.0f },
 };
 #define NPAT ((int)(sizeof PAT / sizeof PAT[0]))
 
@@ -170,6 +177,12 @@ static void set_pattern(world_t *w, int p, int instant)
     /* the base length (setting) with a random spread: 0.6 … 1.4 ×; clear spells are a bit shorter */
     float hold = wx_base() * rng_range(&x->rng, 0.6f, 1.4f) * (p == 0 ? 0.85f : 1.0f);
     x->next_change = fmaxf(hold, 15.0f);
+    if (instant) x->storm_k = !strcmp(PAT[p].name, "storm") ? 1.0f : 0.0f;
+    if (!strcmp(PAT[p].name, "storm")) {
+        x->stag_done = 0;
+        x->lt_next = rng_range(&x->rng, 6.0f, 14.0f);
+        x->lt_since = 0;
+    }
     world_log(w, "weather → %s", PAT[p].name);
 }
 
@@ -197,6 +210,8 @@ void weather_init(world_t *w, uint64_t seed)
     weather_t *x = &w->wx;
     memset(x, 0, sizeof *x);
     x->rng = rng_seed(seed ^ 0x77ea7e3d1ull);
+    x->lt_t = -1.0f;
+    x->blue_t = -1.0f;
     x->bias[WX_FOG] = x->bias[WX_RAIN] = 1.0f;
     for (int k = 0; k < WX_COUNT; k++) { x->layer[k].lead = -WX_INF; x->layer[k].tail = -WX_INF; }
 }
@@ -425,8 +440,176 @@ static void update_rain(world_t *w, float dt)
     }
 }
 
+/* --- lightning ---------------------------------------------------------- */
+
+static int storm_on(const world_t *w)
+{
+    return !strcmp(PAT[w->wx.pattern].name, "storm") && w->wx.layer[WX_RAIN].amount > 0.35f;
+}
+
+/* A jagged bolt from the clouds down to (bx, by): the core in steps of a few px, one or two branches. */
+static void make_bolt(weather_t *x, float bx, float by)
+{
+    x->lt_nseg = 0;
+    float px = bx + rng_range(&x->rng, -14.0f, 14.0f), py = -2.0f;
+    float mid[16][2];
+    int nm = 0;
+    while (py < by && x->lt_nseg < 40) {
+        float ny = fminf(by, py + rng_range(&x->rng, 3.0f, 7.0f));
+        float t = ny / fmaxf(by, 1.0f);
+        float nx = px + rng_range(&x->rng, -3.5f, 3.5f) + (bx - px) * 0.25f * t;
+        if (ny >= by) nx = bx;
+        float *s = x->lt_seg[x->lt_nseg++];
+        s[0] = px; s[1] = py; s[2] = nx; s[3] = ny;
+        if (nm < 16 && t > 0.2f && t < 0.75f) { mid[nm][0] = nx; mid[nm][1] = ny; nm++; }
+        px = nx; py = ny;
+    }
+    int nb = nm ? rng_between(&x->rng, 1, 2) : 0;
+    for (int b = 0; b < nb; b++) {
+        float *m = mid[rng_int(&x->rng, nm)];
+        float qx = m[0], qy = m[1], dir = rng_chance(&x->rng, 0.5f) ? -1.0f : 1.0f;
+        int steps = rng_between(&x->rng, 2, 5);
+        for (int k = 0; k < steps && x->lt_nseg < 64; k++) {
+            float nx = qx + dir * rng_range(&x->rng, 2.0f, 5.0f), ny = qy + rng_range(&x->rng, 2.0f, 5.0f);
+            float *s = x->lt_seg[x->lt_nseg++];
+            s[0] = qx; s[1] = qy; s[2] = nx; s[3] = ny;
+            qx = nx; qy = ny;
+        }
+    }
+}
+
+static void start_flash(world_t *w, int strike, float bx, int stag)
+{
+    weather_t *x = &w->wx;
+    x->lt_t = 0.0f;
+    x->lt_strike = strike;
+    x->lt_np = rng_chance(&x->rng, strike ? 0.6f : 0.35f) ? rng_between(&x->rng, 2, 3) : 1;
+    float at = 0.0f;
+    for (int i = 0; i < x->lt_np; i++) {
+        x->lt_pulse[i][0] = at;
+        x->lt_pulse[i][1] = rng_range(&x->rng, 0.07f, 0.18f);
+        x->lt_pulse[i][2] = i == 0 ? 1.0f : rng_range(&x->rng, 0.45f, 0.9f);
+        at += x->lt_pulse[i][1] + rng_range(&x->rng, 0.05f, 0.22f);
+    }
+    if (strike) {
+        /* a strike: brighter (still restrained), the bolt behind the trunks of the clearing, thunder */
+        x->lt_int = rng_range(&x->rng, 0.32f, 0.45f);
+        x->lt_cx = bx / (float)w->w;
+        x->lt_reach = rng_range(&x->rng, 0.7f, 1.0f);
+        x->lt_z = w->ground_z + 4;
+        float gy = world_ground_at(w, bx, (float)(w->ground_z + 8));
+        make_bolt(x, bx, gy);
+        x->lt_since = 0.0f;
+        world_stimulus(w, bx, gy, (float)w->w, ST_NOISE, 1.0f, 0.6f, -1);
+        world_log(w, "lightning strikes at x=%d", (int)bx);
+        if (stag) {
+            int i = actor_spawn(w, "spirit_stag", bx, 0, NAV_GROUND, w->ground_z + 8);
+            if (i >= 0) {
+                actor_t *a = &w->act[i];
+                a->facing = rng_chance(&x->rng, 0.5f) ? 1 : -1;
+                step_t st[2];
+                memset(st, 0, sizeof st);
+                st[0].kind = ST_ANIM; st[0].anim = A_APPEAR; st[0].dur = 0; st[0].place = -1;
+                st[1].kind = ST_ANIM; st[1].anim = A_LOOK; st[1].dur = rng_range(&x->rng, 1.5f, 3.0f); st[1].place = -1;
+                actor_script(w, a, IN_LOOK, st, 2);
+                x->stag = (i << 16) | (int)(a->id & 0xffff);
+                x->stag_left = rng_range(&x->rng, 5.0f, 30.0f);
+                x->stag_done = 1;
+                x->blue_t = 0.0f;
+                x->blue_k = 1.0f;
+                world_log(w, "… and in its light a stag of blue fire stands there");
+            }
+        }
+    } else {
+        /* far away: a dim sheet glow from the sky, sometimes low on the horizon, sometimes high */
+        x->lt_int = rng_range(&x->rng, 0.10f, 0.26f);
+        x->lt_cx = rng_range(&x->rng, -0.1f, 1.1f);
+        x->lt_reach = rng_range(&x->rng, 0.25f, 0.85f);
+        x->lt_nseg = 0;
+    }
+}
+
+/* the spirit stag, or NULL when it is gone */
+static actor_t *the_stag(world_t *w)
+{
+    int slot = w->wx.stag >> 16;
+    if (!w->wx.stag || slot < 0 || slot >= w->nact) return NULL;
+    actor_t *a = &w->act[slot];
+    return a->alive && (a->id & 0xffff) == (unsigned)(w->wx.stag & 0xffff) ? a : NULL;
+}
+
+int weather_strike(world_t *w, int stag)
+{
+    weather_t *x = &w->wx;
+    if (stag && the_stag(w)) return 0;
+    float bx = rng_range(&x->rng, (float)w->w * 0.15f, (float)w->w * 0.85f);
+    start_flash(w, 1, bx, stag);
+    return 1;
+}
+
+static void update_lightning(world_t *w, float dt)
+{
+    weather_t *x = &w->wx;
+    if (x->lt_t >= 0.0f) {
+        x->lt_t += dt;
+        float end = x->lt_pulse[x->lt_np - 1][0] + x->lt_pulse[x->lt_np - 1][1] + 0.4f;
+        if (x->lt_t > end) x->lt_t = -1.0f;
+    }
+    x->lt_since += dt;
+    if (x->blue_t >= 0.0f && (x->blue_t += dt) > 2.5f) x->blue_t = -1.0f;
+    /* the stag waits for the strike that takes it away (also after the storm has passed) */
+    actor_t *st = the_stag(w);
+    if (st) {
+        x->stag_left -= dt;
+        if (x->stag_left <= 0 && x->lt_t < 0.0f && st->intent != IN_VANISH) {
+            start_flash(w, 1, st->x, 0);
+            step_t s2[2];
+            memset(s2, 0, sizeof s2);
+            s2[0].kind = ST_ANIM; s2[0].anim = A_VANISH; s2[0].dur = 0; s2[0].place = -1;
+            s2[1].kind = ST_DESPAWN; s2[1].place = -1;
+            actor_script(w, st, IN_VANISH, s2, 2);
+            x->blue_t = 0.0f;
+            x->blue_k = 0.55f;
+            world_log(w, "another strike — and the stag is gone");
+        }
+    } else {
+        x->stag = 0;
+    }
+    if (!storm_on(w)) return;
+    x->lt_next -= dt;
+    if (x->lt_next > 0 || x->lt_t >= 0.0f) return;
+    x->lt_next = rng_range(&x->rng, 5.0f, 16.0f);
+    int strike = x->lt_since > 10.0f && rng_chance(&x->rng, 0.40f);
+    if (strike) {
+        int stag = !x->stag_done && !st && rng_chance(&x->rng, 0.05f);      /* only now and then a strike brings it */
+        weather_strike(w, stag);
+    } else {
+        start_flash(w, 0, 0.0f, 0);
+    }
+}
+
+/* the flash's brightness now (0..1 × lt_int) */
+static float flash_level(const weather_t *x)
+{
+    if (x->lt_t < 0.0f) return 0.0f;
+    float L = 0.0f;
+    for (int i = 0; i < x->lt_np; i++) {
+        float u = (x->lt_t - x->lt_pulse[i][0]) / x->lt_pulse[i][1];
+        if (u < 0.0f) continue;
+        float v = u < 0.15f ? u / 0.15f : powf(fmaxf(0.0f, 1.0f - (u - 0.15f) / 2.2f), 2.0f);
+        L = fmaxf(L, v * x->lt_pulse[i][2]);
+    }
+    return L * x->lt_int;
+}
+
 void weather_update(world_t *w, float dt)
 {
+    update_lightning(w, dt);
+    {   /* the storm's extra dimming eases in and out slowly (about 10 s either way) */
+        float want = !strcmp(PAT[w->wx.pattern].name, "storm") ? 1.0f : 0.0f;
+        float st = dt / 10.0f;
+        w->wx.storm_k += clampf(want - w->wx.storm_k, -st, st);
+    }
     weather_t *x = &w->wx;
     if (!x->fixed) {
         x->next_change -= dt;
@@ -520,6 +703,7 @@ static void render_air(world_t *w, raster_t *r)
         g_cap = gw * gh;
     }
     float h = (float)r->h;
+    float storm = w->wx.storm_k;
     /* wisps creep with the wind at a few pixels per second (noise units: 1 = ~55 px) */
     float drift = w->wx.drift;
     for (int gy = 0; gy < gh; gy++)
@@ -536,7 +720,7 @@ static void render_air(world_t *w, raster_t *r)
                     f = c * (0.2f + 1.15f * wisp * wisp + 0.2f * wisp) * (0.6f + 0.5f * low);
                 }
             }
-            if (rain_on) dk = 1.0f - 0.22f * cover(w, WX_RAIN, X, Y);
+            if (rain_on) dk = 1.0f - (0.22f + 0.40f * storm) * cover(w, WX_RAIN, X, Y);   /* a storm dims the scene more */
             g_fog[gy * gw + gx] = f;
             g_dark[gy * gw + gx] = dk;
         }
@@ -567,8 +751,110 @@ static void render_air(world_t *w, raster_t *r)
     }
 }
 
+static void render_lightning(world_t *w, raster_t *r)
+{
+    const weather_t *x = &w->wx;
+    float L = flash_level(x);
+    if (L <= 0.003f) return;
+    /* the wash: from the sky down, strongest where the flash is; the far background lights up more than what
+     * stands close (the trunks stay dark against it, a moment of hard silhouette) */
+    const rgb_t fc = mkrgb(176, 198, 255);
+    float H = (float)r->h, reach = x->lt_reach * H, cx = x->lt_cx * (float)r->w;
+    for (int y = 0; y < r->h; y++) {
+        float vy = clampf(1.0f - (float)y / fmaxf(reach, 1.0f), 0.0f, 1.0f);
+        vy = 0.12f + 0.88f * vy * vy;
+        for (int xx = 0; xx < r->w; xx++) {
+            float dx = ((float)xx - cx) / ((float)r->w * 0.45f);
+            float hx = 0.45f + 0.55f * expf(-dx * dx);
+            int i = y * r->w + xx;
+            int z = r->z[i];
+            float far = (z == Z_EMPTY || z < w->ground_z - 20) ? 1.0f : 0.5f;
+            float a = clampf(L * vy * hx * far, 0.0f, 0.6f);
+            r->c[i] = rgb_mix(r->c[i], fc, a);
+        }
+    }
+    /* the bolt: a white-blue core with a soft halo, behind whatever stands in front of it; only in the first,
+     * brightest moments of the strike */
+    if (!x->lt_strike || x->lt_t > x->lt_pulse[0][1] + 0.25f) return;
+    const rgb_t core = mkrgb(236, 244, 255), halo = mkrgb(140, 180, 255);
+    float k = L / fmaxf(x->lt_int, 0.01f);
+    for (int s = 0; s < x->lt_nseg; s++) {
+        const float *g = x->lt_seg[s];
+        float len = fmaxf(fabsf(g[2] - g[0]), fabsf(g[3] - g[1]));
+        int n = (int)len + 1;
+        for (int j = 0; j <= n; j++) {
+            float t = (float)j / (float)n;
+            int px = (int)lroundf(g[0] + (g[2] - g[0]) * t), py = (int)lroundf(g[1] + (g[3] - g[1]) * t);
+            if (px < 0 || py < 0 || px >= r->w || py >= r->h) continue;
+            for (int oy = -1; oy <= 1; oy++)
+                for (int ox = -1; ox <= 1; ox++) {
+                    if (!ox && !oy) continue;
+                    blend(r, px + ox, py + oy, x->lt_z, halo, 0.35f * k);
+                }
+            blend(r, px, py, x->lt_z, core, clampf(0.4f + 0.6f * k, 0.0f, 1.0f));
+        }
+    }
+}
+
+/* The spirit stag: a soft blue aura that follows its outline (pulsing slowly) and a faint glow on the ground at
+ * its feet; behind whatever stands in front of it. */
+static void render_spirit(world_t *w, raster_t *r)
+{
+    actor_t *a = the_stag(w);
+    if (!a || a->hidden) return;
+    const frame_t *f = &a->spr->frames[a->ov_frame ? a->ov_frame - 1 : clip_frame_at(&a->spr->clips[a->clip], a->ct)];
+    int ax = (int)floorf(a->x + 0.5f), ay = (int)floorf(a->y + 0.5f), z = (int)floorf(a->zf + 0.5f);
+    float pulse = 0.8f + 0.2f * sinf(w->t * 1.7f);
+    const rgb_t aura = mkrgb(70, 150, 255);
+    static const float fall[4] = { 0.0f, 0.16f, 0.09f, 0.045f };
+    /* the ground glow: a flat ellipse of pale blue light under it */
+    for (int dy = -2; dy <= 2; dy++)
+        for (int dx = -26; dx <= 26; dx++) {
+            float e = (float)(dx * dx) / (26.0f * 26.0f) + (float)(dy * dy) / 6.0f;
+            if (e < 1.0f) blend(r, ax + dx, ay + dy, z, aura, 0.14f * (1.0f - e) * pulse);
+        }
+    for (int fy = 0; fy < f->h; fy++)
+        for (int fx = 0; fx < f->w; fx++) {
+            if (!f->px[fy * f->w + fx].a) continue;
+            int px = ax + (a->facing < 0 ? -(fx - f->ax) : fx - f->ax), py = ay + fy - f->ay;
+            for (int oy = -3; oy <= 3; oy++)
+                for (int ox = -3; ox <= 3; ox++) {
+                    int d = abs(ox) > abs(oy) ? abs(ox) : abs(oy);
+                    if (!d) continue;
+                    int qx = fx + (a->facing < 0 ? -ox : ox), qy = fy + oy;
+                    if (qx >= 0 && qy >= 0 && qx < f->w && qy < f->h && f->px[qy * f->w + qx].a) continue;   /* only outside */
+                    blend(r, px + ox, py + oy, z, aura, fall[d] * 0.35f * pulse);
+                }
+        }
+}
+
+/* The stag's strike: a slow blue flash across the whole screen, a bloom around where it stands. */
+static void render_blue(world_t *w, raster_t *r)
+{
+    const weather_t *x = &w->wx;
+    if (x->blue_t < 0.0f) return;
+    float t = x->blue_t;
+    float k = (t < 0.12f ? t / 0.12f : powf(fmaxf(0.0f, 1.0f - (t - 0.12f) / 2.3f), 1.6f)) * x->blue_k;
+    if (k <= 0.004f) return;
+    actor_t *a = the_stag(w);
+    float cx = a ? a->x : x->lt_cx * (float)r->w, cy = a ? a->y - 30.0f : (float)r->h * 0.6f;
+    const rgb_t blue = mkrgb(70, 120, 255), white = mkrgb(200, 225, 255);
+    float R = (float)r->w * 0.3f;
+    for (int y = 0; y < r->h; y++)
+        for (int xx = 0; xx < r->w; xx++) {
+            float dx = (float)xx - cx, dy = ((float)y - cy) * 1.3f;
+            float bloom = 1.0f / (1.0f + (dx * dx + dy * dy) / (R * R));
+            int i = y * r->w + xx;
+            rgb_t c = rgb_mix(r->c[i], blue, clampf(k * (0.22f + 0.30f * bloom), 0.0f, 0.7f));
+            r->c[i] = rgb_mix(c, white, clampf(k * 0.25f * bloom * bloom, 0.0f, 0.5f));
+        }
+}
+
 void weather_render(world_t *w, raster_t *r)
 {
     render_rain(w, r);
     render_air(w, r);
+    render_spirit(w, r);
+    render_lightning(w, r);
+    render_blue(w, r);
 }

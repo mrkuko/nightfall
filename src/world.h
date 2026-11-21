@@ -191,6 +191,7 @@ typedef struct {
     char  hunts[128];           /* " mouse " — a bird of prey stoops on them (and may catch them) */
     int   shelter;              /* "shelter rain": goes under big leaves when it rains */
     int   roots;                /* rooting leaves turned-earth patches (boar) */
+    float aura;                 /* "aura R": its presence alone frightens the `scares` creatures within R px */
     float wary;                 /* grazing, it lifts its head now and then to listen (and may bolt); 0 = never */
     float bound_len, bound_h;   /* "bound LEN H": it bolts in leaps this long and high (px) */
     int   bound_f[4];           /* frames bound0..bound3 (gather, launch, flight, landing); -1 = no leaps */
@@ -265,6 +266,24 @@ typedef struct {
     float      spawn_acc;       /* fractional raindrops to spawn */
     float      drift;           /* how far the fog wisps have crept with the wind (integrated, so wind changes never make them jump) */
     float      wet;             /* how wet the leaves are (they drip for a while after the rain) */
+    /* storm: lightning (mostly distant sheet flashes, now and then a strike into the scene) */
+    float      lt_next;         /* seconds to the next flash */
+    float      lt_t;            /* seconds since the current flash started (< 0: none) */
+    float      lt_int;          /* its strength (a calm screensaver: dim) */
+    float      lt_cx, lt_reach; /* where it glows (0..1 across) and how high up the sky it reaches (0..1) */
+    int        lt_np;           /* flicker pulses: start, length, strength */
+    float      lt_pulse[4][3];
+    int        lt_strike;       /* this flash is a strike: the bolt is drawn */
+    float      lt_since;        /* seconds since the last strike */
+    int        lt_nseg;         /* the bolt: line segments x0 y0 x1 y1, the core first, then the branches */
+    float      lt_seg[64][4];
+    int        lt_z;            /* its depth (behind the trunks of the clearing) */
+    int        stag;            /* (slot << 16) | low id bits of the spirit stag, 0 = none */
+    float      stag_left;       /* seconds until the strike that takes it away */
+    int        stag_done;       /* it came in this storm already */
+    float      storm_k;         /* how stormy the scene is dimmed, 0..1: eases in and out over ~10 s (no jump at a weather change) */
+    float      blue_t;          /* seconds since the stag's strike: a slow blue flash across the screen (< 0: none) */
+    float      blue_k;          /* its strength (1 = it comes, less = it goes) */
     wx_drop_t  drop[MAX_DROP];
     int        ndrop;
     wx_splash_t splash[MAX_SPLASH];
@@ -383,6 +402,8 @@ void  events_render(world_t *w, raster_t *r);        /* the flash over the finis
 int   event_start(world_t *w, const char *name);     /* by name ("fireflies", "dholes", "bats"); 0 = could not start */
 void  weather_next(world_t *w);
 void  weather_set(world_t *w, int pattern);   /* roll in pattern and keep it; -1 = auto again */
+/* A lightning strike into the scene now (storm or not); stag = 1: the spirit stag stands where it hits. */
+int   weather_strike(world_t *w, int stag);
 int   weather_count(void);
 void  weather_update(world_t *w, float dt);
 /* Draws rain, splashes and fog over the finished frame (uses the z-buffer). */
