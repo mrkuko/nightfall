@@ -2794,6 +2794,13 @@ end
     # lying down: the body on the ground, the legs folded under it (the forelegs tucked forward), the head up
     LD = 21.0
     lie_legs = ik_legs({k: (x + (11.0 if k[1] == 'f' else 10.0), G - 0.6) for k, (x, y) in hips(LD).items()}, LD)
+    # one step before lying (and after, getting up): the body down, the chest still propped on the forelegs
+    lie_prop = dict(dy=LD, legs=dict(lie_legs), head=(49.0, 42.0, 0.3))
+    # the forelegs folded right under the chest: the knee on the ground at the front of the chest, the cannon
+    # and the hoof tucked back beneath the body (only the knee shows) — not propped up as when it gets up
+    for k, kdx, fdx in (('nf', 4.6, -4.0), ('ff', 4.0, -3.0)):
+        hx_, hy_ = hips(LD)[k]
+        lie_legs[k] = (hx_, hy_, hx_ + kdx, G - 1.2, hx_ + fdx, G - 0.8)
     lie = dict(dy=LD, legs=lie_legs, head=(49.0, 42.0, 0.3))
     # half way down (and up): kneeling on the front legs, the hind still standing
     KD, KP = 9.0, 0.22
@@ -2806,6 +2813,7 @@ end
         ('lie_ears', dict(lie, ear=(-2.8, -2.0, 4.0, 1.9), earlean=-1.4)),
         ('lie_look', dict(lie, head=(47.4, 39.0, 0.0))),
         ('kneel', dict(dy=KD, pitch=KP, legs=kneel_legs, head=(51.0, 40.0, 0.45))),
+        ('lie_prop', lie_prop),
     ]
 
     # walk: a four-beat walk (near hind, near fore, far hind, far fore), a gentle nod of the head
@@ -2825,8 +2833,8 @@ clip idle loop fps=4 : stand*14 stand_blink stand*8 ears ears stand*6 look*6 loo
 clip look loop fps=4 : look*8 look_blink look*6 stand*2
 clip alert loop fps=4 : alert*6 alert_earl*4 alert*3 alert_earr*4 alert*2 look_blink alert*3
 clip lie loop fps=3 : lie*12 lie_blink lie*8 lie_ears lie_ears lie*6 lie_look*8 lie_blink lie_look*3 lie*6
-clip lie_in once fps=4 : kneel kneel
-clip lie_out once fps=4 : kneel kneel
+clip lie_in once fps=4 : kneel kneel lie_prop lie_prop
+clip lie_out once fps=4 : lie_prop lie_prop kneel kneel
 clip bound once fps=4 : bound0 bound1 bound2 bound3
 clip graze loop fps=5 : graze graze2 graze graze2 graze graze2 graze_blink graze graze2 graze graze2 graze*4 graze_up graze_up graze*2
 clip walk loop fps=7 speed=13 : walk0 walk1 walk2 walk3 walk4 walk5
@@ -2856,7 +2864,7 @@ end
     tex = [(name, textured(pose)) for name, pose in poses]
 
     # per class: the colours -> a small palette (median cut), each class its own depth
-    CLS = dict(body=(28, ''), near=(10, ' z+1'), far=(8, ' z-2'), ant_far=(5, ' z-3'), ant_near=(6, ' z+2'))
+    CLS = dict(body=(28, ''), near=(10, ' z+1'), far=(8, ' z-2'), ant_far=(5, ' z-1'), ant_near=(6, ''))   # antlers at the body's depth: a deer behind must not poke them through one in front
     from PIL import Image
     pool = iter('abcdfghijklmoprstuvxyzABCDFGHIJKLMNOPQRSTUVWXYZ0123456789')
     keymap, lines = {}, []
