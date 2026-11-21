@@ -20,7 +20,7 @@ static HANDLE g_in, g_out;
 static DWORD g_in_mode, g_out_mode;
 static UINT g_out_cp;
 static int g_active, g_cols, g_rows;
-static volatile LONG g_quit_flag, g_resize_flag;
+static volatile LONG g_quit_flag;
 
 static BOOL WINAPI on_ctrl(DWORD type)
 {
@@ -99,7 +99,9 @@ int term_key(void)
         INPUT_RECORD ev;
         DWORD got = 0;
         if (!ReadConsoleInputW(g_in, &ev, 1, &got) || got == 0) return KEY_NONE;
-        if (ev.EventType == WINDOW_BUFFER_SIZE_EVENT) { InterlockedExchange(&g_resize_flag, 1); continue; }
+        /* WINDOW_BUFFER_SIZE_EVENT also arrives when nothing visible changed (right after start, when the
+         * alternate screen is switched on) -> ignore it here, term_resized() compares the real window size */
+        if (ev.EventType == WINDOW_BUFFER_SIZE_EVENT) continue;
         if (ev.EventType != KEY_EVENT || !ev.Event.KeyEvent.bKeyDown) continue;
         switch (ev.Event.KeyEvent.wVirtualKeyCode) {
         case VK_UP: return KEY_UP;
@@ -121,11 +123,10 @@ int term_key(void)
 
 int term_resized(void)
 {
-    /* resize events are not always delivered (e.g. Windows Terminal) -> also compare the size */
+    /* by the size itself: resize events are not always delivered (Windows Terminal) and also come spuriously */
     int c, r;
     query_size(&c, &r);
-    if (c != g_cols || r != g_rows) InterlockedExchange(&g_resize_flag, 1);
-    return InterlockedExchange(&g_resize_flag, 0) != 0;
+    return c != g_cols || r != g_rows;
 }
 
 int term_quit_requested(void) { return g_quit_flag != 0; }
