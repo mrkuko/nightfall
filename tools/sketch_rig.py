@@ -89,6 +89,15 @@ def chain(points, radii, keys, fuzz=0.0):
     return [Union(circles, keys, fuzz)]
 
 
+class Merge:
+    """Several shapes drawn as one piece (one outline, no seams where they overlap)."""
+    def __init__(s, shapes, keys, fuzz=0.0):
+        s.shapes, s.keys, s.fuzz = shapes, keys, fuzz
+
+    def inside(s, x, y):
+        return any(p.inside(x, y) for p in s.shapes)
+
+
 class Union:
     def __init__(s, circles, keys, fuzz):
         s.circles, s.keys, s.fuzz = circles, keys, fuzz
@@ -1526,6 +1535,72 @@ end
 QUAD_KEYS = 'bad BAD gfF cCa kKK jJJ'
 
 
+def jointed_leg(L, r0, r1, keys, hoofkeys, k):
+    """A leg in two segments (hip -> knee/hock -> foot): L = (hx, hy, kx, ky, fx, fy)."""
+    hx, hy, kx, ky, fx, fy = L
+    rk = (r0 + r1) * 0.5
+    return [C(hx, hy, kx, ky, r0 * k, rk, keys),
+            C(kx, ky, fx, fy, rk * 0.9, r1, keys),
+            C(kx + (fx - kx) * 0.55, ky + (fy - ky) * 0.55, fx, fy, r1 * 1.05, r1, hoofkeys)]
+
+
+def leg_ik(hip, foot, l1, l2, bend):
+    """Two-bone leg: the knee for a hip and a foot; bend +1 = joint in front of the line (fore knee),
+    -1 = behind it (hind hock). A foot out of reach is pulled in."""
+    dx, dy = foot[0] - hip[0], foot[1] - hip[1]
+    d = math.hypot(dx, dy)
+    if d > l1 + l2 - 0.3:
+        s = (l1 + l2 - 0.3) / d
+        dx, dy, d = dx * s, dy * s, l1 + l2 - 0.3
+    a = (l1 * l1 - l2 * l2 + d * d) / (2 * d)
+    h = math.sqrt(max(0.0, l1 * l1 - a * a))
+    ux, uy = dx / d, dy / d
+    kx, ky = hip[0] + ux * a + bend * uy * h, hip[1] + uy * a - bend * ux * h
+    return (hip[0], hip[1], kx, ky, hip[0] + dx, hip[1] + dy)
+
+
+def _keys(s, ks):
+    """Value at s of keyframes [(s0, v0), (s1, v1) ...] with eased (cosine) steps between them."""
+    for (s0, v0), (s1, v1) in zip(ks, ks[1:]):
+        if s <= s1:
+            t = 0.0 if s1 == s0 else (s - s0) / (s1 - s0)
+            t = 0.5 - 0.5 * math.cos(math.pi * t)
+            return v0 + (v1 - v0) * t
+    return ks[-1][1]
+
+
+def quad_gallop(c, phase, ground, lens, offs, land, push, swing, stance=0.36):
+    """Legs of a gallop at phase 0..1 (2-segment legs). offs = each leg's phase offset (a rotary gallop:
+    the legs of a pair land one after the other, not together). On the ground a foot sweeps from the landing
+    angle `land` back to the push-off angle `push` (angles from straight down, + = forward). In the air the
+    leg is driven by angle + extension keyframes `swing[front]` = [(s, angle, extension) ...] around the hip:
+    it leaves the ground STRAIGHT (the push-off), folds as it swings forward under the body, then reaches out
+    straight again to land. Returns (legs, body bob)."""
+    legs = {}
+    bob = -1.4 * math.sin(2 * math.pi * (phase + 0.1))
+    for k, (hx_, hy_) in c['hips'].items():
+        q = (phase + offs[k]) % 1.0
+        front = k[1] == 'f'
+        l1, l2 = lens[front]
+        hip = (hx_, hy_ + bob)
+        hh = ground - hip[1]
+        xl, xp = hh * math.tan(land[front]), hh * math.tan(push[front])
+        if q < stance:                             # on the ground, sweeping back under the body
+            t = q / stance
+            fx, fy = hip[0] + xl + (xp - xl) * t, ground
+        else:                                      # in the air: angle + extension around the hip
+            t = (q - stance) / (1 - stance)
+            full = l1 + l2
+            el = min(1.0, math.hypot(xl, hh) / full)       # the extension at landing / push-off, so the
+            ep = min(1.0, math.hypot(xp, hh) / full)       # air path joins the ground path without a jump
+            ks = [(0.0, push[front], ep)] + list(swing[front]) + [(1.0, land[front], el)]
+            a = _keys(t, [(s_, a_) for s_, a_, _ in ks])
+            e = _keys(t, [(s_, e_) for s_, _, e_ in ks])
+            fx, fy = hip[0] + e * full * math.sin(a), min(ground, hip[1] + e * full * math.cos(a))
+        legs[k] = leg_ik(hip, (fx, fy), l1, l2, 1 if front else -1)
+    return legs, bob
+
+
 def quad(c, pose):
     """A generic quadruped facing right. c = species configuration, pose = changes."""
     p = dict(c)
@@ -1540,7 +1615,9 @@ def quad(c, pose):
     lr0, lr1 = p['legr']
     for k in ('ff', 'fh'):
         L = p['legs'].get(k)
-        if L:
+        if L and len(L) == 6:
+            parts += jointed_leg(L, lr0, lr1, p.get('farlegkeys', 'gfF'), 'jJJ', 1.0)
+        elif L:
             x0, y0, x1, y1 = L
             parts.append(C(x0, y0, x1, y1, lr0, lr1, p.get('farlegkeys', 'gfF')))
             parts.append(C(x0 + (x1 - x0) * 0.6, y0 + (y1 - y0) * 0.6, x1, y1, lr1 * 1.05, lr1, 'jJJ'))
@@ -1549,13 +1626,21 @@ def quad(c, pose):
         parts.append(E(hx + ex + 1.2, hy + ey, er, er, 0, 'gfF'))
     else:
         parts.append(C(hx + ex + 1.2, hy + ey, hx + ex + 1.6, hy + ey - el, er, 0.4, 'gfF'))
-    for b in p['body']:
-        parts.append(E(*b, keys='bad', fuzz=p.get('fuzz', 0.1)))
+    if p.get('smooth'):
+        # body and neck as one piece: a single outline, no seams between the ellipses
+        shapes = [E(*b) for b in p['body']]
+        if p.get('neck'):
+            x0, y0, x1, y1, r0, r1 = p['neck']
+            shapes.append(C(x0, y0, x1, y1, r0, r1))
+        parts.append(Merge(shapes, 'bad', p.get('fuzz', 0.1)))
+    else:
+        for b in p['body']:
+            parts.append(E(*b, keys='bad', fuzz=p.get('fuzz', 0.1)))
     if p.get('chest'):
         parts.append(E(*p['chest'], keys='cCa', fuzz=0.2))
     for e in p.get('bodyextra', []):
         parts.append(e)
-    if p.get('neck'):
+    if p.get('neck') and not p.get('smooth'):
         x0, y0, x1, y1, r0, r1 = p['neck']
         parts.append(C(x0, y0, x1, y1, r0, r1, 'bad', p.get('fuzz', 0.1)))
     hk = p.get('headkeys', 'bad')
@@ -1568,7 +1653,9 @@ def quad(c, pose):
         parts += p['headextra'](hx, hy, ha, tx, ty)
     for k in ('nf', 'nh'):
         L = p['legs'].get(k)
-        if L:
+        if L and len(L) == 6:
+            parts += jointed_leg(L, lr0, lr1, p.get('legkeys', 'BAD'), 'kKK', 1.1)
+        elif L:
             x0, y0, x1, y1 = L
             parts.append(C(x0, y0, x1, y1, lr0 * 1.1, lr1, p.get('legkeys', 'BAD')))
             parts.append(C(x0 + (x1 - x0) * 0.6, y0 + (y1 - y0) * 0.6, x1, y1, lr1 * 1.1, lr1, 'kKK'))
@@ -2312,7 +2399,7 @@ def deer(out):
              hx=50.4, hy=8.0 + DY, hang=0.35, hrx=4.4, hry=3.4, snout=(4.2, 2.4, 1.4),
              ear=(-2.2, -2.4, 4.0, 1.6), headextra=antlers,
              hips=dict(nf=(41.0, 31.0 + DY), ff=(43.0, 31.0 + DY), nh=(20.0, 31.0 + DY), fh=(17.6, 31.0 + DY)),
-             legr=(2.6, 1.0), eyeshine=True, fuzz=0.08)
+             legr=(2.6, 1.0), eyeshine=True, fuzz=0.08, smooth=True)
     header = """# deer (full animal) — generated by tools/sketch_rig.py (shared quadruped skeleton)
 sprite deer
 tags creature ground large mammal rare
@@ -2358,13 +2445,38 @@ end
         ('graze_blink', dict(graze, eye=0)),
         ('graze_up', dict(neck=Y(41.0, 22.4, 47.4, 30.0) + (5.0, 3.0), hx=50.6, hy=33.0 + DY, hang=0.8)),
     ]
+
+    def running(dy, legs):
+        """Gallop pose: the body moved by dy (the bob), the neck stretched forward, the head low and level."""
+        return dict(body=[(x, y + dy, rx, ry, a) for (x, y, rx, ry, a) in c['body']],
+                    chest=(44.0, 29.4 + DY + dy, 2.8, 5.0, 0.2),
+                    bodyextra=[E(11.8, 23.4 + DY + dy, 2.6, 4.4, 0.0, 'cCa', 0.2),
+                               E(11.2, 19.6 + DY + dy, 1.4, 2.2, 0.0, 'ddd')],
+                    neck=Y(41.0, 23.0 + dy, 49.0, 15.0 + dy) + (5.2, 3.4),
+                    hx=53.0, hy=14.0 + DY - dy * 0.5, hang=0.45, ear=(-2.6, -1.6, 4.0, 1.6), earlean=-1.4,
+                    legs=legs)
+
+    # gallop (8 frames): a rotary gallop, far hind -> near hind -> far fore -> near fore, each leg in two
+    # segments (fore knee forward, hind hock back), the feet sweep back under the body while on the ground
+    NG = 8
+    for i in range(NG):
+        legs, bob = quad_gallop(c, i / NG, G, lens={True: (12.6, 14.6), False: (13.0, 14.8)},
+                                offs=dict(fh=0.0, nh=0.14, ff=0.46, nf=0.60),
+                                land={True: 0.34, False: 0.22}, push={True: -0.30, False: -0.36},
+                                swing={
+                                    # fore: trails straight, tucks tight under the chest, reaches far out
+                                    True: [(0.18, -0.55, 0.97), (0.45, -0.05, 0.55), (0.78, 0.62, 0.98)],
+                                    # hind: kicks out straight behind, folds under the belly, swings forward
+                                    False: [(0.22, -0.78, 0.99), (0.58, -0.10, 0.62), (0.85, 0.32, 0.95)],
+                                })
+        poses.append(('gal%d' % i, running(bob, legs)))
     clips = """
 clip idle loop fps=4 : stand*14 stand_blink stand*8 ears ears stand*6 look*6 look_blink look*4 stand*4
 clip look loop fps=4 : look*8 look_blink look*6 stand*2
 clip alert loop fps=4 : alert*12 look_blink alert*4
 clip graze loop fps=5 : graze graze2 graze graze2 graze graze2 graze_blink graze graze2 graze graze2 graze*4 graze_up graze_up graze*2
 clip walk loop fps=7 speed=13 : walk0 walk1 walk2 walk3 walk4 walk5
-clip run loop fps=13 speed=48 : walk0 walk1 walk2 walk3 walk4 walk5
+clip run loop fps=10 speed=48 : gal0 gal1 gal2 gal3 gal4 gal5 gal6 gal7
 """
     profile = """creature
   move ground

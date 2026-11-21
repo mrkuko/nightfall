@@ -155,6 +155,7 @@ enum {
     ST_TUNNEL,      /* (mole) underground to x, then surfaces with a new molehill */
     ST_HUNT,        /* (owl) stoop on creature `place` from above; z = 1: it will catch it, 0: it misses */
     ST_SHELTER,     /* wait under big leaves (place) until the rain stops */
+    ST_PURSUE,      /* (event) run after creature `place` (id `anim`) x px behind it, z deeper/closer; when it is gone, runs on off the screen */
     ST_DESPAWN
 };
 
@@ -222,6 +223,7 @@ typedef struct {
     int        hphase;          /* ST_HUNT: 0 approach, 1 stoop, 2 strike, 3 pull up */
     float      hx, hy;          /* ST_HUNT: the point it aims at */
     int        hold;            /* an event keeps it in place (it only bobs) */
+    int        scripted;        /* an event drives it: no perception or own choices until its plan ends */
     int        ov_frame;        /* an event picks its frame: 1 + frame, 0 = the clip decides */
     uint32_t   id;
 } actor_t;
@@ -265,7 +267,7 @@ typedef struct {
 } weather_t;
 
 /* --- events (src/event.c): rare, mysterious happenings; one at a time, with their own rng stream --- */
-enum { EV_NONE, EV_FIREFLIES };
+enum { EV_NONE, EV_FIREFLIES, EV_DHOLES };
 #define EV_MAX_FF 16
 typedef struct {
     int      kind;              /* EV_* running now */
@@ -275,8 +277,8 @@ typedef struct {
     float    prep;              /* seconds left until the pending event starts */
     float    prep_next;         /* seconds until the next preparation step (e.g. one more firefly) */
     int      prep_left;         /* preparation steps still to do */
-    int      n;                 /* fireflies taking part */
-    int      id[EV_MAX_FF];     /* their actor ids (the slot may be reused: compare a->id) */
+    int      n;                 /* actors taking part (fireflies; the deer + the dholes) */
+    int      id[EV_MAX_FF];     /* (slot << 16) | low bits of their actor ids (the slot may be reused: compare a->id) */
     float    off[EV_MAX_FF];    /* each one's starting phase (0..1), converges to 0 = in sync */
     float    phase;             /* common blink phase (cycles) */
     float    cx, cy;            /* centre of the swarm (where the flash is brightest) */
@@ -369,7 +371,7 @@ void  weather_begin(world_t *w, const char *arg);
 void  events_init(world_t *w, uint64_t seed);
 void  events_update(world_t *w, float dt);
 void  events_render(world_t *w, raster_t *r);        /* the flash over the finished frame */
-int   event_start(world_t *w, const char *name);     /* by name ("fireflies"); 0 = could not start */
+int   event_start(world_t *w, const char *name);     /* by name ("fireflies", "dholes"); 0 = could not start */
 void  weather_next(world_t *w);
 void  weather_set(world_t *w, int pattern);   /* roll in pattern and keep it; -1 = auto again */
 int   weather_count(void);
@@ -388,6 +390,9 @@ int   actor_spawn(world_t *w, const char *species, float x, float y, int nav, in
 int   actor_spawn_hidden(world_t *w, const char *species, int place);
 void  actor_update(world_t *w, actor_t *a, float dt);
 void  actor_set_intent(world_t *w, actor_t *a, int intent);
+/* An event takes the creature over: it runs these steps (the last one should be ST_DESPAWN), its own brain
+ * (perception, fear, curiosity, rain) stays off until the plan ends. */
+void  actor_script(world_t *w, actor_t *a, int intent, const step_t *steps, int n);
 const char *intent_name(int intent);
 void  profile_parse(const sprite_t *s, profile_t *p);
 /* Picks a ground lane depth around the profile's preferred row (sometimes anywhere). */

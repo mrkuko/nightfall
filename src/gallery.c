@@ -1082,6 +1082,7 @@ int play_run(library_t *lib, const char *assets_dir, uint64_t seed)
             case 'n': w->next_spawn = 0; director(w, 0); break;
             case 'W': weather_next(w); break;      /* the next weather pattern now (its fronts start moving) */
             case 'f': event_start(w, "fireflies"); break;   /* the fireflies blink in step, brighter, flash, gone */
+            case 'P': event_start(w, "dholes"); break;      /* a deer runs across, a pack of dholes on its heels */
             case '0': weather_set(w, -1); break;   /* weather: auto again */
             case '1': case '2': case '3': case '4': case '5': case '6':
                 weather_set(w, k - '1'); break;    /* that weather rolls in and stays: clear mist fog drizzle rain rainfog */
@@ -1129,7 +1130,7 @@ int play_run(library_t *lib, const char *assets_dir, uint64_t seed)
             char line[512], head[720], wxd[64];
             weather_describe(w, wxd, sizeof wxd);
             snprintf(head, sizeof head, " NIGHTFALL playground  seed %llu (%s)  weather %s  creatures %d  %.2gx%s  %dx%d cells (%dx%d px)   "
-                     "q quit  l new scene  B biome  W weather  1-6 pick  0 auto  f fireflies event  h hud  d places/paths  space pause  +/- time  n spawn  r s x o v e g j b c m w p = rabbit squirrel fox owl bat eyes spirit deer boar cat mole weasel dhole ",
+                     "q quit  l new scene  B biome  W weather  1-6 pick  0 auto  f fireflies event  P dhole chase  h hud  d places/paths  space pause  +/- time  n spawn  r s x o v e g j b c m w p = rabbit squirrel fox owl bat eyes spirit deer boar cat mole weasel dhole ",
                      (unsigned long long)seed, g_scene_desc, wxd, w->population, (double)speed, paused ? " PAUSED" : "",
                      sc.w, sc.h, r.w, r.h);
             /* the header wraps at word boundaries when the terminal is narrow */

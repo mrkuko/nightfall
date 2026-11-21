@@ -1550,6 +1550,53 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         a->y = world_ground_at(w, a->x, a->zf);
         return 0;
     }
+    case ST_PURSUE: {
+        /* (event) one of a pack running down its quarry: it keeps its place in the row, x px behind it,
+         * catching up when it lags, easing off when it gets too close; never turning back. hx = the quarry's
+         * pace (smoothed: one standing tick of the quarry must not stop the whole pack), hy = run direction. */
+        actor_t *o = s->place >= 0 && s->place < MAX_ACT ? &w->act[s->place] : NULL;
+        int valid = o && o->alive && !o->hidden && o->id == (uint32_t)s->anim;
+        if (first) { a->hx = 0; a->hy = 0; }
+        float dir, v;
+        if (!valid) {
+            /* the quarry is gone (over the edge): the pack runs on at the same pace until it is off the screen too */
+            if (a->hy == 0 || a->x < -40.0f || a->x > (float)w->w + 40.0f) return 1;
+            dir = a->hy;
+            v = fmaxf(a->hx, 20.0f);
+        } else {
+            dir = (float)o->facing;
+            if (a->hy == 0 && (a->x - o->x) * dir > -4.0f) {
+                /* the quarry has not gone by yet (a dhole that was already here): it watches it come, then joins in */
+                a->facing = o->x < a->x ? -1 : 1;
+                set_anim(a, A_ALERT);
+                return 0;
+            }
+            float base = clip_speed(a, A_RUN, a->prof.run) * a->speed_mul;
+            float pace = dt > 0 ? fabsf(o->moved) / dt : 0.0f;
+            a->hx = a->hy == 0 ? pace : a->hx + (pace - a->hx) * fminf(1.0f, dt * 2.5f);
+            a->hy = dir;
+            float slot = o->x - dir * (s->x + 4.0f * sinf(a->ct * 1.9f + s->x));   /* a loose row, not a rigid one */
+            float behind = (slot - a->x) * dir;                                    /* > 0: it has to catch up */
+            /* too close: it eases off but keeps running (never a run on the spot); the quarry stopped: so does it */
+            v = clampf(a->hx + behind * 1.5f, a->hx * 0.5f, base * 1.3f);
+            if (v < 6.0f) {
+                a->facing = dir < 0 ? -1 : 1;
+                set_anim(a, A_ALERT);
+                return 0;
+            }
+            a->zf = approach(a->zf, o->zf + (float)s->z, dt * 10.0f);
+            a->lane_z = (int)lroundf(a->zf);
+        }
+        set_anim(a, A_RUN);
+        if (in_transition(a)) return 0;
+        a->facing = dir < 0 ? -1 : 1;
+        a->x += dir * v * dt;
+        a->moved = dir * v * dt;
+        a->nav = NAV_GROUND;
+        a->path = -1;
+        a->y = world_ground_at(w, a->x, a->zf);
+        return 0;
+    }
     case ST_TUNNEL: {
         if (first) a->hidden = 1;
         float dx = s->x - a->x;
@@ -1711,6 +1758,23 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
 
 void actor_set_intent(world_t *w, actor_t *a, int intent) { plan_intent(w, a, intent); }
 
+void actor_script(world_t *w, actor_t *a, int intent, const step_t *steps, int n)
+{
+    /* it lets go of whatever it held (a hideout, a shelter, a spot on a branch) */
+    int me = actor_index(w, a);
+    for (int i = 0; i < w->nplace; i++)
+        if (w->place[i].occupant == me) w->place[i].occupant = -1;
+    a->place = -1;
+    plan_clear(a);
+    if (n > MAX_PLAN) n = MAX_PLAN;
+    memcpy(a->plan, steps, sizeof(step_t) * (size_t)n);
+    a->nplan = n;
+    a->intent = intent;
+    a->intent_age = 0;
+    a->fear = 0;
+    a->scripted = 1;
+}
+
 void actor_update(world_t *w, actor_t *a, float dt)
 {
     a->ct += dt;
@@ -1742,7 +1806,7 @@ void actor_update(world_t *w, actor_t *a, float dt)
     a->fatigue = fminf(1.0f, a->fatigue + dt * 0.006f);
     a->boredom = fminf(1.0f, a->boredom + dt * 0.008f);
 
-    perceive(w, a, dt);
+    if (!a->scripted) perceive(w, a, dt);
 
     /* a predator spreads danger, a firefly spreads light */
     if (!a->hidden) {
@@ -1750,7 +1814,8 @@ void actor_update(world_t *w, actor_t *a, float dt)
             /* a predator is frightening by what it does: resting it is barely noticed (the prey lets it
              * come close), walking a bit more, running / chasing it scares from afar */
             int fast = a->anim == A_RUN || (a->step < a->nplan &&
-                       (a->plan[a->step].kind == ST_CHASE || a->plan[a->step].kind == ST_RUNTO));
+                       (a->plan[a->step].kind == ST_CHASE || a->plan[a->step].kind == ST_RUNTO ||
+                        a->plan[a->step].kind == ST_PURSUE));
             int moving = a->anim == A_MOVE;
             float r = fast ? 110.0f : moving ? 50.0f : 35.0f;
             float k = fast ? 1.0f : moving ? 0.6f : 0.5f;
@@ -1762,7 +1827,7 @@ void actor_update(world_t *w, actor_t *a, float dt)
 
     /* curiosity never sleeps completely: even while scratching, resting or sniffing it may notice
      * a creature it likes to chase and dash after it (about a 25 % chance per few-second activity) */
-    if (a->prof.chases[0] && a->nav == NAV_GROUND && !a->hidden && !in_transition(a) &&
+    if (a->prof.chases[0] && !a->scripted && a->nav == NAV_GROUND && !a->hidden && !in_transition(a) &&
         a->intent != IN_CHASE && a->intent != IN_FLEE && a->intent != IN_HIDE && a->intent != IN_LEAVE &&
         a->fear < 0.3f) {
         int asleep = a->intent == IN_REST || a->intent == IN_SHELTER;     /* lying under the leaves too */
@@ -1774,7 +1839,7 @@ void actor_update(world_t *w, actor_t *a, float dt)
     }
 
     /* rain starts: a creature that dislikes it breaks off a calm activity and heads for the leaves */
-    if (a->prof.shelter && a->nav == NAV_GROUND && !a->hidden && !in_transition(a) &&
+    if (a->prof.shelter && !a->scripted && a->nav == NAV_GROUND && !a->hidden && !in_transition(a) &&
         a->intent != IN_SHELTER && a->intent != IN_FLEE && a->intent != IN_HIDE && a->intent != IN_VANISH &&
         a->intent != IN_CHASE && a->intent != IN_LEAVE && a->fear < 0.4f &&
         weather_at(w, WX_RAIN, a->x) > 0.3f && rng_float(&w->rng) < 0.3f * dt && find_shelter(w, a, 400.0f) >= 0) {
@@ -1783,7 +1848,7 @@ void actor_update(world_t *w, actor_t *a, float dt)
     }
 
     /* a bird of prey in its hollow or on a branch may spot something below and go for it */
-    if (a->prof.hunts[0] && !a->hidden && a->intent != IN_HUNT && a->step < a->nplan) {
+    if (a->prof.hunts[0] && !a->scripted && !a->hidden && a->intent != IN_HUNT && a->step < a->nplan) {
         int kind = a->plan[a->step].kind;
         int in_hollow = a->place >= 0 && kind == ST_HOLLOW && a->step_t > 5.0f;
         int on_perch = a->nav == NAV_PERCH && a->place < 0 && kind == ST_ANIM && a->intent == IN_PERCH;
@@ -1804,7 +1869,10 @@ void actor_update(world_t *w, actor_t *a, float dt)
         }
     }
 
-    if (a->step >= a->nplan) choose_intent(w, a);
+    if (a->step >= a->nplan) {
+        a->scripted = 0;                        /* the event's plan is over (normally it ends by leaving) */
+        choose_intent(w, a);
+    }
     if (!a->alive) return;
     if (a->step < a->nplan) {
         a->step_t += dt;

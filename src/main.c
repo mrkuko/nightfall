@@ -52,7 +52,7 @@ static void usage(void)
            "  --seed N                         reproducible scene and behaviour\n"
            "  --scene-time S                   new scene every S seconds (0 = never, default 600)\n"
            "  --biome auto|off|NAME|list       biome (default: random by seed)\n"
-           "  --event NAME                     start an event right away: fireflies  \n"
+           "  --event NAME                     start an event right away: fireflies dholes\n"
            "  --weather auto|NAME              weather: auto comes and goes, or one that stays:\n"
            "                                   clear mist fog drizzle rain rainfog\n"
            "  --weather-in NAME                start clear, then NAME rolls in as a front and stays\n"

@@ -9,6 +9,11 @@
  *   SYNC .. FLASH_AT faster and brighter, the dark between blinks fills with light
  *   FLASH_AT         the flash (a warm white wash, strongest around the swarm) and, a moment later, they vanish
  *   .. END           the flash fades; the forest is as it was, only a little emptier
+ *
+ * Dhole pack chase: a deer bursts in from one edge and runs flat out across the screen, a pack of 3–4 dholes
+ * on its heels in a loose row (they share one target: each keeps its own place behind the deer, ST_PURSUE).
+ * Dholes that were already on the screen watch the deer go by and fall in. Everything small that the dholes
+ * frighten hides as the pack goes past; the deer and the pack leave over the other edge.
  */
 #include "world.h"
 
@@ -98,11 +103,127 @@ static int start_fireflies(world_t *w, int force)
     return 1;
 }
 
+#define DH_MAX_PACK 4
+#define DH_TIMEOUT  60.0f      /* safety net: the event is over by then even if somebody got stuck */
+
+/* Dholes on the screen, on the ground and free, that can join the chase. */
+static int free_dholes(world_t *w, int *out, int cap)
+{
+    int n = 0;
+    for (int i = 0; i < w->nact && n < cap; i++) {
+        const actor_t *a = &w->act[i];
+        if (!a->alive || a->hidden || a->scripted || a->nav != NAV_GROUND || a->path >= 0 || a->clip_after ||
+            strcmp(a->spr->name, "dhole") != 0) continue;
+        if (a->x < 0 || a->x > (float)w->w) continue;
+        out[n++] = i;
+    }
+    return n;
+}
+
+static int start_dholes(world_t *w)
+{
+    event_t *e = &w->ev;
+    if (!lib_find(w->lib, "deer") || !lib_find(w->lib, "dhole")) return 0;
+    int have[DH_MAX_PACK];
+    int nhave = free_dholes(w, have, DH_MAX_PACK);
+    /* the deer comes from the side away from the dholes already here (so it passes them), else at random */
+    float mean = 0;
+    for (int k = 0; k < nhave; k++) mean += w->act[have[k]].x;
+    int from_left = nhave ? mean / (float)nhave > (float)w->w * 0.5f : rng_chance(&e->rng, 0.5f);
+    float dir = from_left ? 1.0f : -1.0f;
+    float x0 = from_left ? -50.0f : (float)w->w + 50.0f;
+    float x1 = from_left ? (float)w->w + 70.0f : -70.0f;
+
+    profile_t dp;
+    profile_parse(lib_find(w->lib, "deer"), &dp);
+    int lane = actor_pick_lane(w, &dp);
+    int di = actor_spawn(w, "deer", x0, 0, NAV_GROUND, lane);
+    if (di < 0) return 0;
+    actor_t *deer = &w->act[di];
+    deer->speed_mul = 0.92f;                    /* flat out, but not a blur: the pack keeps its pace */
+    deer->facing = (int)dir;
+    step_t st[4];
+    memset(st, 0, sizeof st);
+    st[0].kind = ST_RUNTO; st[0].x = x1; st[0].z = lane; st[0].place = -1;
+    st[1].kind = ST_DESPAWN; st[1].place = -1;
+    actor_script(w, deer, IN_FLEE, st, 2);
+
+    e->kind = EV_DHOLES;
+    e->t = 0;
+    e->flash = 0;
+    e->gone = 0;
+    e->n = 0;
+    e->id[e->n++] = (di << 16) | (int)(deer->id & 0xffff);
+
+    /* the pack: the ones already here first (front of the row), the rest run in behind the deer */
+    int want = rng_between(&e->rng, 3, DH_MAX_PACK);
+    if (want < nhave) want = nhave;
+    float gap = 62.0f;                          /* the first one a good length behind the deer's tail */
+    for (int k = 0; k < want; k++) {
+        int i;
+        if (k < nhave) {
+            i = have[k];
+        } else {
+            float x = x0 - dir * (gap + rng_range(&e->rng, 0.0f, 12.0f));
+            i = actor_spawn(w, "dhole", x, 0, NAV_GROUND, lane);
+            if (i < 0) break;
+        }
+        actor_t *a = &w->act[i];
+        a->speed_mul = rng_range(&e->rng, 1.0f, 1.15f);
+        memset(st, 0, sizeof st);
+        st[0].kind = ST_PURSUE;
+        st[0].place = di;
+        st[0].anim = (int)deer->id;
+        st[0].x = gap;
+        st[0].z = 2 + (k % 2) * 4 + rng_between(&e->rng, -1, 1);      /* staggered rows: not one on top of the other */
+        st[1].kind = ST_RUNTO; st[1].x = x1 - dir * 10.0f; st[1].z = lane + st[0].z; st[1].place = -1;
+        st[2].kind = ST_DESPAWN; st[2].place = -1;
+        actor_script(w, a, IN_CHASE, st, 3);
+        e->id[e->n++] = (i << 16) | (int)(a->id & 0xffff);
+        gap += rng_range(&e->rng, 34.0f, 46.0f);
+    }
+    if (e->n < 4) {                             /* not even a pack of three: let them all go their way */
+        for (int k = 0; k < e->n; k++) {
+            actor_t *a = member(w, e, k);
+            if (a) a->nplan = a->step;          /* plan over -> own brain again (the deer still has to get away) */
+        }
+        if (deer->alive) actor_set_intent(w, deer, IN_LEAVE);
+        e->kind = EV_NONE;
+        e->n = 0;
+        return 0;
+    }
+    world_log(w, "a deer bursts out, %d dholes on its heels", e->n - 1);
+    return 1;
+}
+
+static void update_dholes(world_t *w, event_t *e, float dt)
+{
+    e->t += dt;
+    int live = 0;
+    for (int k = 0; k < e->n; k++) {
+        actor_t *a = member(w, e, k);
+        if (!a) continue;
+        live++;
+        /* the pack in full cry frightens from further away than one running dhole */
+        if (k > 0 && a->anim == A_RUN) world_stimulus(w, a->x, a->y, 170, ST_DANGER, 1.0f, 0.4f, e->id[k] >> 16);
+    }
+    if (!e->gone && !member(w, e, 0)) {
+        e->gone = 1;
+        world_log(w, "the chase is gone, the forest holds its breath");
+    }
+    if (!live || e->t > DH_TIMEOUT) {
+        e->kind = EV_NONE;
+        e->n = 0;
+        e->next = rng_range(&e->rng, 180.0f, 420.0f);
+    }
+}
+
 int event_start(world_t *w, const char *name)
 {
     if (w->ev.kind != EV_NONE) return 0;
     w->ev.pending = EV_NONE;
     if (!strcmp(name, "fireflies")) return start_fireflies(w, 1);
+    if (!strcmp(name, "dholes")) return start_dholes(w);
     return 0;
 }
 
@@ -214,6 +335,10 @@ void events_update(world_t *w, float dt)
         update_fireflies(w, e, dt);
         return;
     }
+    if (e->kind == EV_DHOLES) {
+        update_dholes(w, e, dt);
+        return;
+    }
     if (e->pending != EV_NONE) {
         prepare(w, e, dt);
         return;
@@ -223,6 +348,9 @@ void events_update(world_t *w, float dt)
     /* the director: picks an event that fits the moment; if none does, it asks again soon */
     e->next = 20.0f;
     if (weather_at(w, WX_RAIN, (float)w->w * 0.5f) > 0.25f) return;
+    /* dholes about (so the biome has them): now and then they pick up a deer's trail instead */
+    int dh[1];
+    if (free_dholes(w, dh, 1) && rng_chance(&e->rng, 0.5f) && start_dholes(w)) return;
     e->pending = EV_FIREFLIES;
     e->prep = PREP_TIME;
     /* fireflies: if there are only two or three, a few more arrive before it starts (at least two) */

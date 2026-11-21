@@ -140,10 +140,33 @@ double term_now(void)
     return (double)t.QuadPart / (double)freq.QuadPart;
 }
 
+#ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
+#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
+#endif
+
+/* Sleep() rounds up to the system tick (~15.6 ms): frames would come at 78 / 94 / 109 ms instead of a steady
+ * 83 ms and fast motion judders. A high-resolution waitable timer (Windows 10 1803+) wakes within ~0.5 ms;
+ * on older systems Sleep() covers most of the wait and the last couple of milliseconds are spun out. */
 void term_sleep(double sec)
 {
     if (sec <= 0) return;
-    Sleep((DWORD)(sec * 1000.0 + 0.5));
+    static HANDLE timer;
+    static int tried;
+    if (!tried) {
+        tried = 1;
+        timer = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+    }
+    if (timer) {
+        LARGE_INTEGER due;
+        due.QuadPart = -(LONGLONG)(sec * 1e7);          /* relative, in 100 ns units */
+        if (SetWaitableTimer(timer, &due, 0, NULL, NULL, FALSE)) {
+            WaitForSingleObject(timer, INFINITE);
+            return;
+        }
+    }
+    double end = term_now() + sec;
+    if (sec > 0.02) Sleep((DWORD)((sec - 0.017) * 1000.0));
+    while (term_now() < end) Sleep(0);
 }
 
 #else
