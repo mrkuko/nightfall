@@ -2470,10 +2470,67 @@ end
                                     False: [(0.22, -0.78, 0.99), (0.58, -0.10, 0.62), (0.85, 0.32, 0.95)],
                                 })
         poses.append(('gal%d' % i, running(bob, legs)))
+
+    # alert with the ears turning (listening to one side, then the other)
+    alert = dict(neck=Y(41.0, 20.0, 44.8, 5.6) + (5.2, 3.4), hx=47.6, hy=3.6 + DY, hang=-0.1)
+    poses += [
+        ('alert_earl', dict(alert, ear=(-2.8, -2.0, 4.0, 1.9), earlean=-1.4)),
+        ('alert_earr', dict(alert, ear=(-1.2, -3.0, 4.6, 1.4), earlean=0.8)),
+    ]
+
+    # bound (a long leap, driven frame by frame by ST_BOUND, which also lifts the whole deer along the arc):
+    # gather -> launch (hind legs push off straight) -> stretched flight -> landing on the front legs
+    LF, LH = (12.6, 14.6), (13.0, 14.8)
+    def leaps(dy, feet, **kw):
+        legs = {}
+        for k, (fx, fy) in feet.items():
+            hx_, hy_ = c['hips'][k]
+            l1, l2 = LF if k[1] == 'f' else LH
+            legs[k] = leg_ik((hx_, hy_ + dy), (fx, fy + dy), l1, l2, 1 if k[1] == 'f' else -1)
+        d = running(dy, legs)
+        d.update(kw)
+        return d
+    H = 31.0 + DY
+    poses += [
+        ('bound0', leaps(3.0, dict(nf=(38.0, G - 3.0), ff=(40.0, G - 3.5), nh=(27.0, G - 3.0), fh=(25.0, G - 3.5)),
+                         hy=16.0 + DY, hang=0.6)),
+        ('bound1', leaps(-2.0, dict(nf=(45.0, H + 13.0), ff=(48.0, H + 11.0), nh=(7.0, G - 1.0), fh=(5.0, G - 3.0)),
+                         hy=11.0 + DY, hang=0.3)),
+        ('bound2', leaps(-1.0, dict(nf=(58.0, H + 17.0), ff=(60.0, H + 14.0), nh=(5.0, H + 15.0), fh=(3.0, H + 12.0)),
+                         hy=12.0 + DY, hang=0.35)),
+        ('bound3', leaps(0.0, dict(nf=(48.0, G), ff=(51.0, G - 2.0), nh=(26.0, H + 16.0), fh=(24.0, H + 14.0)),
+                         hy=15.0 + DY, hang=0.5)),
+    ]
+
+    # lying down (resting in a clearing): the body on the ground, the legs folded under it, the head held up
+    def lying(dy=21.0, **kw):
+        legs = {k: leg_ik((hx_, hy_ + dy), (hx_ + (11.0 if k[1] == 'f' else 10.0), G - 0.6), *(LF if k[1] == 'f' else LH),
+                          1 if k[1] == 'f' else -1) for k, (hx_, hy_) in c['hips'].items()}
+        d = dict(body=[(x, y + dy, rx, ry, a) for (x, y, rx, ry, a) in c['body']],
+                 chest=(44.0, 29.4 + DY + dy, 2.8, 5.0, 0.2),
+                 bodyextra=[E(11.8, 23.4 + DY + dy, 2.6, 4.4, 0.0, 'cCa', 0.2), E(11.2, 19.6 + DY + dy, 1.4, 2.2, 0.0, 'ddd')],
+                 neck=Y(41.0, 24.0 + dy, 46.0, 13.0 + dy) + (5.2, 3.4), hx=49.4, hy=11.0 + DY + dy, hang=0.3, legs=legs)
+        d.update(kw)
+        return d
+    lie = lying()
+    poses += [
+        ('lie', lie),
+        ('lie_blink', dict(lie, eye=0)),
+        ('lie_ears', dict(lie, ear=(-2.8, -2.0, 4.0, 1.9), earlean=-1.4)),
+        ('lie_look', dict(lie, neck=Y(41.0, 23.0 + 21.0, 44.6, 10.0 + 21.0) + (5.2, 3.4), hx=47.4, hy=7.0 + DY + 21.0, hang=0.0)),
+        # half way: the front kneels first (getting up it is the other way round, the same frame)
+        ('kneel', dict(lying(11.0), body=[(30.0, 26.0 + DY + 12.0, 14.6, 8.4, -0.18), (18.6, 25.4 + DY + 6.0, 7.8, 8.6, 0.0),
+                                          (39.4, 25.0 + DY + 16.0, 7.2, 8.8, 0.0)],
+                       legs=dict(lying(16.0)['legs'], nh=(20.0, 31.0 + DY + 5.0, 21.0, G), fh=(17.6, 31.0 + DY + 5.0, 18.6, G)))),
+    ]
     clips = """
 clip idle loop fps=4 : stand*14 stand_blink stand*8 ears ears stand*6 look*6 look_blink look*4 stand*4
 clip look loop fps=4 : look*8 look_blink look*6 stand*2
-clip alert loop fps=4 : alert*12 look_blink alert*4
+clip alert loop fps=4 : alert*6 alert_earl*4 alert*3 alert_earr*4 alert*2 look_blink alert*3
+clip lie loop fps=3 : lie*12 lie_blink lie*8 lie_ears lie_ears lie*6 lie_look*8 lie_blink lie_look*3 lie*6
+clip lie_in once fps=4 : kneel kneel
+clip lie_out once fps=4 : kneel kneel
+clip bound once fps=4 : bound0 bound1 bound2 bound3
 clip graze loop fps=5 : graze graze2 graze graze2 graze graze2 graze_blink graze graze2 graze graze2 graze*4 graze_up graze_up graze*2
 clip walk loop fps=7 speed=13 : walk0 walk1 walk2 walk3 walk4 walk5
 clip run loop fps=10 speed=48 : gal0 gal1 gal2 gal3 gal4 gal5 gal6 gal7
@@ -2482,8 +2539,11 @@ clip run loop fps=10 speed=48 : gal0 gal1 gal2 gal3 gal4 gal5 gal6 gal7
   move ground
   lane -0.1
   speed walk=13 run=48
-  anim idle=idle move=walk run=run look=look alert=alert eat=graze sniff=graze
-  intents forage=7 look=3 wander=2 leave=3
+  anim idle=idle move=walk run=run look=look alert=alert eat=graze sniff=graze rest=lie
+  intents forage=7 look=3 wander=2 leave=3 rest=2
+  rest_time 15 45
+  wary 1            # while grazing it lifts its head now and then, listens, and sometimes bolts
+  bound 50 9        # it bolts in leaps: length and height (px), frames bound0..bound3
   homes edge
   fear 0.5
   curiosity 0.3

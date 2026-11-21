@@ -155,6 +155,7 @@ enum {
     ST_TUNNEL,      /* (mole) underground to x, then surfaces with a new molehill */
     ST_HUNT,        /* (owl) stoop on creature `place` from above; z = 1: it will catch it, 0: it misses */
     ST_SHELTER,     /* wait under big leaves (place) until the rain stops */
+    ST_BOUND,       /* long leaps along arcs to x (frames bound0..3 by the leap phase), depth to z */
     ST_PURSUE,      /* (event) run after creature `place` (id `anim`) x px behind it, z deeper/closer; when it is gone, runs on off the screen */
     ST_DESPAWN
 };
@@ -188,6 +189,9 @@ typedef struct {
     char  chases[128];          /* " rabbit mouse " — runs after them out of curiosity */
     char  hunts[128];           /* " mouse " — a bird of prey stoops on them (and may catch them) */
     int   shelter;              /* "shelter rain": goes under big leaves when it rains */
+    float wary;                 /* grazing, it lifts its head now and then to listen (and may bolt); 0 = never */
+    float bound_len, bound_h;   /* "bound LEN H": it bolts in leaps this long and high (px) */
+    int   bound_f[4];           /* frames bound0..bound3 (gather, launch, flight, landing); -1 = no leaps */
 } profile_t;
 
 typedef struct {

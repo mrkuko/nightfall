@@ -107,6 +107,15 @@ void profile_parse(const sprite_t *s, profile_t *p)
     if ((v = sprite_prop(s, "chases"))) snprintf(p->chases, sizeof p->chases, " %s ", v);
     if ((v = sprite_prop(s, "hunts"))) snprintf(p->hunts, sizeof p->hunts, " %s ", v);
     p->shelter = (v = sprite_prop(s, "shelter")) && strstr(v, "rain");
+    p->wary = (v = sprite_prop(s, "wary")) ? (float)atof(v) : 0.0f;
+    p->bound_len = 50.0f; p->bound_h = 8.0f;
+    if ((v = sprite_prop(s, "bound"))) sscanf(v, "%f %f", &p->bound_len, &p->bound_h);
+    for (int k = 0; k < 4; k++) {
+        char fn[16];
+        snprintf(fn, sizeof fn, "bound%d", k);
+        p->bound_f[k] = v ? sprite_frame_index(s, fn) : -1;
+    }
+    if (p->bound_f[3] < 0) p->bound_f[0] = -1;
     p->lane = (v = sprite_prop(s, "lane")) ? (float)atof(v) : 0.15f;
     p->rare = (v = sprite_prop(s, "rare")) ? atoi(v) : 0;
     p->burrow = (v = sprite_prop(s, "burrow")) ? atoi(v) : 0;
@@ -437,8 +446,12 @@ static void plan_hide(world_t *w, actor_t *a, int run)
     int mask = a->prof.homes & ((1 << PL_ENTRY) | (1 << PL_UNDER) | (1 << PL_HOLLOW));
     int pi = find_place(w, a, mask, 1, 400);
     if (pi < 0) {
-        /* nowhere to hide -> off the screen */
+        /* nowhere to hide -> off the screen (a leaper bolts with a few long leaps first) */
         float ex = a->x < (float)w->w / 2 ? -30.0f : (float)w->w + 30.0f;
+        if (run && a->prof.bound_f[0] >= 0 && a->nav == NAV_GROUND) {
+            step_t *b = plan_push(a, ST_BOUND);
+            if (b) { b->x = a->x + sgnf(ex - a->x) * a->prof.bound_len * (float)rng_between(&w->rng, 2, 3); b->z = a->lane_z; }
+        }
         plan_ground_move(w, a, ex, run, a->lane_z);
         plan_push(a, ST_DESPAWN);
         a->intent = IN_FLEE;
@@ -1550,6 +1563,42 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         a->y = world_ground_at(w, a->x, a->zf);
         return 0;
     }
+    case ST_BOUND: {
+        /* Long leaps: each one gathers, launches off the hind legs, flies along an arc, lands on the front legs.
+         * The frames are picked by the leap phase (bob = 0..1), the arc lifts the whole body. It finishes the
+         * leap it is in and stops when the next one would overshoot the target. */
+        if (a->prof.bound_f[0] < 0) { s->kind = ST_RUNTO; return 0; }        /* no leap frames: it just runs */
+        if (first) a->bob = 0;
+        set_anim(a, A_RUN);
+        a->nav = NAV_GROUND;
+        a->path = -1;
+        float L = a->prof.bound_len;
+        float spd = clip_speed(a, A_RUN, a->prof.run) * a->speed_mul * 1.2f;
+        float dx = s->x - a->x;
+        a->bob += spd * dt / L;
+        if (a->bob >= 1.0f) {
+            if (fabsf(dx) < L * 0.6f) {                 /* landed, and no room for another leap */
+                a->bob = 0;
+                a->ov_frame = 0;
+                a->y = world_ground_at(w, a->x, a->zf);
+                return 1;
+            }
+            a->bob -= 1.0f;
+        }
+        float u = a->bob;
+        int air = u >= 0.18f && u < 0.92f;              /* only off the ground does it cover distance fast */
+        float st = sgnf(dx) * fminf(fabsf(dx), spd * dt * (air ? 1.3f : 0.35f));
+        if (fabsf(dx) > 0.5f) a->facing = dx < 0 ? -1 : 1;
+        a->x += st;
+        a->moved = air ? 0.0f : st;
+        int f = u < 0.18f ? 0 : u < 0.32f ? 1 : u < 0.78f ? 2 : 3;
+        a->ov_frame = 1 + a->prof.bound_f[f];
+        float lift = (u > 0.2f && u < 0.9f) ? a->prof.bound_h * sinf(3.14159265f * (u - 0.2f) / 0.7f) : 0.0f;
+        a->zf = approach(a->zf, (float)s->z, dt * 8.0f);
+        a->lane_z = s->z;
+        a->y = world_ground_at(w, a->x, a->zf) - lift;
+        return 0;
+    }
     case ST_PURSUE: {
         /* (event) one of a pack running down its quarry: it keeps its place in the row, x px behind it,
          * catching up when it lags, easing off when it gets too close; never turning back. hx = the quarry's
@@ -1838,6 +1887,37 @@ void actor_update(world_t *w, actor_t *a, float dt)
         }
     }
 
+    /* a wary grazer: now and then the head comes up from the grass, the ears turn, it listens … and either grazes
+     * on, or bolts in a few long leaps and looks back from a safer distance */
+    if (a->prof.wary > 0 && !a->scripted && a->nav == NAV_GROUND && !a->hidden && !in_transition(a) &&
+        a->step < a->nplan && a->plan[a->step].kind == ST_ANIM && a->plan[a->step].anim == A_EAT &&
+        a->step_t > 1.0f && rng_float(&w->rng) < 0.12f * a->prof.wary * dt) {
+        float L = a->prof.bound_len;
+        int leaps = rng_between(&w->rng, 3, 4);
+        if (a->prof.bound_f[0] >= 0 && rng_chance(&w->rng, 0.3f + a->fear)) {
+            float dir = rng_chance(&w->rng, 0.5f) ? -1.0f : 1.0f;
+            float room = dir > 0 ? (float)w->w - 20.0f - a->x : a->x - 20.0f;
+            if (room < L * 2.0f) dir = -dir;
+            float tx = clampf(a->x + dir * L * (float)leaps, 20.0f, (float)w->w - 20.0f);
+            plan_clear(a);
+            a->intent = IN_FLEE;
+            a->intent_age = 0;
+            push_anim(a, A_ALERT, rng_range(&w->rng, 1.2f, 2.5f));
+            step_t *b = plan_push(a, ST_BOUND);
+            if (b) { b->x = tx; b->z = a->lane_z; }
+            b = plan_push(a, ST_FACE);                  /* looks back where it came from */
+            if (b) b->x = a->x;
+            push_anim(a, A_ALERT, rng_range(&w->rng, 1.5f, 3.5f));
+            world_log(w, "%s#%u lifts its head … and bolts!", a->spr->name, a->id);
+        } else {
+            step_t st[1];
+            memset(st, 0, sizeof st);
+            st[0].kind = ST_ANIM; st[0].anim = A_ALERT; st[0].dur = rng_range(&w->rng, 1.5f, 4.0f); st[0].place = -1;
+            plan_interrupt(a, st, 1);
+            world_log(w, "%s#%u lifts its head and listens", a->spr->name, a->id);
+        }
+    }
+
     /* rain starts: a creature that dislikes it breaks off a calm activity and heads for the leaves */
     if (a->prof.shelter && !a->scripted && a->nav == NAV_GROUND && !a->hidden && !in_transition(a) &&
         a->intent != IN_SHELTER && a->intent != IN_FLEE && a->intent != IN_HIDE && a->intent != IN_VANISH &&
@@ -1886,8 +1966,11 @@ void actor_update(world_t *w, actor_t *a, float dt)
     if (a->mask_place && (a->step >= a->nplan || (a->plan[a->step].kind != ST_ENTER &&
         a->plan[a->step].kind != ST_EXIT && a->plan[a->step].kind != ST_PEEK && a->plan[a->step].kind != ST_HOLLOW)))
         a->mask_place = 0;
+    /* leap frames belong to ST_BOUND only (an interrupted leap must not leave the deer frozen in mid-air) */
+    int leaping = a->step < a->nplan && a->plan[a->step].kind == ST_BOUND;
+    if (a->ov_frame && !leaping) a->ov_frame = 0;
     /* on the ground the screen row follows the depth (depth changes walk forward / back) */
-    if (a->nav == NAV_GROUND && !a->hidden && a->path < 0)
+    if (a->nav == NAV_GROUND && !a->hidden && a->path < 0 && !leaping)
         a->y = approach(a->y, world_ground_at(w, a->x, a->zf), dt * 30.0f);
 }
 
