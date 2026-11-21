@@ -14,6 +14,10 @@
  * on its heels in a loose row (they share one target: each keeps its own place behind the deer, ST_PURSUE).
  * Dholes that were already on the screen watch the deer go by and fall in. Everything small that the dholes
  * frighten hides as the pack goes past; the deer and the pack leave over the other edge.
+ *
+ * Bat swarm: out of one spot (a hollow in a trunk, else a branch high up) bats pour out one after another,
+ * rise in a loose column, then scatter across the sky in zigzags; most leave over the edges, one or two stay
+ * and go on as ordinary bats.
  */
 #include "world.h"
 
@@ -218,12 +222,121 @@ static void update_dholes(world_t *w, event_t *e, float dt)
     }
 }
 
+#define BAT_MIN     10
+#define BAT_MAX     16          /* (<= EV_MAX_FF) */
+#define BAT_TIMEOUT 45.0f
+
+/* Where the bats come out: a hollow on the screen (a free one if there is one), else a branch high up,
+ * else just somewhere in the crowns. */
+static void bat_spot(world_t *w, event_t *e, float *x, float *y)
+{
+    int free_h[32], any_h[32], perch[32], nf = 0, na = 0, np = 0;
+    for (int i = 0; i < w->nplace; i++) {
+        const place_t *p = &w->place[i];
+        int hollow = p->type == PL_HOLLOW && p->has_eye;
+        if (!hollow && p->type != PL_PERCH) continue;
+        float px = hollow ? p->ex : p->x, py = hollow ? p->ey : p->y;
+        if (px < 12.0f || px > (float)w->w - 12.0f || py < 8.0f || py > (float)w->h * 0.7f) continue;
+        if (hollow && p->occupant < 0 && nf < 32) free_h[nf++] = i;
+        if (hollow && na < 32) any_h[na++] = i;
+        if (!hollow && np < 32) perch[np++] = i;
+    }
+    int pick = nf ? free_h[rng_int(&e->rng, nf)] : na ? any_h[rng_int(&e->rng, na)] : np ? perch[rng_int(&e->rng, np)] : -1;
+    if (pick < 0) {
+        *x = rng_range(&e->rng, (float)w->w * 0.2f, (float)w->w * 0.8f);
+        *y = (float)w->h * rng_range(&e->rng, 0.12f, 0.3f);
+        return;
+    }
+    const place_t *p = &w->place[pick];
+    *x = p->type == PL_HOLLOW ? p->ex : p->x;
+    *y = p->type == PL_HOLLOW ? p->ey : p->y;
+}
+
+/* One more bat out of the spot: up in the column, then off in its own direction. */
+static void emerge_bat(world_t *w, event_t *e)
+{
+    int z = w->ground_z + 14;                   /* in front of the trunks */
+    int i = actor_spawn(w, "bat", e->cx + rng_range(&e->rng, -1.5f, 1.5f), e->cy, NAV_AIR, z);
+    if (i < 0) { e->prep_left = 0; return; }
+    actor_t *a = &w->act[i];
+    a->speed_mul = rng_range(&e->rng, 0.9f, 1.25f);
+    int stay = e->n >= 2 && e->gone < 2 && rng_chance(&e->rng, 0.18f);       /* gone = how many stay */
+    step_t st[6];
+    memset(st, 0, sizeof st);
+    int n = 0;
+    float W = (float)w->w, H = (float)w->h;
+    /* out and up: a loose column above the spot, leaning the way it will go */
+    float side = rng_chance(&e->rng, 0.5f) ? -1.0f : 1.0f;
+    float x = e->cx + side * rng_range(&e->rng, 2.0f, 10.0f), y = fmaxf(4.0f, e->cy - rng_range(&e->rng, 12.0f, 26.0f));
+    st[n].kind = ST_FLY; st[n].x = x; st[n].y = y; st[n].z = z; st[n].place = -1; n++;
+    /* scattering: two zigzag legs across the sky */
+    for (int k = 0; k < 2; k++) {
+        x = clampf(x + side * rng_range(&e->rng, 25.0f, 70.0f), 6.0f, W - 6.0f);
+        y = clampf(y + rng_range(&e->rng, -18.0f, 16.0f), 4.0f, H * 0.5f);
+        st[n].kind = ST_FLY; st[n].x = x; st[n].y = y; st[n].z = z; st[n].place = -1; n++;
+    }
+    if (stay) {
+        e->gone++;
+    } else {
+        /* away over the nearest edge (or up into the canopy) */
+        float ex = side < 0 ? -20.0f : W + 20.0f, ey = rng_range(&e->rng, -15.0f, H * 0.4f);
+        if (rng_chance(&e->rng, 0.3f)) { ex = clampf(x + side * rng_range(&e->rng, 20.0f, 60.0f), -20.0f, W + 20.0f); ey = -20.0f; }
+        st[n].kind = ST_FLY; st[n].x = ex; st[n].y = ey; st[n].z = z; st[n].place = -1; n++;
+        st[n].kind = ST_DESPAWN; st[n].place = -1; n++;
+    }
+    actor_script(w, a, IN_FLEE, st, n);         /* (IN_FLEE: they fly at full speed) */
+    if (e->n < EV_MAX_FF) e->id[e->n++] = (i << 16) | (int)(a->id & 0xffff);
+}
+
+static int start_bats(world_t *w)
+{
+    event_t *e = &w->ev;
+    if (!lib_find(w->lib, "bat")) return 0;
+    e->kind = EV_BATS;
+    e->t = 0;
+    e->flash = 0;
+    e->gone = 0;
+    e->n = 0;
+    bat_spot(w, e, &e->cx, &e->cy);
+    e->prep_left = rng_between(&e->rng, BAT_MIN, BAT_MAX);
+    e->prep_next = 0;
+    world_log(w, "bats pour out at x=%d", (int)e->cx);
+    return 1;
+}
+
+static void update_bats(world_t *w, event_t *e, float dt)
+{
+    e->t += dt;
+    if (e->prep_left > 0) {
+        e->prep_next -= dt;
+        if (e->prep_next <= 0) {
+            emerge_bat(w, e);
+            e->prep_left--;
+            /* a stream with gaps: sometimes two right behind each other, sometimes a pause */
+            e->prep_next = rng_chance(&e->rng, 0.35f) ? rng_range(&e->rng, 0.04f, 0.12f) : rng_range(&e->rng, 0.15f, 0.4f);
+        }
+        return;
+    }
+    int busy = 0;
+    for (int k = 0; k < e->n; k++) {
+        actor_t *a = member(w, e, k);
+        if (a && a->scripted) busy++;
+    }
+    if (!busy || e->t > BAT_TIMEOUT) {
+        world_log(w, "the bats have scattered");
+        e->kind = EV_NONE;
+        e->n = 0;
+        e->next = rng_range(&e->rng, 180.0f, 420.0f);
+    }
+}
+
 int event_start(world_t *w, const char *name)
 {
     if (w->ev.kind != EV_NONE) return 0;
     w->ev.pending = EV_NONE;
     if (!strcmp(name, "fireflies")) return start_fireflies(w, 1);
     if (!strcmp(name, "dholes")) return start_dholes(w);
+    if (!strcmp(name, "bats")) return start_bats(w);
     return 0;
 }
 
@@ -339,6 +452,10 @@ void events_update(world_t *w, float dt)
         update_dholes(w, e, dt);
         return;
     }
+    if (e->kind == EV_BATS) {
+        update_bats(w, e, dt);
+        return;
+    }
     if (e->pending != EV_NONE) {
         prepare(w, e, dt);
         return;
@@ -351,6 +468,8 @@ void events_update(world_t *w, float dt)
     /* dholes about (so the biome has them): now and then they pick up a deer's trail instead */
     int dh[1];
     if (free_dholes(w, dh, 1) && rng_chance(&e->rng, 0.5f) && start_dholes(w)) return;
+    /* bats: mostly early in the night (the scene is young), now and then later too */
+    if (rng_chance(&e->rng, w->t < 600.0f ? 0.45f : 0.2f) && start_bats(w)) return;
     e->pending = EV_FIREFLIES;
     e->prep = PREP_TIME;
     /* fireflies: if there are only two or three, a few more arrive before it starts (at least two) */

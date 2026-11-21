@@ -156,7 +156,7 @@ crosses = hideouts and perches. The playground also shows a HUD with every creat
 | `--biome auto\|off\|NAME\|list` | pick a biome (`auto`: by the seed, `off`: anything goes) |
 | `--weather auto\|NAME` | `auto` (default): fog and rain come and go; or one that stays: `clear mist fog drizzle rain rainfog` |
 | `--weather-time M` | about how long one weather lasts, in minutes (default `6`, the real length is random, 0.6–1.4 ×; `0` = no weather) |
-| `--event NAME` | start an event right away (also in `--play` and the screensaver): `fireflies`, `dholes` |
+| `--event NAME` | start an event right away (also in `--play` and the screensaver): `fireflies`, `dholes`, `bats` |
 | `--spawn-freq F` | how often creatures arrive (`1` default, `2` twice as often, `0` none) |
 | `--max-creatures N` | most creatures about at once (`0` = automatic, grows with the screen width) |
 | `--spawn-rate NAME=F …` | override spawn chances, e.g. `--spawn-rate dhole=0.3 rabbit=0` |
@@ -181,7 +181,7 @@ nightfall --seed 42 --scene-time 0 --grass-density 0.6
 | `h` | toggle HUD | `d` | show places, paths, links |
 | `W` | next weather (the fronts start moving) | `1`–`6` | pick a weather and keep it: clear, mist, fog, drizzle, rain, rainfog |
 | `0` | weather back to auto | `f` | the fireflies event now |
-| `P` | dhole pack chases a deer now | | |
+| `P` | dhole pack chases a deer now | `V` | a bat swarm pours out now |
 
 Spawn a creature: `r` rabbit · `s` squirrel · `x` fox · `o` owl · `v` bat · `e` eyes ·
 `g` spirit · `j` deer · `b` boar · `c` wildcat · `m` mole · `w` weasel · `p` dhole

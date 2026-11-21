@@ -267,7 +267,7 @@ typedef struct {
 } weather_t;
 
 /* --- events (src/event.c): rare, mysterious happenings; one at a time, with their own rng stream --- */
-enum { EV_NONE, EV_FIREFLIES, EV_DHOLES };
+enum { EV_NONE, EV_FIREFLIES, EV_DHOLES, EV_BATS };
 #define EV_MAX_FF 16
 typedef struct {
     int      kind;              /* EV_* running now */
@@ -371,7 +371,7 @@ void  weather_begin(world_t *w, const char *arg);
 void  events_init(world_t *w, uint64_t seed);
 void  events_update(world_t *w, float dt);
 void  events_render(world_t *w, raster_t *r);        /* the flash over the finished frame */
-int   event_start(world_t *w, const char *name);     /* by name ("fireflies", "dholes"); 0 = could not start */
+int   event_start(world_t *w, const char *name);     /* by name ("fireflies", "dholes", "bats"); 0 = could not start */
 void  weather_next(world_t *w);
 void  weather_set(world_t *w, int pattern);   /* roll in pattern and keep it; -1 = auto again */
 int   weather_count(void);
