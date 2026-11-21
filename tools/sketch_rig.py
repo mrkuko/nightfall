@@ -98,6 +98,65 @@ class Merge:
         return any(p.inside(x, y) for p in s.shapes)
 
 
+class Poly:
+    """A closed outline through control points, smoothed (Catmull-Rom) — organic silhouettes in one piece."""
+    def __init__(s, pts, keys='bad', fuzz=0.0, steps=6):
+        s.keys, s.fuzz = keys, fuzz
+        n = len(pts)
+        out = []
+        for i in range(n):
+            p0, p1, p2, p3 = pts[(i - 1) % n], pts[i], pts[(i + 1) % n], pts[(i + 2) % n]
+            for k in range(steps):
+                t = k / steps
+                t2, t3 = t * t, t * t * t
+                out.append(tuple(0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2
+                                        + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3) for j in (0, 1)))
+        s.pts = out
+        s.x0, s.x1 = min(p[0] for p in out), max(p[0] for p in out)
+        s.y0, s.y1 = min(p[1] for p in out), max(p[1] for p in out)
+
+    def inside(s, x, y):
+        if x < s.x0 or x > s.x1 or y < s.y0 or y > s.y1:
+            return False
+        c = False
+        pts = s.pts
+        j = len(pts) - 1
+        for i in range(len(pts)):
+            xi, yi = pts[i]
+            xj, yj = pts[j]
+            if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi) + xi:
+                c = not c
+            j = i
+        return c
+
+
+class Inter:
+    """Pixels inside both shapes (shading regions clipped to the body)."""
+    def __init__(s, a, b, keys='bad', fuzz=0.0):
+        s.a, s.b, s.keys, s.fuzz = a, b, keys, fuzz
+
+    def inside(s, x, y):
+        return s.a.inside(x, y) and s.b.inside(x, y)
+
+
+class Diff:
+    """Pixels inside a but not inside b."""
+    def __init__(s, a, b, keys='bad', fuzz=0.0):
+        s.a, s.b, s.keys, s.fuzz = a, b, keys, fuzz
+
+    def inside(s, x, y):
+        return s.a.inside(x, y) and not s.b.inside(x, y)
+
+
+class Shift:
+    """A shape moved by (dx, dy): Diff(A, Shift(A, 0, 3)) = the 3 px band along A's upper edge."""
+    def __init__(s, a, dx, dy):
+        s.a, s.dx, s.dy = a, dx, dy
+
+    def inside(s, x, y):
+        return s.a.inside(x - s.dx, y - s.dy)
+
+
 class Union:
     def __init__(s, circles, keys, fuzz):
         s.circles, s.keys, s.fuzz = circles, keys, fuzz
@@ -106,7 +165,8 @@ class Union:
         return any((x - cx) ** 2 + (y - cy) ** 2 <= r * r for cx, cy, r in s.circles)
 
 
-def render(parts, w, h, rot=0.0, pivot=(0, 0), seed=1):
+def render(parts, w, h, rot=0.0, pivot=(0, 0), seed=1, owner=None):
+    """owner: an optional h x w list of lists, filled with the index of the part that drew each pixel."""
     grid = [['.'] * w for _ in range(h)]
     cr, sr = math.cos(-rot), math.sin(-rot)
     px0, py0 = pivot
@@ -122,12 +182,16 @@ def render(parts, w, h, rot=0.0, pivot=(0, 0), seed=1):
             x, y = round(px0 + dx * c2 - dy * s2), round(py0 + dx * s2 + dy * c2)
             if 0 <= x < w and 0 <= y < h:
                 grid[y][x] = part.key
+                if owner is not None:
+                    owner[y][x] = pi
             continue
         if isinstance(part, Clear):
             for y in range(h):
                 for x in range(w):
                     if part.e.inside(*to_local(x + 0.5, y + 0.5)):
                         grid[y][x] = '.'
+                        if owner is not None:
+                            owner[y][x] = None
             continue
         mask = [[part.inside(*to_local(x + 0.5, y + 0.5)) for x in range(w)] for y in range(h)]
         if part.fuzz > 0:
@@ -155,6 +219,8 @@ def render(parts, w, h, rot=0.0, pivot=(0, 0), seed=1):
                 else:
                     k = mk
                 grid[y][x] = k
+                if owner is not None:
+                    owner[y][x] = pi
     return grid
 
 
@@ -2364,15 +2430,21 @@ end
 # ==========================================================================
 
 def deer(out):
+    """Deer — one sculpted silhouette instead of ellipses: the torso is a smooth outline through anatomical
+    points (croup, back, withers, brisket, deep girth, tucked belly, haunch), the neck and the head join it in the
+    same piece (no seams). Volume comes from shading clipped to the body: a light band along the back and the
+    neck, a lighter haunch and shoulder, a dark underside, a cream belly. White patches belong to what moves:
+    the throat patch to the head, the tail flags up white when it runs."""
     DY = 16.0                      # room above the head for the antlers
     G = 57.4 + DY
+    PIV = (29.0, 42.0)             # the torso pitches around this point
 
     def rot(px, py, cx, cy, ang):
         c_, s_ = math.cos(ang), math.sin(ang)
         dx, dy = px - cx, py - cy
         return cx + dx * c_ - dy * s_, cy + dx * s_ + dy * c_
 
-    def antlers(hx, hy, ha, tx, ty):
+    def antlers(hx, hy, ha):
         ps = []
         da = ha - 0.35              # the antlers rotate together with the head
         for keys, dx in (('xXX', 1.6), ('yYY', -0.8)):
@@ -2389,140 +2461,365 @@ def deer(out):
                 ps.append(C(x0, y0, x1, y1, r0, r1, keys))
         return ps
 
-    def Y(*v):
-        return tuple(x + DY if i % 2 else x for i, x in enumerate(v))
+    # torso outline, facing right (absolute frame coordinates)
+    TORSO = [(12.2, 35.6),  # tail base
+             (16.4, 32.8),  # croup (a little higher than the back)
+             (22.4, 33.8),  # loin
+             (29.0, 34.6),  # back (the slight dip behind the withers)
+             (35.6, 33.2),
+             (40.0, 30.8),  # withers
+             (44.8, 34.6),
+             (48.0, 40.8),  # point of the chest
+             (46.8, 47.4),
+             (42.0, 51.6),  # deep girth behind the front legs
+             (34.6, 51.2),
+             (27.6, 48.6),  # belly tucks up towards the flank
+             (22.8, 47.4),
+             (19.6, 49.0),  # (the thighs are separate pieces that follow the hind legs, see parts())
+             (13.6, 48.4),
+             (10.2, 45.0),  # buttock
+             (9.8, 39.4)]
+    HIPS = dict(nf=(40.5, 46.5), ff=(42.5, 46.5), nh=(19.5, 45.5), fh=(17.0, 45.5))
+    GS, GG = {}, {}                # geometry of the reference poses (stand; gal3 for the raised tail)
+    LENS = {True: (13.0, 14.2), False: (14.0, 14.8)}          # front: upper, lower; hind: thigh+gaskin, cannon
 
-    rump = [E(11.8, 23.4 + DY, 2.6, 4.4, 0.0, 'cCa', 0.2), E(11.2, 19.6 + DY, 1.4, 2.2, 0.0, 'ddd')]
-    c = dict(G=G, body=[(30.0, 26.0 + DY, 14.6, 8.4, -0.03), (18.6, 25.4 + DY, 7.8, 8.6, 0.0), (39.4, 25.0 + DY, 7.2, 8.8, 0.0)],
-             chest=(44.0, 29.4 + DY, 2.8, 5.0, 0.2), bodyextra=rump,
-             neck=(41.0, 22.0 + DY, 47.0, 10.0 + DY, 5.2, 3.4),
-             hx=50.4, hy=8.0 + DY, hang=0.35, hrx=4.4, hry=3.4, snout=(4.2, 2.4, 1.4),
-             ear=(-2.2, -2.4, 4.0, 1.6), headextra=antlers,
-             hips=dict(nf=(41.0, 31.0 + DY), ff=(43.0, 31.0 + DY), nh=(20.0, 31.0 + DY), fh=(17.6, 31.0 + DY)),
-             legr=(2.6, 1.0), eyeshine=True, fuzz=0.08, smooth=True)
-    header = """# deer (full animal) — generated by tools/sketch_rig.py (shared quadruped skeleton)
+    def tf(dy, pitch):
+        def f(x, y):
+            x, y = rot(x, y, PIV[0], PIV[1], pitch)
+            return x, y + dy
+        return f
+
+    def hips(dy=0.0, pitch=0.0):
+        t = tf(dy, pitch)
+        return {k: t(*v) for k, v in HIPS.items()}
+
+    def ik_legs(feet, dy=0.0, pitch=0.0):
+        hp = hips(dy, pitch)
+        return {k: leg_ik(hp[k], feet[k], *LENS[k[1] == 'f'], 1 if k[1] == 'f' else -1) for k in feet}
+
+    def stand_legs(dy=0.0, pitch=0.0):
+        hp = hips(dy, pitch)
+        return ik_legs({k: (x + (0.5 if k[1] == 'f' else 1.2), G) for k, (x, y) in hp.items()}, dy, pitch)
+
+    def draw_leg(L, near, front):
+        hx, hy, kx, ky, fx, fy = L
+        r0 = 2.5 if front else 3.3
+        r1 = 1.0
+        rk = 1.6 if front else 1.8
+        keys, hoof = ('BAD', 'kKK') if near else ('gfF', 'jJJ')
+        return [C(hx, hy, kx, ky, r0, rk, keys),
+                C(kx, ky, fx, fy, rk * 0.8, r1, keys),
+                C(kx + (fx - kx) * 0.6, ky + (fy - ky) * 0.6, fx, fy, r1 * 1.1, r1, hoof)]
+
+    # ---------------------------------------------------------------------------------------------
+    # geometry of one pose (everything the shapes and the texture mapping need)
+    def geom(pose):
+        dy, pitch = pose.get('dy', 0.0), pose.get('pitch', 0.0)
+        t = tf(dy, pitch)
+
+        def tinv(x, y):
+            return rot(x, y - dy, PIV[0], PIV[1], -pitch)
+        hx, hy, ha = pose['head']
+        ca, sa = math.cos(ha), math.sin(ha)
+
+        def hr(x, y):                               # a point relative to the head (rotated with it)
+            return hx + x * ca - y * sa, hy + x * sa + y * ca
+        g = dict(pose=pose, t=t, tinv=tinv, head=(hx, hy, ha), hr=hr)
+        g['torso'] = Poly([t(*q) for q in TORSO])
+        # the neck: a swept tube from its base in the chest to the back of the head (never twists into a hole),
+        # thick all the way up, arched a little when it leans forward
+        base = t(41.6, 38.6)
+        top = hr(-2.6, 0.6)
+        mx, my = (base[0] + top[0]) / 2, (base[1] + top[1]) / 2
+        ddx, ddy = top[0] - base[0], top[1] - base[1]
+        dl = math.hypot(ddx, ddy) or 1.0
+        nx, ny = ddy / dl, -ddx / dl
+        if ny > 0:
+            nx, ny = -nx, -ny
+        arch = 1.4 * abs(ddx) / dl
+        g['neckpts'] = [base, (mx + nx * arch, my + ny * arch), top]
+        g['neckr'] = [6.6, 5.3, 3.9]
+        g['skull'] = (hx, hy, 5.0, 3.6, ha)
+        g['muzzle'] = (hr(1.0, 0.8), hr(9.0, 1.8), 2.8, 1.5)
+        legs = pose['legs']
+        g['legs'] = legs
+        g['thighs'] = {}
+        for k in ('nh', 'fh'):
+            lhx, lhy, lkx, lky = legs[k][:4]
+            g['thighs'][k] = ((lhx + 0.6, lhy - 2.0), (lhx + (lkx - lhx) * 0.5, lhy + (lky - lhy) * 0.5), 5.4, 3.4)
+        ex, ey, el, er = pose.get('ear', (-2.4, -2.6, 4.6, 1.9))
+        lean = pose.get('earlean', -0.4)
+        g['ear_far'] = ((hx + ex + 1.2, hy + ey), (hx + ex + 1.6, hy + ey - el), er, 0.4)
+        g['ear_near'] = ((hx + ex, hy + ey), (hx + ex + lean, hy + ey - el), er, 0.4)
+        b0 = t(12.6, 36.0)
+        g['tail_up'] = pose.get('tail') == 'up'
+        g['tail'] = (b0, t(10.2, 31.4), 2.3, 1.8) if g['tail_up'] else (b0, t(11.0, 40.4), 1.7, 1.3)
+        g['eye'] = hr(1.6, -0.8)
+        g['nose'] = hr(9.4, 1.8)
+        return g
+
+    # ---------------------------------------------------------------------------------------------
+    # texture mapping: every part knows where its pixels are on the same part of a reference pose, and the
+    # colours come from the painted reference (tools/ref/deer_ref.png: the frames stand ... lie_look, painted
+    # over); so all frames share one coat, whatever the pose
+    def seg_uv(seg, x, y):
+        (x0, y0), (x1, y1), r0, r1 = seg
+        vx, vy = x1 - x0, y1 - y0
+        L = math.hypot(vx, vy) or 1e-6
+        u = ((x - x0) * vx + (y - y0) * vy) / (L * L)
+        d = ((x - x0) * -vy + (y - y0) * vx) / L
+        r = r0 + (r1 - r0) * min(1.0, max(0.0, u))
+        return u, d / max(r, 0.3)
+
+    def seg_at(seg, u, v):
+        (x0, y0), (x1, y1), r0, r1 = seg
+        vx, vy = x1 - x0, y1 - y0
+        L = math.hypot(vx, vy) or 1e-6
+        r = r0 + (r1 - r0) * min(1.0, max(0.0, u))
+        return x0 + vx * u - vy / L * v * r, y0 + vy * u + vx / L * v * r
+
+    def seg_map(gseg, sseg):
+        return lambda x, y: seg_at(sseg, *seg_uv(gseg, x, y))
+
+    def neck_segs(g):
+        p, r = g['neckpts'], g['neckr']
+        return [(p[0], p[1], r[0], r[1]), (p[1], p[2], r[1], r[2])]
+
+    def neck_map(g, sg):
+        gs, ss = neck_segs(g), neck_segs(sg)
+
+        def f(x, y):
+            best = None
+            for i in (0, 1):
+                u, v = seg_uv(gs[i], x, y)
+                uc = min(1.0, max(0.0, u))
+                q = seg_at(gs[i], uc, 0.0)
+                d = math.hypot(x - q[0], y - q[1])
+                if best is None or d < best[0]:
+                    best = (d, i, u, v)
+            _, i, u, v = best
+            return seg_at(ss[i], u, v)
+        return f
+
+    def head_map(g, sg):
+        hx, hy, ha = g['head']
+        sx, sy, sa = sg['head']
+        return lambda x, y: rot(x - hx + sx, y - hy + sy, sx, sy, sa - ha)
+
+    def leg_segs(L):
+        hx, hy, kx, ky, fx, fy = L
+        return L
+
+    def tagged(part, cls, src, cell='stand'):
+        part.cls, part.src, part.cell = cls, src, cell
+        return part
+
+    def parts(pose):
+        g = geom(pose)
+        sg = GS                                     # the reference pose (stand)
+        hx, hy, ha = g['head']
+        torso = g['torso']
+        neck = chain(g['neckpts'], g['neckr'], 'bad')[0]
+        skull = E(*g['skull'])
+        m0, m1, mr0, mr1 = g['muzzle']
+        muzzle = C(m0[0], m0[1], m1[0], m1[1], mr0, mr1)
+        thighs = {k: C(a[0], a[1], b[0], b[1], r0, r1) for k, (a, b, r0, r1) in g['thighs'].items()}
+        hmap, nmap = head_map(g, sg), neck_map(g, sg)
+        tmaps = {k: seg_map(g['thighs'][k], sg['thighs'][k]) for k in thighs}
+
+        def body_src(x, y):
+            if skull.inside(x, y) or muzzle.inside(x, y):
+                return hmap(x, y)
+            if torso.inside(x, y):
+                return g['tinv'](x, y)
+            if neck.inside(x, y):
+                return nmap(x, y)
+            for k, th in thighs.items():
+                if th.inside(x, y):
+                    return tmaps[k](x, y)
+            return g['tinv'](x, y)
+
+        ps = []
+        a, b, r0, r1 = g['ear_far']
+        ps.append(tagged(C(a[0], a[1], b[0], b[1], r0, r1, 'gfF'), 'far', seg_map(g['ear_far'], sg['ear_far'])))
+        for k, near in (('ff', False), ('fh', False), ('nf', True), ('nh', True)):
+            L, S = g['legs'][k], sg['legs'][k]
+            up_g, up_s = ((L[0], L[1]), (L[2], L[3]), 1, 1), ((S[0], S[1]), (S[2], S[3]), 1, 1)
+            lo_g, lo_s = ((L[2], L[3]), (L[4], L[5]), 1, 1), ((S[2], S[3]), (S[4], S[5]), 1, 1)
+            front = k[1] == 'f'
+            pieces = draw_leg(L, near, front)
+            cls = 'near' if near else 'far'
+            ps.append(tagged(pieces[0], cls, seg_map(up_g, up_s)))
+            ps.append(tagged(pieces[1], cls, seg_map(lo_g, lo_s)))
+            ps.append(tagged(pieces[2], cls, seg_map(lo_g, lo_s)))
+        ps.append(tagged(Merge([torso, neck, skull, muzzle] + list(thighs.values()), 'bad', 0.06), 'body', body_src))
+        a, b, r0, r1 = g['tail']
+        if g['tail_up']:
+            ps.append(tagged(C(a[0], a[1], b[0], b[1], r0, r1, 'bad'), 'body', seg_map(g['tail'], GG['tail']), 'gal3'))
+        else:
+            ps.append(tagged(C(a[0], a[1], b[0], b[1], r0, r1, 'bad'), 'body', g['tinv']))
+        a, b, r0, r1 = g['ear_near']
+        ps.append(tagged(C(a[0], a[1], b[0], b[1], r0, r1, 'BAD'), 'near', seg_map(g['ear_near'], sg['ear_near'])))
+        for piece in antlers(hx, hy, ha):
+            ps.append(tagged(piece, 'ant_far' if piece.keys[0] == 'x' else 'ant_near', hmap))
+        ox, oy = g['eye']
+        if pose.get('eye', 1):
+            ps += [tagged(P(round(ox), round(oy), 'E'), 'glow', None), tagged(P(round(ox) + 1, round(oy), 'e'), 'eye', None)]
+        else:
+            ps.append(tagged(P(round(ox), round(oy), 'q'), 'shut', None))
+        nx_, ny_ = g['nose']
+        ps.append(tagged(P(round(nx_), round(ny_), 'n'), 'nose', None))
+        return ps
+
+    # the reference: where each painted frame sits in the image (column, row, scale, offset — fitted)
+    REF = 'tools/ref/deer_ref.png'
+    CELLS = {'stand': (0, 0, 1.170, 2, 0), 'gal3': (0, 1, 1.170, 0, 0)}
+    _ref = {}
+
+    def ref_px():
+        if 'px' not in _ref:
+            from PIL import Image
+            here = os.path.dirname(os.path.abspath(__file__))
+            im = Image.open(os.path.join(here, '..', REF) if not os.path.exists(REF) else REF).convert('RGB')
+            _ref['im'], _ref['px'] = im, im.load()
+        return _ref['px'], _ref['im'].size
+
+    def ref_opaque(c):
+        return abs(c[0] - 12) + abs(c[1] - 16) + abs(c[2] - 19) > 40
+
+    def sample(cell, X, Y):
+        px, (iw, ih) = ref_px()
+        col, row, sc, ox, oy = CELLS[cell]
+        P_ = 4 * sc
+        bx, by = 39 + col * 264 * sc + ox, 57 + row * 304 * sc + oy
+        for rad in (0.0, 0.7, 1.4, 2.1, 2.8):           # off the painted silhouette: the nearest painted spot
+            for ang in ((0,) if rad == 0 else range(0, 360, 45)):
+                qx = X + rad * math.cos(math.radians(ang))
+                qy = Y + rad * math.sin(math.radians(ang))
+                cx, cy = bx + qx * P_, by + qy * P_
+                got = []
+                for ddx in (-1, 0, 1):
+                    for ddy in (-1, 0, 1):
+                        rx, ry = int(cx + ddx), int(cy + ddy)
+                        if 0 <= rx < iw and 0 <= ry < ih and ref_opaque(px[rx, ry]):
+                            got.append(px[rx, ry])
+                if len(got) >= 5:                          # the median keeps the crisp pixel-art detail
+                    got.sort(key=lambda c: c[0] * 3 + c[1] * 6 + c[2])
+                    return got[len(got) // 2]
+        return None
+
+    def textured(pose):
+        """(class, colour) per pixel, or None."""
+        ps = parts(pose)
+        owner = [[None] * 64 for _ in range(74)]
+        render(ps, 64, 74, 0.0, (32, 37), 1, owner)
+        out = [[None] * 64 for _ in range(74)]
+        for y in range(74):
+            for x in range(64):
+                oi = owner[y][x]
+                if oi is None:
+                    continue
+                part = ps[oi]
+                if part.src is None:
+                    out[y][x] = (part.cls, None)
+                    continue
+                X, Y = part.src(x + 0.5, y + 0.5)
+                out[y][x] = (part.cls, sample(part.cell, X, Y))
+        return out
+
+    header = """# deer (full animal) — generated by tools/sketch_rig.py (one sculpted silhouette, jointed legs, coat from tools/ref/deer_ref.png)
 sprite deer
 tags creature ground large mammal rare
 anchor 31 73
 palette
-  b 8a6a4c ~5
-  a 6a4e36 ~4
-  d 42301f ~3
-  B 8a6a4c ~5 z+1
-  A 6a4e36 ~4 z+1
-  D 42301f ~3 z+1
-  g 56402c z-2
-  f 44321f z-2
-  F 2e2216 z-2
-  c c8bca8 ~3
-  C a89a86 ~3
-  k 3e3024 ~2 z+1
-  K 241a12 z+1
-  j 30241a z-2
-  J 1c140e z-2
-  x 6e6250 z-3
-  X 54483a z-3
-  y b0a48a ~4 z+2
-  Y 887c66 ~3 z+2
-  E b8e070 glow
-  e 060604
-  w c8d0d8 glow
-  n 1a1210
+PALETTE
 end
 """
-    graze = dict(neck=Y(41.0, 23.0, 46.6, 42.0) + (5.0, 3.0), hx=49.4, hy=46.8 + DY, hang=1.2)
-    look = dict(neck=Y(41.0, 21.0, 45.6, 7.6) + (5.2, 3.4), hx=48.6, hy=5.4 + DY, hang=0.05)
+    SL = stand_legs()
+    stand = dict(head=(50.4, 24.0, 0.35), legs=SL)
+    look = dict(stand, head=(48.6, 21.4, 0.05))
+    alert = dict(stand, head=(47.6, 19.6, -0.1), ear=(-1.8, -2.8, 4.4, 1.6))
+    graze = dict(stand, head=(49.4, 62.8, 1.2))
     poses = [
-        ('stand', {}),
-        ('stand_blink', dict(eye=0)),
-        ('ears', dict(ear=(-2.6, -1.8, 4.0, 1.6))),
+        ('stand', stand),
+        ('stand_blink', dict(stand, eye=0)),
+        ('ears', dict(stand, ear=(-2.6, -1.8, 4.0, 1.6))),
         ('look', look),
         ('look_blink', dict(look, eye=0)),
-        ('alert', dict(neck=Y(41.0, 20.0, 44.8, 5.6) + (5.2, 3.4), hx=47.6, hy=3.6 + DY, hang=-0.1,
-                       ear=(-1.8, -2.8, 4.4, 1.6))),
+        ('alert', alert),
         ('graze', graze),
-        ('graze2', dict(graze, hy=47.8 + DY, hx=49.8, hang=1.3)),
+        ('graze2', dict(graze, head=(49.8, 63.8, 1.3))),
         ('graze_blink', dict(graze, eye=0)),
-        ('graze_up', dict(neck=Y(41.0, 22.4, 47.4, 30.0) + (5.0, 3.0), hx=50.6, hy=33.0 + DY, hang=0.8)),
-    ]
-
-    def running(dy, legs):
-        """Gallop pose: the body moved by dy (the bob), the neck stretched forward, the head low and level."""
-        return dict(body=[(x, y + dy, rx, ry, a) for (x, y, rx, ry, a) in c['body']],
-                    chest=(44.0, 29.4 + DY + dy, 2.8, 5.0, 0.2),
-                    bodyextra=[E(11.8, 23.4 + DY + dy, 2.6, 4.4, 0.0, 'cCa', 0.2),
-                               E(11.2, 19.6 + DY + dy, 1.4, 2.2, 0.0, 'ddd')],
-                    neck=Y(41.0, 23.0 + dy, 49.0, 15.0 + dy) + (5.2, 3.4),
-                    hx=53.0, hy=14.0 + DY - dy * 0.5, hang=0.45, ear=(-2.6, -1.6, 4.0, 1.6), earlean=-1.4,
-                    legs=legs)
-
-    # gallop (8 frames): a rotary gallop, far hind -> near hind -> far fore -> near fore, each leg in two
-    # segments (fore knee forward, hind hock back), the feet sweep back under the body while on the ground
-    NG = 8
-    for i in range(NG):
-        legs, bob = quad_gallop(c, i / NG, G, lens={True: (12.6, 14.6), False: (13.0, 14.8)},
-                                offs=dict(fh=0.0, nh=0.14, ff=0.46, nf=0.60),
-                                land={True: 0.34, False: 0.22}, push={True: -0.30, False: -0.36},
-                                swing={
-                                    # fore: trails straight, tucks tight under the chest, reaches far out
-                                    True: [(0.18, -0.55, 0.97), (0.45, -0.05, 0.55), (0.78, 0.62, 0.98)],
-                                    # hind: kicks out straight behind, folds under the belly, swings forward
-                                    False: [(0.22, -0.78, 0.99), (0.58, -0.10, 0.62), (0.85, 0.32, 0.95)],
-                                })
-        poses.append(('gal%d' % i, running(bob, legs)))
-
-    # alert with the ears turning (listening to one side, then the other)
-    alert = dict(neck=Y(41.0, 20.0, 44.8, 5.6) + (5.2, 3.4), hx=47.6, hy=3.6 + DY, hang=-0.1)
-    poses += [
+        ('graze_up', dict(stand, head=(50.6, 49.0, 0.8))),
         ('alert_earl', dict(alert, ear=(-2.8, -2.0, 4.0, 1.9), earlean=-1.4)),
         ('alert_earr', dict(alert, ear=(-1.2, -3.0, 4.6, 1.4), earlean=0.8)),
     ]
 
-    # bound (a long leap, driven frame by frame by ST_BOUND, which also lifts the whole deer along the arc):
-    # gather -> launch (hind legs push off straight) -> stretched flight -> landing on the front legs
-    LF, LH = (12.6, 14.6), (13.0, 14.8)
-    def leaps(dy, feet, **kw):
-        legs = {}
-        for k, (fx, fy) in feet.items():
-            hx_, hy_ = c['hips'][k]
-            l1, l2 = LF if k[1] == 'f' else LH
-            legs[k] = leg_ik((hx_, hy_ + dy), (fx, fy + dy), l1, l2, 1 if k[1] == 'f' else -1)
-        d = running(dy, legs)
+    def running(dy, legs, pitch=0.0, **kw):
+        d = dict(dy=dy, pitch=pitch, legs=legs, head=(53.0, 30.0 - dy * 0.5, 0.45), ear=(-2.6, -1.6, 4.0, 1.6),
+                 earlean=-1.4, tail='up')
         d.update(kw)
         return d
-    H = 31.0 + DY
+
+    # gallop (8 frames): a rotary gallop, far hind -> near hind -> far fore -> near fore; legs leave the ground
+    # straight, fold under the body as they swing forward, reach out straight to land
+    NG = 8
+    cg = dict(hips=HIPS)
+    for i in range(NG):
+        legs, bob = quad_gallop(cg, i / NG, G, lens=LENS,
+                                offs=dict(fh=0.0, nh=0.14, ff=0.46, nf=0.60),
+                                land={True: 0.34, False: 0.22}, push={True: -0.30, False: -0.36},
+                                swing={
+                                    True: [(0.18, -0.55, 0.97), (0.45, -0.05, 0.55), (0.78, 0.62, 0.98)],
+                                    False: [(0.22, -0.78, 0.99), (0.58, -0.10, 0.62), (0.85, 0.32, 0.95)],
+                                })
+        poses.append(('gal%d' % i, running(bob, legs)))
+
+    # bound (a long leap, driven frame by frame by ST_BOUND, which also lifts the whole deer along the arc):
+    # gather -> launch (hind legs push off straight, nose up) -> stretched flight -> landing on the front legs
+    H = 46.5
+    def leap(dy, pitch, feet, head):
+        return running(dy, ik_legs({k: (x, y + dy) for k, (x, y) in feet.items()}, dy, pitch), pitch, head=head)
     poses += [
-        ('bound0', leaps(3.0, dict(nf=(38.0, G - 3.0), ff=(40.0, G - 3.5), nh=(27.0, G - 3.0), fh=(25.0, G - 3.5)),
-                         hy=16.0 + DY, hang=0.6)),
-        ('bound1', leaps(-2.0, dict(nf=(45.0, H + 13.0), ff=(48.0, H + 11.0), nh=(7.0, G - 1.0), fh=(5.0, G - 3.0)),
-                         hy=11.0 + DY, hang=0.3)),
-        ('bound2', leaps(-1.0, dict(nf=(58.0, H + 17.0), ff=(60.0, H + 14.0), nh=(5.0, H + 15.0), fh=(3.0, H + 12.0)),
-                         hy=12.0 + DY, hang=0.35)),
-        ('bound3', leaps(0.0, dict(nf=(48.0, G), ff=(51.0, G - 2.0), nh=(26.0, H + 16.0), fh=(24.0, H + 14.0)),
-                         hy=15.0 + DY, hang=0.5)),
+        ('bound0', leap(3.0, 0.04, dict(nf=(38.0, G - 3.0), ff=(40.0, G - 3.5), nh=(27.0, G - 3.0), fh=(25.0, G - 3.5)),
+                        (52.6, 32.0, 0.6))),
+        ('bound1', leap(-2.0, -0.12, dict(nf=(45.0, H + 13.0), ff=(48.0, H + 11.0), nh=(7.0, G - 1.0), fh=(5.0, G - 3.0)),
+                        (52.6, 24.0, 0.3))),
+        ('bound2', leap(-1.0, 0.0, dict(nf=(58.0, H + 17.0), ff=(60.0, H + 14.0), nh=(5.0, H + 15.0), fh=(3.0, H + 12.0)),
+                        (53.4, 27.0, 0.35))),
+        ('bound3', leap(0.0, 0.1, dict(nf=(48.0, G), ff=(51.0, G - 2.0), nh=(26.0, H + 16.0), fh=(24.0, H + 14.0)),
+                        (53.0, 32.0, 0.55))),
     ]
 
-    # lying down (resting in a clearing): the body on the ground, the legs folded under it, the head held up
-    def lying(dy=21.0, **kw):
-        legs = {k: leg_ik((hx_, hy_ + dy), (hx_ + (11.0 if k[1] == 'f' else 10.0), G - 0.6), *(LF if k[1] == 'f' else LH),
-                          1 if k[1] == 'f' else -1) for k, (hx_, hy_) in c['hips'].items()}
-        d = dict(body=[(x, y + dy, rx, ry, a) for (x, y, rx, ry, a) in c['body']],
-                 chest=(44.0, 29.4 + DY + dy, 2.8, 5.0, 0.2),
-                 bodyextra=[E(11.8, 23.4 + DY + dy, 2.6, 4.4, 0.0, 'cCa', 0.2), E(11.2, 19.6 + DY + dy, 1.4, 2.2, 0.0, 'ddd')],
-                 neck=Y(41.0, 24.0 + dy, 46.0, 13.0 + dy) + (5.2, 3.4), hx=49.4, hy=11.0 + DY + dy, hang=0.3, legs=legs)
-        d.update(kw)
-        return d
-    lie = lying()
+    # lying down: the body on the ground, the legs folded under it (the forelegs tucked forward), the head up
+    LD = 21.0
+    lie_legs = ik_legs({k: (x + (11.0 if k[1] == 'f' else 10.0), G - 0.6) for k, (x, y) in hips(LD).items()}, LD)
+    lie = dict(dy=LD, legs=lie_legs, head=(49.0, 42.0, 0.3))
+    # half way down (and up): kneeling on the front legs, the hind still standing
+    KD, KP = 9.0, 0.22
+    kh = hips(KD, KP)
+    kneel_legs = ik_legs(dict(nf=(kh['nf'][0] + 10.0, G - 0.6), ff=(kh['ff'][0] + 10.0, G - 0.6),
+                              nh=(kh['nh'][0] + 1.0, G), fh=(kh['fh'][0] + 1.0, G)), KD, KP)
     poses += [
         ('lie', lie),
         ('lie_blink', dict(lie, eye=0)),
         ('lie_ears', dict(lie, ear=(-2.8, -2.0, 4.0, 1.9), earlean=-1.4)),
-        ('lie_look', dict(lie, neck=Y(41.0, 23.0 + 21.0, 44.6, 10.0 + 21.0) + (5.2, 3.4), hx=47.4, hy=7.0 + DY + 21.0, hang=0.0)),
-        # half way: the front kneels first (getting up it is the other way round, the same frame)
-        ('kneel', dict(lying(11.0), body=[(30.0, 26.0 + DY + 12.0, 14.6, 8.4, -0.18), (18.6, 25.4 + DY + 6.0, 7.8, 8.6, 0.0),
-                                          (39.4, 25.0 + DY + 16.0, 7.2, 8.8, 0.0)],
-                       legs=dict(lying(16.0)['legs'], nh=(20.0, 31.0 + DY + 5.0, 21.0, G), fh=(17.6, 31.0 + DY + 5.0, 18.6, G)))),
+        ('lie_look', dict(lie, head=(47.4, 39.0, 0.0))),
+        ('kneel', dict(dy=KD, pitch=KP, legs=kneel_legs, head=(51.0, 40.0, 0.45))),
     ]
+
+    # walk: a four-beat walk (near hind, near fore, far hind, far fore), a gentle nod of the head
+    NW = 6
+    for i in range(NW):
+        ph = i * 2 * math.pi / NW
+        bob = 0.3 * math.sin(2 * ph)
+        feet = {}
+        for k, off in (('nh', 0.0), ('nf', math.pi / 2), ('fh', math.pi), ('ff', 3 * math.pi / 2)):
+            hx_, hy_ = HIPS[k]
+            feet[k] = legs_walk(ph + off, hx_ + (0.5 if k[1] == 'f' else 1.2), hy_ + bob, G, G - hy_, 0.3, 2.2)
+        poses.append(('walk%d' % i, dict(dy=bob, legs=ik_legs(feet, bob),
+                                         head=(50.4, 24.0 + 0.8 * math.sin(2 * ph + 1.0), 0.38))))
+
     clips = """
 clip idle loop fps=4 : stand*14 stand_blink stand*8 ears ears stand*6 look*6 look_blink look*4 stand*4
 clip look loop fps=4 : look*8 look_blink look*6 stand*2
@@ -2553,7 +2850,48 @@ clip run loop fps=10 speed=48 : gal0 gal1 gal2 gal3 gal4 gal5 gal6 gal7
 end
 end
 """
-    emit_quad(out, header, c, poses, 6, 64, 74, clips, profile, 0.3, 2.2, 0.6)
+    pd = dict(poses)
+    GS.update(geom(pd['stand']))
+    GG.update(geom(pd['gal3']))
+    tex = [(name, textured(pose)) for name, pose in poses]
+
+    # per class: the colours -> a small palette (median cut), each class its own depth
+    CLS = dict(body=(28, ''), near=(10, ' z+1'), far=(8, ' z-2'), ant_far=(5, ' z-3'), ant_near=(6, ' z+2'))
+    from PIL import Image
+    pool = iter('abcdfghijklmoprstuvxyzABCDFGHIJKLMNOPQRSTUVWXYZ0123456789')
+    keymap, lines = {}, []
+    for cls, (ncol, z) in CLS.items():
+        cols = [c for _, f in tex for row in f for e in row if e and e[0] == cls and e[1] for c in [e[1]]]
+        if not cols:
+            continue
+        im = Image.new('RGB', (len(cols), 1))
+        im.putdata(cols)
+        q = im.quantize(colors=ncol, method=Image.Quantize.MEDIANCUT)
+        pal = q.getpalette()[:3 * ncol]
+        entries = []
+        for i in range(ncol):
+            c = tuple(pal[3 * i:3 * i + 3])
+            k = next(pool)
+            entries.append((c, k))
+            lines.append('  %s %02x%02x%02x%s' % (k, c[0], c[1], c[2], z))
+        keymap[cls] = entries
+    lines += ['  E b8e070 glow', '  e 060604', '  n 1a1210', '  q 2a1a10']
+    special = dict(glow='E', eye='e', nose='n', shut='q')
+
+    def nearest(cls, c):
+        if c is None:
+            c = keymap[cls][len(keymap[cls]) // 2][0]
+        return min(keymap[cls], key=lambda e: (e[0][0] - c[0]) ** 2 + (e[0][1] - c[1]) ** 2 + (e[0][2] - c[2]) ** 2)[1]
+
+    out.append(header.replace('PALETTE', '\n'.join(lines)))
+    for name, f in tex:
+        out.append('frame %s' % name)
+        for row in f:
+            out.append('|' + ''.join('.' if e is None else special[e[0]] if e[0] in special else nearest(e[0], e[1])
+                                     for e in row).rstrip('.').ljust(1, '.'))
+        out.append('')
+    out.append(clips)
+    out.append(profile)
 
 
 # ==========================================================================
