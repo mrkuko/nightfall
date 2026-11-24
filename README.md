@@ -41,9 +41,10 @@ Every scene is different. A frame takes about half a millisecond.
   bank pours in from the side along the forest floor, a rain front sweeps across, one can roll out while
   the other moves in, and the swamp is foggier than the rocky pine wood. When it rains, dholes, foxes,
   rabbits and others lie down under the huge funnel-shaped leaves of butterbur; in fog they notice a
-  predator later, and the owl hunts by ear. Now and then something unseen walks through the fog: the
-  forest falls silent, muddy footprints press into the ground one by one, the mist parts around a
-  tall hooded figure, and the animals slip away into hiding.
+  predator later, and the owl hunts by ear. Now and then something unseen walks through the forest: it
+  falls silent, glowing bare footprints appear on the ground one by one, the animals slip away into
+  hiding, and once the trail ends the prints go out, the oldest first; in fog the mist also parts
+  around a tall hooded figure.
 - **Biomes.** Oak wood, beech hall, spruce taiga, rocky pine wood, birch grove, alder swamp, mixed forest.
   Each has its own trees, undergrowth, animals and ground (needles, moss, mud, gravel …).
 - **Tiny and fast.** One ~500 kB binary with all art compiled in. Plain C99 with libc and libm only
@@ -185,7 +186,7 @@ nightfall --seed 42 --scene-time 0 --grass-density 0.6
 | `L` | a lightning strike now | `S` | a strike that brings the spirit stag |
 | `0` | weather back to auto | `f` | the fireflies event now |
 | `P` | dhole pack chases a deer now | `V` | a bat swarm pours out now |
-| `G` | the ghost walk now (best in fog: `3`) | | |
+| `G` | the ghost walk now (glowing footprints; the figure shows in fog: `3`) | | |
 
 Spawn a creature: `r` rabbit · `s` squirrel · `x` fox · `o` owl · `v` bat · `e` eyes ·
 `g` spirit · `j` deer · `b` boar · `c` wildcat · `m` mole · `w` weasel · `p` dhole

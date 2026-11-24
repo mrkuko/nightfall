@@ -298,12 +298,16 @@ typedef struct {
 enum { EV_NONE, EV_FIREFLIES, EV_DHOLES, EV_BATS, EV_GHOST };
 #define EV_MAX_FF 16
 #define EV_MAX_PRINT 128
-/* a footprint of the ghost walk: pressed into the ground, it glows a moment, then fades (also after the event) */
+/* a footprint of the ghost walk: a pale frosted shoe print that seeps in heel to toe, stays, and once the trail
+ * has ended fades out in the order the prints were made (also after the event) */
 typedef struct {
     float x, y, age;
+    float fade;                 /* PR_ON: glowing on; else counts up from minus its turn after the trail ended
+                                 * (fading while 0..PR_FADE, gone after) */
     int   z;
     int   side;                 /* 0 = the far foot, 1 = the near one (which edge the arch is on) */
     int   dir;                  /* +1 = walking to the right */
+    int   shape;                /* 0 = along the trail, 1 = half turned into the forest, 2 = toes into the forest */
 } ev_print_t;
 typedef struct {
     int      kind;              /* EV_* running now */
@@ -333,7 +337,8 @@ typedef struct {
     float    gvis;              /* 0..1 how strongly it parts the fog */
     float    glift;             /* the end: px it has risen while dissolving */
     int      gfoot;             /* the foot that steps next (0 / 1) */
-    int      gstate;            /* 0 the hush before it, 1 walking, 2 standing, 3 dissolving */
+    int      gstate;            /* 0 the hush before it, 1 walking, 2 standing, 3 dissolving, 4 turning into the forest */
+    int      gturn;             /* turning: steps made into the forest so far */
     ev_print_t print[EV_MAX_PRINT];
     int      nprint;            /* footprints in use (when full, the oldest is reused) */
     rng_t    rng;
