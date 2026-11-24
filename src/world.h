@@ -111,6 +111,9 @@ typedef struct {
 } navlink_t;
 
 enum { ST_DANGER, ST_NOISE, ST_GLOW };
+/* `src` of a stimulus with no creature behind it that every creature still senses (the ghost walk): fog does not
+ * hide it, each one reacts by its own `fear` (fear 0 = not at all) */
+#define SRC_UNSEEN (-2)
 
 typedef struct {
     float x, y, r;
@@ -292,8 +295,16 @@ typedef struct {
 } weather_t;
 
 /* --- events (src/event.c): rare, mysterious happenings; one at a time, with their own rng stream --- */
-enum { EV_NONE, EV_FIREFLIES, EV_DHOLES, EV_BATS };
+enum { EV_NONE, EV_FIREFLIES, EV_DHOLES, EV_BATS, EV_GHOST };
 #define EV_MAX_FF 16
+#define EV_MAX_PRINT 128
+/* a footprint of the ghost walk: pressed into the ground, it glows a moment, then fades (also after the event) */
+typedef struct {
+    float x, y, age;
+    int   z;
+    int   side;                 /* 0 = the far foot, 1 = the near one (which edge the arch is on) */
+    int   dir;                  /* +1 = walking to the right */
+} ev_print_t;
 typedef struct {
     int      kind;              /* EV_* running now */
     float    t;                 /* seconds since it started */
@@ -309,6 +320,22 @@ typedef struct {
     float    cx, cy;            /* centre of the swarm (where the flash is brightest) */
     float    flash;             /* 0..1 whole-scene flash */
     int      gone;              /* the fireflies have vanished */
+    /* ghost walk: something unseen walks slowly through the fog; only its footprints and the fog it parts show */
+    float    gx, gz, gdir;      /* where it is (x, depth) and which way it walks */
+    float    gfy;               /* y of its feet */
+    float    gmoved;            /* x moved during the last tick (the plants it brushes) */
+    float    gnext;             /* x of the next footfall */
+    float    gstep;             /* stride (px between two footfalls) */
+    float    gspeed;            /* px/s */
+    float    gend;              /* the trail stops here (beyond the edge: it walks off) */
+    float    gpause_at;         /* it stops here once for a while (NAN: no pause) */
+    float    gwait;             /* > 0: standing still for this many more seconds */
+    float    gvis;              /* 0..1 how strongly it parts the fog */
+    float    glift;             /* the end: px it has risen while dissolving */
+    int      gfoot;             /* the foot that steps next (0 / 1) */
+    int      gstate;            /* 0 the hush before it, 1 walking, 2 standing, 3 dissolving */
+    ev_print_t print[EV_MAX_PRINT];
+    int      nprint;            /* footprints in use (when full, the oldest is reused) */
     rng_t    rng;
 } event_t;
 
@@ -398,12 +425,21 @@ void  weather_begin(world_t *w, const char *arg);
 /* Changes to the next pattern now (playground 'W'): the fronts start moving. */
 void  events_init(world_t *w, uint64_t seed);
 void  events_update(world_t *w, float dt);
-void  events_render(world_t *w, raster_t *r);        /* the flash over the finished frame */
-int   event_start(world_t *w, const char *name);     /* by name ("fireflies", "dholes", "bats"); 0 = could not start */
+void  events_render(world_t *w, raster_t *r);        /* footprints and the flash over the finished frame */
+int   event_start(world_t *w, const char *name);     /* by name ("fireflies", "dholes", "bats", "ghost"); 0 = could not start */
+/* The ghost walk parts the fog: the box (x0 y0 x1 y1) where it does and the depth of the walker (only what is
+ * behind it is affected); 0 = nothing to do. event_fog_part at (x, y) inside the box: hole = how much of the
+ * fog is pushed away (0..1), rim = how much gathers at the outline (0..1). */
+int   event_fog_box(const world_t *w, int box[4], int *z);
+void  event_fog_part(const world_t *w, int x, int y, float *hole, float *rim);
+/* The walker brushing the plants: its x, depth and the x moved in the last tick; 0 = no walker. */
+int   event_walker(const world_t *w, float *x, float *z, float *moved);
 void  weather_next(world_t *w);
 void  weather_set(world_t *w, int pattern);   /* roll in pattern and keep it; -1 = auto again */
 /* A lightning strike into the scene now (storm or not); stag = 1: the spirit stag stands where it hits. */
 int   weather_strike(world_t *w, int stag);
+/* A ring spreading on a puddle at (x, y) (a raindrop, a footfall). */
+void  weather_ring(world_t *w, float x, float y, int z);
 int   weather_count(void);
 void  weather_update(world_t *w, float dt);
 /* Draws rain, splashes and fog over the finished frame (uses the z-buffer). */

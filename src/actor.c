@@ -1176,13 +1176,20 @@ static void perceive(world_t *w, actor_t *a, float dt)
     int me = actor_index(w, a);
     char key[NF_NAME + 2];
     snprintf(key, sizeof key, " %s ", a->spr->name);
-    float danger = 0;
-    float dx_danger = 0;
+    float danger = 0, dread = 0;
+    float dx_danger = 0, dx_dread = 0;
     for (int i = 0; i < w->nstim; i++) {
         stim_t *s = &w->stim[i];
         if (s->src == me) continue;
         float d = fabsf(s->x - a->x) + fabsf(s->y - a->y) * 0.6f;
         if (d > s->r) continue;
+        if (s->kind == ST_DANGER && s->src == SRC_UNSEEN) {
+            /* something nobody can see: sensed, not seen (the fog does not hide it); the timid feel it from afar,
+             * the bold only close by, the fearless not at all */
+            float k = s->strength * (1.0f - d / s->r) * (0.35f + 1.3f * a->prof.fear);
+            if (a->prof.fear > 0 && k > dread) { dread = k; dx_dread = s->x - a->x; }
+            continue;
+        }
         if (s->kind == ST_DANGER && d > s->r * sight_at(w, a->x)) continue;   /* fog: it sees the predator later */
         if (s->kind == ST_DANGER && s->src >= 0 &&
             (strstr(w->act[s->src].prof.scares, key) || strstr(w->act[s->src].prof.hunts, key))) {
@@ -1200,7 +1207,9 @@ static void perceive(world_t *w, actor_t *a, float dt)
             }
         }
     }
-    if (danger > 0) a->fear = fmaxf(a->fear, danger * (0.5f + a->prof.fear));
+    danger *= 0.5f + a->prof.fear;
+    if (dread > danger) { danger = dread; dx_danger = dx_dread; }
+    if (danger > 0) a->fear = fmaxf(a->fear, danger);
     else a->fear = fmaxf(0, a->fear - dt * 0.06f);
 
     /* fear -> freeze and run to a hideout */

@@ -360,6 +360,8 @@ static void add_splash(world_t *w, float x, float y, int z, int ring)
     s->life = ring ? rng_range(&wx->rng, 0.45f, 0.7f) : rng_range(&wx->rng, 0.08f, 0.16f);
 }
 
+void weather_ring(world_t *w, float x, float y, int z) { add_splash(w, x, y, z, 1); }
+
 static void update_rain(world_t *w, float dt)
 {
     weather_t *x = &w->wx;
@@ -726,6 +728,8 @@ static void render_air(world_t *w, raster_t *r)
         }
     const rgb_t fc = mkrgb(52, 62, 68);
     float zn = (float)(w->fg_z + 12), zf = 30.0f;
+    int gbox[4], gzz = 0;
+    int part = fog_on && event_fog_box(w, gbox, &gzz);       /* the ghost walk parts the fog */
     for (int y = 0; y < r->h; y++) {
         int gy = y / GRID;
         float ty = (float)(y % GRID) / (float)GRID;
@@ -740,11 +744,21 @@ static void render_air(world_t *w, raster_t *r)
             int i = y * r->w + x;
             rgb_t c = r->c[i];
             if (dk < 0.999f) c = rgb_scale(c, dk);
+            int z = r->z[i];
+            float hole = 0.0f, rim = 0.0f;
+            if (part && x >= gbox[0] && x <= gbox[2] && y >= gbox[1] && y <= gbox[3] && (z == Z_EMPTY || z < gzz))
+                event_fog_part(w, x, y, &hole, &rim);
             if (f > 0.002f) {
-                int z = r->z[i];
                 float far = z == Z_EMPTY ? 1.0f : clampf((zn - (float)z) / (zn - zf), 0.0f, 1.0f);
-                float a = clampf(f * (0.3f + 0.9f * far), 0.0f, 0.92f);
+                float a = clampf(f * (0.3f + 0.9f * far), 0.0f, 0.92f) * (1.0f - 0.5f * hole);
                 c = rgb_mix(c, fc, a);
+            }
+            if (hole > 0.005f || rim > 0.005f) {
+                /* the ghost walk: where the mist is pushed away the light it carried is gone too (a shadow in the
+                 * fog), and the mist gathers at the outline; both as strong as the fog is here */
+                float cv = cover(w, WX_FOG, (float)x, (float)y);
+                c = rgb_scale(c, 1.0f - 0.12f * hole * cv);
+                c = rgb_mix(c, mkrgb(96, 110, 118), clampf(0.2f * rim * cv, 0.0f, 0.3f));
             }
             r->c[i] = c;
         }

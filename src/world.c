@@ -355,7 +355,7 @@ void world_stimulus(world_t *w, float x, float y, float r, int kind, float stren
 {
     /* same source and kind -> refresh */
     for (int i = 0; i < w->nstim; i++)
-        if (w->stim[i].src == src && src >= 0 && w->stim[i].kind == kind) {
+        if (w->stim[i].src == src && src != -1 && w->stim[i].kind == kind) {
             w->stim[i] = (stim_t){ x, y, r, kind, strength, ttl, src };
             return;
         }
@@ -384,37 +384,44 @@ static void update_objects(world_t *w, float dt)
 /* A creature on the ground sets in motion only the plants it really brushes against: at nearly the
  * same depth and under its body, at most the two closest ones, not everything around. The push in the
  * movement direction goes into the same spring as the wind, so the plant bends, returns with a delay
- * and rings out. */
+ * and rings out. (Also the ghost walk's unseen walker: event_walker.) */
+static void touch_at(world_t *w, float x, float zf, float moved)
+{
+    int best[2] = { -1, -1 };
+    float score[2] = { 1e9f, 1e9f };
+    for (int i = 0; i < w->nobj; i++) {
+        const object_t *o = &w->obj[i];
+        if (o->sway_clip < 0) continue;
+        float dz = fabsf((float)o->z - zf);
+        if (dz > 9.0f) continue;
+        float mid = ((float)o->bx0 + (float)o->bx1) * 0.5f;
+        float half = ((float)o->bx1 - (float)o->bx0) * 0.5f;
+        float dx = fabsf(x - mid);
+        if (dx > half * 0.55f + 1.0f) continue;                 /* it has to be under the body, not just nearby */
+        float sc = dz + dx * 0.35f;
+        if (sc < score[0]) { score[1] = score[0]; best[1] = best[0]; score[0] = sc; best[0] = i; }
+        else if (sc < score[1]) { score[1] = sc; best[1] = i; }
+    }
+    for (int k = 0; k < 2; k++) {
+        if (best[k] < 0) continue;
+        object_t *o = &w->obj[best[k]];
+        float half = ((float)o->bx1 - (float)o->bx0) * 0.5f;
+        float mid = ((float)o->bx0 + (float)o->bx1) * 0.5f;
+        float c = 1.0f - fabsf(x - mid) / (half + 0.01f);
+        o->push += (moved > 0 ? 1.0f : -1.0f) * (0.7f + 0.6f * c);
+    }
+}
+
 static void touch_plants(world_t *w)
 {
     for (int i = 0; i < w->nobj; i++) w->obj[i].push = 0;
     for (int a = 0; a < w->nact; a++) {
         actor_t *ac = &w->act[a];
         if (!ac->alive || ac->hidden || ac->nav != NAV_GROUND || fabsf(ac->moved) < 0.01f) continue;
-        int best[2] = { -1, -1 };
-        float score[2] = { 1e9f, 1e9f };
-        for (int i = 0; i < w->nobj; i++) {
-            const object_t *o = &w->obj[i];
-            if (o->sway_clip < 0) continue;
-            float dz = fabsf((float)o->z - ac->zf);
-            if (dz > 9.0f) continue;
-            float mid = ((float)o->bx0 + (float)o->bx1) * 0.5f;
-            float half = ((float)o->bx1 - (float)o->bx0) * 0.5f;
-            float dx = fabsf(ac->x - mid);
-            if (dx > half * 0.55f + 1.0f) continue;                 /* it has to be under the body, not just nearby */
-            float sc = dz + dx * 0.35f;
-            if (sc < score[0]) { score[1] = score[0]; best[1] = best[0]; score[0] = sc; best[0] = i; }
-            else if (sc < score[1]) { score[1] = sc; best[1] = i; }
-        }
-        for (int k = 0; k < 2; k++) {
-            if (best[k] < 0) continue;
-            object_t *o = &w->obj[best[k]];
-            float half = ((float)o->bx1 - (float)o->bx0) * 0.5f;
-            float mid = ((float)o->bx0 + (float)o->bx1) * 0.5f;
-            float c = 1.0f - fabsf(ac->x - mid) / (half + 0.01f);
-            o->push += (ac->moved > 0 ? 1.0f : -1.0f) * (0.7f + 0.6f * c);
-        }
+        touch_at(w, ac->x, ac->zf, ac->moved);
     }
+    float gx, gz, gm;
+    if (event_walker(w, &gx, &gz, &gm) && fabsf(gm) >= 0.01f) touch_at(w, gx, gz, gm);   /* the unseen walker too */
 }
 
 /* Strength of one gust at x in [0, 1] (without the sign): a short rise ahead of the front, a longer
