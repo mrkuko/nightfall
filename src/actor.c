@@ -21,7 +21,7 @@ static const char *ANIM_NAMES[A_COUNT] = {
 
 static const char *INTENT_NAMES[IN_COUNT] = {
     "none", "wander", "forage", "look", "groom", "rest", "hide", "peek", "leave",
-    "climb", "perch", "flee", "follow", "watch", "pass", "hover", "sniff", "emerge", "vanish", "roost", "chase", "frolic", "hunt", "shelter", "wallow"
+    "climb", "perch", "flee", "follow", "watch", "pass", "hover", "sniff", "emerge", "vanish", "roost", "chase", "frolic", "hunt", "shelter", "wallow", "dig"
 };
 
 const char *intent_name(int i) { return (i >= 0 && i < IN_COUNT) ? INTENT_NAMES[i] : "?"; }
@@ -99,6 +99,7 @@ void profile_parse(const sprite_t *s, profile_t *p)
         if (strstr(h, "hollow")) p->homes |= 1 << PL_HOLLOW;
         if (strstr(h, "branch")) p->homes |= 1 << PL_PERCH;
         if (strstr(h, "edge")) p->homes |= 1 << PL_EDGE;
+        if (strstr(h, "sett")) p->homes |= 1 << PL_SETT;
     }
     const char *v;
     p->fear = (v = sprite_prop(s, "fear")) ? (float)atof(v) : 0.5f;
@@ -111,6 +112,7 @@ void profile_parse(const sprite_t *s, profile_t *p)
     p->shelter = (v = sprite_prop(s, "shelter")) && strstr(v, "rain");
     p->wary = (v = sprite_prop(s, "wary")) ? (float)atof(v) : 0.0f;
     p->roots = (v = sprite_prop(s, "roots")) ? atoi(v) : 0;
+    p->digs = (v = sprite_prop(s, "digs")) && strstr(v, "sett");
     p->aura = (v = sprite_prop(s, "aura")) ? (float)atof(v) : 0.0f;
     p->bound_len = 50.0f; p->bound_h = 8.0f;
     if ((v = sprite_prop(s, "bound"))) sscanf(v, "%f %f", &p->bound_len, &p->bound_h);
@@ -238,7 +240,7 @@ static int can_reach_place(const actor_t *a, const place_t *p)
     switch (p->type) {
     case PL_HOLLOW: return (m & (NAV_CLIMB | NAV_AIR)) != 0;
     case PL_PERCH:  return (m & (NAV_PERCH | NAV_AIR)) != 0;
-    case PL_ENTRY: case PL_UNDER: case PL_TRUNK: case PL_EDGE: case PL_SHELTER: return (m & NAV_GROUND) != 0;
+    case PL_ENTRY: case PL_UNDER: case PL_TRUNK: case PL_EDGE: case PL_SHELTER: case PL_SETT: return (m & NAV_GROUND) != 0;
     case PL_PEEK:   return a->hidden;
     default:        return 0;
     }
@@ -445,9 +447,70 @@ static float climb_depth(const actor_t *a)
 /* safe flight depth: in front of trunks and bushes, behind the foreground */
 static int cruise_z(const world_t *w) { return w->ground_z + 14; }
 
+/* A sett (badger burrow): where the anchor stands relative to the mouth, along the tunnel's direction:
+ * diving in (the body slides into the ground in front of it), coming out head first (the body still in the
+ * tunnel behind), digging (the claws at the face of the hole). Measured from the badger's dive / rise / burrow frames. */
+#define SETT_DIVE_DX 10.0f
+#define SETT_RISE_DX 5.0f
+#define SETT_DIG_DX  14.0f
+#define MAX_SETTS    2
+
+/* Plays a clip of the shape by name, outside the logical animations (`once` clips stay on their last frame). */
+static int play_clip(actor_t *a, const char *name)
+{
+    int c = sprite_clip_index(a->spr, name);
+    if (c < 0) return 0;
+    if (a->clip != c || a->clip_after) { a->clip = c; a->clip_after = 0; a->ct = 0; }
+    a->anim = -1;
+    return 1;
+}
+
+static int clip_done(const actor_t *a) { return a->ct >= clip_duration(&a->spr->clips[a->clip]); }
+
+static int is_sett(const world_t *w, int oi) { return oi >= 0 && oi < w->nobj && strcmp(w->obj[oi].spr->name, "sett") == 0; }
+
+/* A sett object with no entrance yet (digging was interrupted). */
+static int sett_unfinished(const world_t *w, int oi)
+{
+    for (int i = 0; i < w->nplace; i++)
+        if (w->place[i].type == PL_SETT && w->place[i].obj == oi) return 0;
+    return 1;
+}
+
+/* Where to dig: an unfinished sett on the screen first, otherwise a new spot near the badger, away from other
+ * setts, with room for the spoil heap behind it. 0 = nowhere (enough setts already). */
+static int sett_spot(world_t *w, actor_t *a, float *mx, int *dir)
+{
+    int n = 0;
+    for (int i = 0; i < w->nobj; i++) {
+        if (!is_sett(w, i)) continue;
+        n++;
+        const object_t *o = &w->obj[i];
+        if (sett_unfinished(w, i) && o->x > 30.0f && o->x < (float)w->w - 30.0f) {
+            if (mx) *mx = o->x;
+            if (dir) *dir = o->flip ? -1 : 1;
+            return 1;
+        }
+    }
+    if (n >= MAX_SETTS) return 0;
+    for (int k = 0; k < 10; k++) {
+        float x = clampf(a->x + rng_range(&w->rng, -80, 80), 60, (float)w->w - 60);
+        int d = rng_chance(&w->rng, 0.5f) ? 1 : -1;
+        if (x - (float)d * 50.0f < 4.0f || x - (float)d * 50.0f > (float)w->w - 4.0f) d = -d;
+        int ok = 1;
+        for (int i = 0; i < w->nobj && ok; i++)
+            if (is_sett(w, i) && fabsf(w->obj[i].x - x) < 80.0f) ok = 0;
+        if (!ok) continue;
+        if (mx) *mx = x;
+        if (dir) *dir = d;
+        return 1;
+    }
+    return 0;
+}
+
 static void plan_hide(world_t *w, actor_t *a, int run)
 {
-    int mask = a->prof.homes & ((1 << PL_ENTRY) | (1 << PL_UNDER) | (1 << PL_HOLLOW));
+    int mask = a->prof.homes & ((1 << PL_ENTRY) | (1 << PL_UNDER) | (1 << PL_HOLLOW) | (1 << PL_SETT));
     int pi = find_place(w, a, mask, 1, 400);
     if (pi < 0) {
         /* nowhere to hide -> off the screen (a leaper bolts with a few long leaps first) */
@@ -477,12 +540,18 @@ static void plan_hide(world_t *w, actor_t *a, int run)
             step_t *s = plan_push(a, ST_CLIMB);
             if (s) { s->x = p->climb_x; s->y = p->y; s->z = w->place[tb].z; }
         }
+    } else if (p->type == PL_SETT) {
+        /* to the mouth, facing down the tunnel: it dives in nose first */
+        plan_ground_move(w, a, p->x - (float)p->sub * SETT_DIVE_DX, run, p->z);
+        step_t *f = plan_push(a, ST_FACE);
+        if (f) f->x = p->x + (float)p->sub * 20.0f;
     } else {
         plan_ground_move(w, a, p->x, run, a->lane_z);
     }
     step_t *s = plan_push(a, ST_ENTER);
     if (s) s->place = pi;
     p->occupant = actor_index(w, a);
+    if (p->type == PL_SETT) push_anim(a, A_IDLE, rng_range(&w->rng, 6.0f, 15.0f));   /* safe underground for a while */
 }
 
 static int can_fly(const actor_t *a) { return (a->prof.navmask & (NAV_AIR | NAV_PERCH)) != 0; }
@@ -776,7 +845,7 @@ static void plan_intent(world_t *w, actor_t *a, int in)
         /* peek out of its hideout: from a bush through an opening, from a hollow directly */
         place_t *home = a->place >= 0 ? &w->place[a->place] : NULL;
         int pi = -1;
-        if (home && (home->type == PL_HOLLOW || home->type == PL_UNDER)) pi = a->place;
+        if (home && (home->type == PL_HOLLOW || home->type == PL_UNDER || home->type == PL_SETT)) pi = a->place;
         else if (home) {
             int cands[8], n = 0;
             for (int i = 0; i < w->nplace && n < 8; i++)
@@ -835,6 +904,27 @@ static void plan_intent(world_t *w, actor_t *a, int in)
             s = plan_push(a, ST_MOVE);
             if (s) { s->x = clampf(p->x + out, 8, (float)w->w - 8); s->z = a->lane_z; }
             push_anim(a, A_LOOK, rng_range(&w->rng, 0.8f, 2.0f));
+        }
+        break;
+    }
+    case IN_DIG: {
+        /* a new sett (or carrying on with an unfinished one): to the spot, a sniff, then digging; when it is
+         * done it often goes straight in */
+        float mx;
+        int dir;
+        if (!ground || !sett_spot(w, a, &mx, &dir)) { push_anim(a, A_LOOK, 1.0f); break; }
+        plan_ground_move(w, a, mx - (float)dir * SETT_DIG_DX, 0, a->lane_z);
+        s = plan_push(a, ST_FACE);
+        if (s) s->x = mx + (float)dir * 20.0f;
+        push_anim(a, A_SNIFF, rng_range(&w->rng, 1.0f, 2.5f));
+        s = plan_push(a, ST_DIG);
+        if (s) { s->x = mx; s->z = dir; s->dur = rng_range(&w->rng, 30.0f, 50.0f); }
+        if (rng_chance(&w->rng, 0.6f)) {
+            plan_push(a, ST_ENTER);                     /* the place is filled in when the sett is finished */
+            push_anim(a, A_IDLE, rng_range(&w->rng, 10.0f, 30.0f));      /* (hidden) a nap in the new sett */
+        } else {
+            push_anim(a, A_LOOK, rng_range(&w->rng, 1.5f, 3.0f));
+            push_anim(a, A_GROOM, rng_range(&w->rng, 2.0f, 4.0f));
         }
         break;
     }
@@ -1101,6 +1191,10 @@ static void choose_intent(world_t *w, actor_t *a)
             score[IN_EMERGE] = 2.5f * (1.0f - a->fear) * (a->fear > 0.35f ? 0.0f : 1.0f);
             score[IN_VANISH] = 0.4f + a->boredom * 2.5f;
             score[IN_REST] = 0.8f + a->fear * 3.0f;     /* stays hidden quietly */
+            if (a->place >= 0 && w->place[a->place].type == PL_SETT) {
+                score[IN_REST] += 1.0f + a->fatigue * 4.0f;
+                score[IN_VANISH] *= 0.5f;               /* mostly it comes out again rather than staying down for good */
+            }
         }
     } else {
         for (int i = 1; i < IN_COUNT; i++) score[i] = p->iw[i];
@@ -1124,6 +1218,8 @@ static void choose_intent(world_t *w, actor_t *a)
         float rain = weather_at(w, WX_RAIN, a->x);
         score[IN_SHELTER] = (p->shelter && g && rain > 0.2f && find_shelter(w, a, 400.0f) >= 0) ? 4.0f + rain * 8.0f : 0.0f;
         if (!g || find_puddle(w, a) < 0) score[IN_WALLOW] = 0;
+        if (!p->digs || !g || a->fear > 0.3f || weather_at(w, WX_RAIN, a->x) > 0.3f || !sett_spot(w, a, NULL, NULL))
+            score[IN_DIG] = 0;
         else score[IN_WALLOW] *= 1.0f + w->wx.wet * 2.0f;          /* fresh mud after the rain */
         if (!g) { score[IN_GROOM] *= 0.2f; score[IN_SNIFF] = 0; }
         if (a->nav == NAV_AIR) score[IN_LOOK] *= 0.2f;
@@ -1161,7 +1257,9 @@ static void choose_intent(world_t *w, actor_t *a)
     if (a->hidden && best == IN_REST) {
         plan_clear(a);
         a->intent = IN_REST;
-        push_anim(a, A_IDLE, rng_range(&w->rng, 2.0f, 6.0f));
+        int sett = a->place >= 0 && w->place[a->place].type == PL_SETT;
+        push_anim(a, A_IDLE, sett ? rng_range(&w->rng, 8.0f, 25.0f) : rng_range(&w->rng, 2.0f, 6.0f));
+        if (sett) a->fatigue = fmaxf(0, a->fatigue - 0.35f);
         return;
     }
     plan_intent(w, a, best);
@@ -1482,6 +1580,7 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
         a->zf = approach(a->zf, (float)s->z, dt * 30.0f / fmaxf(s->dur, 0.05f) * 0.2f + dt * 8.0f);
         return a->step_t >= s->dur && fabsf(a->zf - (float)s->z) < 0.5f;
     case ST_ENTER: {
+        if (s->place < 0 || s->place >= w->nplace) return 1;
         place_t *p = &w->place[s->place];
         if (first) {
             if (p->obj >= 0 && p->type == PL_ENTRY) {
@@ -1511,6 +1610,21 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
                 return 1;
             }
             return 0;
+        }
+        if (p->type == PL_SETT) {
+            /* nose first down the tunnel: it tips forward and the ground swallows it */
+            if (first) { a->facing = p->sub; a->nav = NAV_GROUND; a->zf = (float)p->z; }
+            a->x = approach(a->x, p->x - (float)p->sub * SETT_DIVE_DX, dt * 8.0f);
+            a->y = world_ground_at(w, a->x, a->zf);
+            play_clip(a, "dive");
+            if (!clip_done(a)) return 0;
+            a->hidden = 1;
+            a->nav = NAV_HIDDEN;
+            a->place = s->place;
+            p->occupant = actor_index(w, a);
+            a->fatigue = fmaxf(a->fatigue, 0.7f);           /* down there it sleeps for a while */
+            world_log(w, "%s#%u went down its sett", a->spr->name, a->id);
+            return 1;
         }
         /* going inside: the depth drops behind the leaves */
         set_anim(a, a->nav == NAV_CLIMB ? A_CLIMB : A_MOVE);
@@ -1555,6 +1669,23 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
             if (fabsf(a->y - ty) < 0.5f) { a->mask_place = 0; return 1; }
             return 0;
         }
+        if (p->type == PL_SETT) {
+            /* head first out of the tunnel, a look round, then the body follows */
+            if (first) {
+                a->hidden = 0;
+                a->nav = NAV_GROUND;
+                a->facing = -p->sub;
+                a->zf = (float)p->z;
+                a->x = p->x - (float)p->sub * SETT_RISE_DX;
+                a->y = world_ground_at(w, a->x, a->zf);
+                p->occupant = -1;
+                a->place = -1;
+                world_stimulus(w, p->x, p->y, 40, ST_NOISE, 0.3f, 0.6f, actor_index(w, a));
+                world_log(w, "%s#%u comes out of its sett", a->spr->name, a->id);
+            }
+            play_clip(a, "rise");
+            return clip_done(a);
+        }
         if (first) {
             a->hidden = 0;
             a->x = p->type == PL_HOLLOW ? p->climb_x : p->x;
@@ -1575,6 +1706,24 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
     }
     case ST_PEEK: {
         place_t *p = &w->place[s->place];
+        if (p->type == PL_SETT) {
+            /* only the head and shoulders out of the mouth, looking round; then back down */
+            if (first) {
+                a->hidden = 0;
+                a->facing = -p->sub;
+                a->zf = (float)p->z;
+                a->x = p->x - (float)p->sub * SETT_RISE_DX;
+                a->y = world_ground_at(w, a->x, a->zf);
+                play_clip(a, "peek_up");
+                world_log(w, "%s#%u peeks out of its sett", a->spr->name, a->id);
+            }
+            float sink = clip_duration(&a->spr->clips[sprite_clip_index(a->spr, "sink") >= 0 ?
+                                                      sprite_clip_index(a->spr, "sink") : a->clip]);
+            if (a->step_t >= s->dur) { a->hidden = 1; return 1; }
+            if (a->step_t >= s->dur - sink) play_clip(a, "sink");
+            else if (a->clip == sprite_clip_index(a->spr, "peek_up") && clip_done(a)) play_clip(a, "peek");
+            return 0;
+        }
         place_t *home = a->place >= 0 ? &w->place[a->place] : p;
         int in_hollow = p->type == PL_HOLLOW;
         if (first) {
@@ -1628,6 +1777,58 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
             return 1;
         }
         return 0;
+    }
+    case ST_DIG: {
+        /* digging a sett: bouts of scraping with the forepaws (soil flying back under the belly), kicking the loose
+         * soil out with the hind legs, a look round; the hole and the spoil heap grow stage by stage, the badger
+         * works its way a little into the hole. s->place = the sett object, s->y = progress it started from. */
+        int dir = s->z >= 0 ? 1 : -1;
+        if (first) {
+            int oi = -1;
+            for (int i = 0; i < w->nobj; i++)
+                if (is_sett(w, i) && fabsf(w->obj[i].x - s->x) < 2.0f) { oi = i; break; }
+            s->y = 0;
+            if (oi < 0) {
+                oi = world_add_object(w, "sett", s->x, world_ground_at(w, s->x, a->zf), (int)a->zf, dir < 0,
+                                      rng_next(&w->rng) | 1);
+                if (oi >= 0) world_set_object_base(w, oi, "stage0");
+                world_log(w, "%s#%u starts digging a sett", a->spr->name, a->id);
+            } else {
+                const char *cn = w->obj[oi].spr->clips[w->obj[oi].base_clip].name;
+                if (strncmp(cn, "stage", 5) == 0) s->y = (float)atoi(cn + 5) / 4.0f;
+                world_log(w, "%s#%u digs on at its sett", a->spr->name, a->id);
+            }
+            s->place = oi;
+            s->anim = (int)(s->y * 4.0f);
+            a->facing = dir;
+        }
+        if (!is_sett(w, s->place)) return 1;
+        float prog = s->y + a->step_t / s->dur;
+        int stage = prog >= 1.0f ? 3 : (int)(prog * 4.0f);
+        if (stage > 3) stage = 3;
+        if (stage != s->anim) {
+            char cn[24];
+            snprintf(cn, sizeof cn, "stage%d", stage);
+            world_set_object_base(w, s->place, cn);
+            s->anim = stage;
+        }
+        float c = fmodf(a->step_t, 5.6f);
+        if (c < 3.6f) play_clip(a, "burrow");
+        else if (c < 5.0f) play_clip(a, "kick");
+        else set_anim(a, A_LOOK);
+        if (c < 5.0f && rng_float(&w->rng) < dt * 0.4f)
+            world_stimulus(w, a->x, a->y, 45, ST_NOISE, 0.3f, 0.6f, actor_index(w, a));
+        a->x = approach(a->x, s->x - (float)dir * (SETT_DIG_DX - 4.0f * fminf(prog, 1.0f)), dt * 1.5f);
+        a->y = world_ground_at(w, a->x, a->zf);
+        if (prog < 1.0f) return 0;
+        int np = w->nplace;
+        world_places_from_object(w, s->place);
+        world_log(w, "%s#%u has dug a sett", a->spr->name, a->id);
+        if (w->nplace > np && a->step + 1 < a->nplan && a->plan[a->step + 1].kind == ST_ENTER) {
+            a->plan[a->step + 1].place = np;
+            w->place[np].occupant = actor_index(w, a);
+        }
+        return 1;
     }
     case ST_CHASE: {
         actor_t *o = s->place >= 0 && s->place < w->nact ? &w->act[s->place] : NULL;

@@ -62,6 +62,7 @@ creature                  # CREATURE PROFILE for the intent system
   scares rabbit mouse     # (predator) whom it scares
   hunts mouse             # (bird of prey) whom it stoops on and may catch (intent `hunt`)
   shelter rain            # goes under big leaves (`point.shelterN`) when it rains (intent `shelter`)
+  digs sett               # (badger) digs its own burrows (intent `dig`), `homes sett` = hides and lives in them
   attracted glow          # (moth) flies towards light
   point head 7 -10        # head point relative to the anchor (peeking out of openings)
 end
@@ -117,11 +118,13 @@ once when the creature leaves `X` (getting up). The creature does not move while
 
 ## Intents (`intents`)
 
-`wander forage look groom rest hide peek leave climb perch flee follow watch pass hover sniff emerge vanish roost chase frolic hunt shelter`
+`wander forage look groom rest hide peek leave climb perch flee follow watch pass hover sniff emerge vanish roost chase frolic hunt shelter wallow dig`
 
 `roost` = settle down: a creature with a `hollow` animation flies into a free visible hollow, a creature with `hang` hangs under a branch (it reserves the spot so that two do not hang in the same place).
 
 `hunt` = (a creature with `hunts mouse …` and `swoop` / `strike` / `carry` clips) a bird of prey eyes a creature from the list that is out in the open, glides to a point above and beside it, stoops in a dive that gets faster, spreads its talons and strikes. With a catch (about half of the hunts) the prey disappears into the talons and the owl flaps away over the edge of the screen with it (`carry` shows the mouse in its talons); on a miss the prey has bolted, the owl strikes the empty ground and pulls up. An owl sitting in a hollow or on a branch can also spot prey and burst out after it.
+
+`dig` = (a creature with `digs sett`) digs a sett: it picks a spot near it (away from other setts, at most two on the screen, an unfinished one first), sniffs, then works in bouts — scraping with the forepaws while soil flies back under its belly (clip `burrow`), kicking the loose soil out with the hind legs (`kick`), a look round — for 30–50 s, making noise. A `sett` object appears at the spot and grows stage by stage (a scrape, a dip, half a hole, the finished entrance with its spoil heap); the badger works its way a little into the hole. When it is done the sett becomes a home (`PL_SETT`); often the badger dives straight in and sleeps there. An interrupted dig (danger, rain) is carried on later. Into a sett it goes nose first (`dive`, the body tips forward and sinks below the ground), out of it head first (`rise`), a peek is `peek_up` → `peek` → `sink`; a sleeping badger stays down longer and badgers can also arrive from a sett. Without these clips a creature should not have `digs` / `homes sett`.
 
 `shelter` = (a creature with `shelter rain`) when it rains where it stands, it goes (runs, in heavy rain) to the nearest free spot under big leaves (a `point.shelterN` of a plant such as butterbur), lies down there until it has been dry for a few seconds, then shakes itself off (`groom`) and looks around. It also breaks off a calm activity when the rain reaches it. In fog creatures see a predator later (the danger radius shrinks to about a third in thick fog) and notice whom they chase only nearby; a bird of prey hunts by ear: only prey that moves, sniffs or eats, not too far away.
 
@@ -158,6 +161,13 @@ prop path.walk0  2 -7  8 -8  14 -8  20 -9 …    # walkway along the top of a br
   "hanging" frames is at the little claws on top). A branch exports it by itself.
 - In the playground `d` shows the paths (pink = climbing, blue = walkway, orange = hanging,
   yellow = link).
+
+## Sett (`point.sett`)
+
+`point.sett X Y` — the mouth of a burrow in the ground (generator `sett`, clips `stage0..stage3`, `idle` = finished). The
+shape is drawn for a tunnel going down to the right, a flipped object's tunnel goes left. Depth: heap, bank and the dark
+mouth behind a creature standing on the object's row, a lip of loose soil in front of it (it hides where a diving
+creature meets the ground).
 
 ## Big leaves (`point.shelterN`, `leaves`, `drips`)
 

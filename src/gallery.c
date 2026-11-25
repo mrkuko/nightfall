@@ -440,7 +440,7 @@ static int spawn_species(world_t *w, const char *name)
         return i;
     }
     /* ground creatures: from the edge, or they come out of a hideout */
-    int homemask = p.homes & ((1 << PL_ENTRY) | (1 << PL_UNDER) | (p.navmask & NAV_CLIMB ? 1 << PL_HOLLOW : 0));
+    int homemask = p.homes & ((1 << PL_ENTRY) | (1 << PL_UNDER) | (1 << PL_SETT) | (p.navmask & NAV_CLIMB ? 1 << PL_HOLLOW : 0));
     if (homemask && rng_chance(&w->rng, 0.45f)) {
         int pl = random_place(w, homemask, 1);
         if (pl >= 0) {

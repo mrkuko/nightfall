@@ -167,6 +167,19 @@ void world_play_object_clip(world_t *w, int obj, const char *clip)
     o->oneshot = strncmp(clip, "open", 4) == 0 ? 2 : 1;
 }
 
+/* Switches what an object shows when nothing else plays (a sett growing stage by stage). */
+void world_set_object_base(world_t *w, int obj, const char *clip)
+{
+    if (obj < 0 || obj >= w->nobj) return;
+    object_t *o = &w->obj[obj];
+    int c = sprite_clip_index(o->spr, clip);
+    if (c < 0) return;
+    o->base_clip = c;
+    o->clip = c;
+    o->t = 0;
+    o->oneshot = 0;
+}
+
 int world_add_place(world_t *w, int type, float x, float y, int z, int nav, int obj, int sub)
 {
     if (GROW(w->place, w->nplace, w->cap_place)) return -1;
@@ -214,6 +227,8 @@ void world_places_from_object(world_t *w, int oi)
             world_add_place(w, PL_SHELTER, o->x + (float)(dx * fl), world_ground_at(w, o->x + (float)(dx * fl), (float)o->z),
                             o->z, NAV_GROUND, oi, k);
     }
+    if (prop_xy(s, "point.sett", &dx, &dy))       /* the tunnel goes down the way the shape faces */
+        world_add_place(w, PL_SETT, o->x + (float)(dx * fl), o->y + (float)dy, o->z, NAV_GROUND, oi, fl);
     if (prop_xy(s, "point.under", &dx, &dy))
         world_add_place(w, PL_UNDER, o->x + (float)(dx * fl), world_ground(w, o->x + (float)(dx * fl)),
                         o->z - 4, NAV_GROUND, oi, 0);
@@ -667,7 +682,7 @@ void world_render(world_t *w, raster_t *r, int debug)
     if (debug) {
         static const rgb_t pc[PL_COUNT] = {
             {200, 60, 60}, {240, 200, 60}, {60, 200, 240}, {200, 120, 255},
-            {120, 255, 120}, {255, 140, 60}, {255, 255, 255}, {100, 100, 255}, {80, 255, 200}
+            {120, 255, 120}, {255, 140, 60}, {255, 255, 255}, {100, 100, 255}, {80, 255, 200}, {170, 110, 60}
         };
         for (int k = 0; k < w->npath; k++) {
             const navpath_t *np = &w->path[k];

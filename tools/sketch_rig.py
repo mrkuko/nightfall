@@ -1799,6 +1799,27 @@ def emit_quad(out, header, c, poses, walk_frames, w, h, clips, profile, swing=0.
     out.append(profile)
 
 
+class Moved:
+    """A shape moved by (dx, dy), keeping its palette keys and fuzz (for drawing a pose into a bigger canvas)."""
+    def __init__(s, a, dx, dy):
+        s.a, s.dx, s.dy, s.keys, s.fuzz = a, dx, dy, a.keys, a.fuzz
+
+    def inside(s, x, y):
+        return s.a.inside(x - s.dx, y - s.dy)
+
+
+def moved(parts, dx, dy):
+    out = []
+    for q in parts:
+        if isinstance(q, P):
+            out.append(P(q.x + dx, q.y + dy, q.key))
+        elif isinstance(q, Clear):
+            out.append(Clear(q.e.cx + dx, q.e.cy + dy, q.e.rx, q.e.ry))
+        else:
+            out.append(Moved(q, dx, dy))
+    return out
+
+
 def badger(out):
     G = 17.4
     def stripes(hx, hy, ha, tx, ty):
@@ -1835,6 +1856,10 @@ palette
   e 060606
   w c8d0d8 glow
   n 0e0c0c
+  o 9a7e5e ~6
+  O 7a6248 ~5
+  q 54422f ~4
+  x b8b2a6
 end
 """
     poses = [
@@ -1847,30 +1872,162 @@ end
                      legs=dict(nf=(23.0, 13.0, 26.4, 16.6), ff=(24.4, 13.0, 24.8, G),
                                nh=(9.4, 13.0, 9.0, G), fh=(7.8, 13.0, 7.6, G)))),
     ]
-    clips = """
+    emit_quad(out, header, c, poses, 6, 36, 18, '', '', 0.3, 1.0, 0.3)
+
+    # ---- new poses, drawn into a bigger canvas: room behind (flying soil) and above (diving nose first)
+    PL, PT = 12, 12
+    W, H = 36 + PL + 6, 18 + PT
+    base = dict(c)
+    base['legs'] = stand_legs(c)
+
+    def pose(**kw):
+        pp = dict(base)
+        legs = dict(base['legs'])
+        legs.update(kw.pop('legs', {}))
+        pp['legs'] = legs
+        pp.update(kw)
+        return quad(pp, {})
+
+    def frame(name, parts, soil=(), rot=0.0, pivot=(24.0, G), dx=0.0, dy=0.0, cut=True):
+        """rot > 0 tips the nose down around `pivot`; dx/dy move the body (into the ground: cut at the ground)."""
+        ox, oy = PL + dx, PT + dy
+        g = render(moved(parts, ox, oy), W, H, rot, (pivot[0] + ox, pivot[1] + oy))
+        if soil:
+            gs = render(moved(clods(soil), PL, PT), W, H)
+            for y in range(H):
+                for x in range(W):
+                    if gs[y][x] != '.':
+                        g[y][x] = gs[y][x]
+        if cut:
+            for y in range(PT + 18, H):
+                g[y] = ['.'] * W
+        out.append('frame %s at %d %d' % (name, 17 + PL, 17 + PT))
+        for r in g:
+            out.append('|' + ''.join(r).rstrip('.').ljust(1, '.'))
+        out.append('')
+
+    def clods(pts):
+        """flying soil: (x, y, size) — size 2 = a lump, 1 = a crumb"""
+        parts = []
+        for x, y, s in pts:
+            if s >= 2:
+                parts.append(E(x, y, 1.2, 1.0, 0, 'oOq'))
+            else:
+                parts.append(P(round(x), round(y), 'o'))
+        return parts
+
+    def stream(phase, n, big, spread=1.0):
+        """clods along the throw: from under the forepaws, low under the belly, out behind the hind legs
+        in an arc; phase 0..1 moves the whole stream on (one value per animation frame)"""
+        pts = []
+        for i in range(n):
+            p = (phase + i / n) % 1.0
+            x = 21.0 - 33.0 * p * spread
+            y = 16.8 - (0.6 * p / 0.45 if p < 0.45 else 0.6 + 8.0 * math.sin(math.pi * (p - 0.45) / 0.55) * spread)
+            if p > 0.8:
+                y = max(y, 16.8 - 8.0 * (1.0 - p) / 0.2)
+            pts.append((x, y, 2 if (i < big) else 1))
+        return pts
+
+    def claws(legs):
+        """the long pale claws of the forefeet: they show where each paw is"""
+        out_ = []
+        for k in ('nf', 'ff'):
+            L = legs.get(k)
+            if L:
+                fx, fy = L[-2], L[-1]
+                out_ += [P(round(fx + 1.0), round(fy - 0.3), 'x'), P(round(fx + 2.0), round(fy - 0.3), 'x')]
+        return out_
+
+    # digging with the forepaws: head down, the paws scrape in turns, soil flies back under the belly
+    def low(bob):
+        return dict(hx=27.4, hy=14.4 + bob, hang=0.85, neck=(23.0, 10.8, 25.4, 13.2 + bob, 3.6, 2.8),
+                    body=[(16.0, 10.6, 10.6, 5.0, 0.06), (8.4, 10.2 - bob * 0.6, 5.0, 4.8, 0.0)],
+                    tail=[(3.6, 7.8 - bob), (1.4, 8.2 - bob * 1.6)])
+    reach = lambda hip, foot: leg_ik(hip, foot, 2.8, 2.8, 1)
+    paws = [
+        dict(nf=reach((23.0, 13.4), (30.4, 17.2)), ff=reach((24.4, 13.4), (20.6, 15.2))),
+        dict(nf=reach((23.0, 13.4), (26.0, 15.0)), ff=reach((24.4, 13.4), (29.0, 17.4))),
+        dict(nf=reach((23.0, 13.4), (20.2, 15.6)), ff=reach((24.4, 13.4), (30.6, 17.2))),
+        dict(nf=reach((23.0, 13.4), (28.6, 17.4)), ff=reach((24.4, 13.4), (24.6, 14.8))),
+    ]
+    bobs = [0.0, 0.6, 0.0, 0.6]
+    for i in range(4):
+        body = pose(legs=paws[i], **low(bobs[i])) + claws(paws[i])
+        frame('dig%d' % i, body, stream(i / 4.0, 2, 0, 0.6))
+        frame('burrow%d' % i, body, stream(i / 4.0 + 0.05, 7, 3))
+
+    # kicking the loosened soil out backwards with the hind legs: gathered, then shot back with a spray
+    kick_legs = [
+        dict(nh=leg_ik((9.4, 13.0), (12.0, G), 2.6, 2.6, -1), fh=leg_ik((7.8, 13.0), (10.4, G - 0.2), 2.6, 2.6, -1)),
+        dict(nh=leg_ik((9.4, 12.6), (1.6, 15.6), 2.8, 2.8, -1), fh=leg_ik((7.8, 12.6), (0.4, 14.6), 2.8, 2.8, -1)),
+    ]
+    kick_soil = [[(6.0, 16.8, 2), (3.0, 17.0, 1), (9.0, 17.0, 1)],
+                 [(-2.0, 13.0, 2), (-6.0, 14.6, 2), (-1.0, 10.8, 1), (-9.0, 16.4, 2), (-4.0, 11.4, 1), (-11.0, 17.0, 1)]]
+    for i in range(2):
+        legs = dict(kick_legs[i], **paws[3])
+        frame('kick%d' % i, pose(legs=legs, **low(0.6 if i else 0.0)) + claws(legs), kick_soil[i])
+
+    # sitting on its haunches, scratching the flank with a hind foot (badgers scratch a lot)
+    sitp = dict(body=[(14.4, 9.0, 8.6, 4.9, -0.55), (8.6, 12.4, 5.6, 4.8, -0.2)],
+                hx=20.6, hy=6.2, hang=0.45, neck=(16.8, 7.0, 19.2, 6.4, 3.4, 3.0),
+                tail=[(3.4, 15.6), (1.0, 16.6)])
+    sitlegs = dict(nf=leg_ik((18.4, 11.0), (20.4, G), 3.4, 3.4, 1), ff=leg_ik((19.4, 11.0), (22.0, G), 3.4, 3.4, 1),
+                   fh=(6.6, 15.0, 9.4, G))
+    sit_nh = leg_ik((9.6, 14.6), (13.4, G), 2.6, 2.6, -1)
+    frame('sit', pose(legs=dict(sitlegs, nh=sit_nh), **sitp))
+    frame('sit_blink', pose(legs=dict(sitlegs, nh=sit_nh), eye=0, **sitp))
+    for i, foot in enumerate(((15.8, 8.0), (14.4, 10.6))):
+        nh = leg_ik((9.6, 14.0), foot, 3.4, 3.4, -1)
+        frame('scratch%d' % i, pose(legs=dict(sitlegs, nh=nh), **sitp) +
+              [P(round(foot[0] + 0.8), round(foot[1] - 0.6), 'x'), P(round(foot[0] + 0.4), round(foot[1] - 1.4), 'x')])
+
+    # into the sett nose first: it tips forward and slides down, the ground swallows it
+    st = pose()
+    for i, (r, dx, dy) in enumerate(((0.22, 1.0, 1.5), (0.5, 3.0, 5.0), (0.75, 5.0, 10.0), (0.9, 6.0, 15.0))):
+        frame('dive%d' % i, st, rot=r, pivot=(26.0, G), dx=dx, dy=dy)
+    # and out of it: the head comes up first (the body still down the tunnel behind it), looks round,
+    # then the body follows
+    up = ((-1.0, 4.0, 19.0), (-0.85, 3.0, 14.5), (-0.5, 1.4, 7.0), (-0.18, 0.4, 1.8))
+    for i, (r, dx, dy) in enumerate(up):
+        frame('rise%d' % i, pose(hang=0.1), rot=r, pivot=(4.0, G), dx=dx, dy=dy)
+    r, dx, dy = up[1]
+    frame('rise1_blink', pose(hang=0.1, eye=0), rot=r, pivot=(4.0, G), dx=dx, dy=dy)
+    frame('rise1_look', pose(hang=0.45, hy=11.8), rot=r, pivot=(4.0, G), dx=dx, dy=dy)
+
+    out.append("""
 clip idle loop fps=5 : stand*16 stand_blink stand*8 look*6 stand*4
 clip sniff loop fps=6 : sniff sniff2 sniff sniff2 sniff*2 stand
-clip dig loop fps=8 : dig sniff2 dig sniff2 dig dig sniff
+clip dig loop fps=8 : dig0 dig1 dig2 dig3 dig0 dig1 dig2 dig3 sniff2*3 dig0 dig1 dig2 dig3 sniff*2
+clip burrow loop fps=9 : burrow0 burrow1 burrow2 burrow3
+clip kick loop fps=7 : kick0 kick1 kick0 kick1 kick0*2
 clip look loop fps=4 : look*8 stand_blink look*4
+clip sit loop fps=4 : sit*14 sit_blink sit*10
+clip scratch loop fps=10 : scratch0 scratch1 scratch0 scratch1 scratch0 scratch1 scratch0 scratch1 sit*4 sit_blink sit*3
+clip dive once fps=7 : stand dive0 dive1 dive2 dive3
+clip rise once fps=6 : rise0 rise1 rise1 rise2 rise3 stand
+clip peek_up once fps=6 : rise0 rise1
+clip peek loop fps=4 : rise1*6 rise1_blink rise1*4 rise1_look*6 rise1*3
+clip sink once fps=6 : rise1 rise0
 clip walk loop fps=8 speed=9 : walk0 walk1 walk2 walk3 walk4 walk5
 clip run loop fps=13 speed=24 : walk0 walk1 walk2 walk3 walk4 walk5
-"""
-    profile = """creature
+""")
+    out.append("""creature
   move ground
   lane 0.3
   speed walk=9 run=24
-  anim idle=idle move=walk run=run look=look eat=dig sniff=sniff alert=look
-  intents forage=6 wander=4 sniff=4 rest=1 hide=1 leave=2
+  anim idle=idle move=walk run=run look=look eat=dig sniff=sniff alert=look groom=scratch sit=sit
+  intents forage=6 wander=4 sniff=4 rest=1 hide=1.5 leave=2 groom=1.5 dig=2.5
+  digs sett               # digs its own burrows: clips burrow, kick, dive, rise, peek_up, peek, sink
   shelter rain            # goes under big leaves when it rains
-  homes log brushwood edge
+  homes sett log brushwood edge
   fear 0.2
   curiosity 0.4
   size medium
   point head 11 -7
 end
 end
-"""
-    emit_quad(out, header, c, poses, 6, 36, 18, clips, profile, 0.3, 1.0, 0.3)
+""")
 
 
 # --------------------------------------------------------------------------

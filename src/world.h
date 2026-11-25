@@ -72,6 +72,7 @@ enum {
     PL_TRUNK,       /* trunk base (where climbing starts) */
     PL_SKY,         /* a point in the air */
     PL_SHELTER,     /* on the ground under big leaves (butterbur): a dry spot in the rain */
+    PL_SETT,        /* the mouth of a burrow in the ground (badger): dived into nose first; sub = +1/-1 the way the tunnel goes */
     PL_COUNT
 };
 
@@ -136,7 +137,7 @@ enum {
 enum {
     IN_NONE, IN_WANDER, IN_FORAGE, IN_LOOK, IN_GROOM, IN_REST, IN_HIDE, IN_PEEK, IN_LEAVE,
     IN_CLIMB, IN_PERCH, IN_FLEE, IN_FOLLOW, IN_WATCH, IN_PASS, IN_HOVER, IN_SNIFF, IN_EMERGE,
-    IN_VANISH, IN_ROOST, IN_CHASE, IN_FROLIC, IN_HUNT, IN_SHELTER, IN_WALLOW, IN_COUNT
+    IN_VANISH, IN_ROOST, IN_CHASE, IN_FROLIC, IN_HUNT, IN_SHELTER, IN_WALLOW, IN_DIG, IN_COUNT
 };
 
 /* plan steps */
@@ -161,6 +162,7 @@ enum {
     ST_BOUND,       /* long leaps along arcs to x (frames bound0..3 by the leap phase), depth to z */
     ST_ROOT,        /* (boar) plough along the ground to x with the snout, turned earth every y px, depth z */
     ST_PURSUE,      /* (event) run after creature `place` (id `anim`) x px behind it, z deeper/closer; when it is gone, runs on off the screen */
+    ST_DIG,         /* (badger) digs a new sett with its mouth at x, tunnel going the way of `z` (+1/-1), for dur seconds */
     ST_DESPAWN
 };
 
@@ -198,6 +200,7 @@ typedef struct {
     float wary;                 /* grazing, it lifts its head now and then to listen (and may bolt); 0 = never */
     float bound_len, bound_h;   /* "bound LEN H": it bolts in leaps this long and high (px) */
     int   bound_f[4];           /* frames bound0..bound3 (gather, launch, flight, landing); -1 = no leaps */
+    int   digs;                 /* "digs sett": digs its own burrows (intent `dig`) */
 } profile_t;
 
 typedef struct {
@@ -395,6 +398,7 @@ int   world_add_place(world_t *w, int type, float x, float y, int z, int nav, in
 /* Adds interaction places from the object's properties (point.peek0, point.entry, point.hollow …). */
 void  world_places_from_object(world_t *w, int obj);
 void  world_play_object_clip(world_t *w, int obj, const char *clip);
+void  world_set_object_base(world_t *w, int obj, const char *clip);
 /* Moves a placed object (e.g. recycling the oldest turned-earth patch); the baked layer is redrawn. */
 void  world_move_object(world_t *w, int obj, float x, float y, int z);
 float world_ground(const world_t *w, float x);

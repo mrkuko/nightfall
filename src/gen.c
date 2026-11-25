@@ -2579,6 +2579,83 @@ static void gen_molehill(sprite_t *s, uint64_t seed)
     sprite_add_clip(s, "idle", CLIP_LOOP, 1, 0, &z0, 1);
 }
 
+/* sett: a badger's burrow being dug — frames stage0..stage3 (a scrape, a shallow dip, half a hole, the finished
+ * entrance), drawn for a tunnel going down to the right: the dark arched mouth in a low bank at the anchor, the
+ * spoil heap of fresh soil to the left (where the digger threw it back under its belly), a lip of loose soil in
+ * front of the mouth (it hides where a creature diving in meets the ground). Depth: heap, bank and mouth behind
+ * the badger standing on the anchor's row, the lip in front of it. `point.sett` = the mouth. */
+static void gen_sett(sprite_t *s, uint64_t seed)
+{
+    rng_t r = rng_seed(seed);
+    enum { W = 62, H = 12, AX = 48 };
+    uint32_t ns = rng_u32(&r);
+    rgb_t soil = vary(mkrgb(96, 72, 50), &r, 0.06f);
+    rgb_t dark = mkrgb(5, 4, 3);
+    float hc = rng_range(&r, -30.0f, -26.0f), hw = rng_range(&r, 16.0f, 19.0f);
+    static const float heap_h[4] = { 1.0f, 2.4f, 4.2f, 6.0f };
+    static const float mouth_rx[4] = { 3.5f, 5.0f, 7.0f, 8.0f }, mouth_ry[4] = { 1.2f, 2.6f, 4.6f, 6.2f };
+    for (int k = 0; k < 4; k++) {
+        char name[16];
+        snprintf(name, sizeof name, "stage%d", k);
+        frame_t *f = sprite_add_frame(s, name, W, H, AX, H - 1);
+        float mrx = mouth_rx[k], mry = mouth_ry[k];
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++) {
+                float xr = (float)(x - AX) + 0.5f, yy = (float)(H - 1 - y);
+                float n = vnoise2((float)x * 0.6f, 0.3f, ns) - 0.5f;
+                /* the spoil heap: a long lumpy mound behind, a low ramp of trodden soil up to the mouth */
+                float u = (xr - hc) / hw;
+                float heap = u > -1.0f && u < 1.0f ? heap_h[k] * (1.0f - u * u) * (1.0f + n * 0.5f) : 0.0f;
+                if (xr > hc && xr < -mrx) heap = fmaxf(heap, heap_h[k] * 0.3f * (1.0f + n));
+                /* a low bank over the mouth (the hole is dug into it) */
+                float bx = (xr - 1.0f) / (mrx + 4.0f), by = yy / (mry + 2.0f);
+                int bank = k >= 2 && bx * bx + by * by < 1.0f + n * 0.3f;
+                /* the mouth: a dark arch, darker deeper in (to the right, where the tunnel goes down) */
+                float mx = xr / mrx, my = yy / mry;
+                int mouth = mx * mx + my * my < 1.0f;
+                rgb_t c;
+                int z;
+                if (mouth) {
+                    float d = clampf(0.5f + mx * 0.4f - my * 0.2f, 0.0f, 1.0f);
+                    c = rgb_mix(mkrgb(24, 17, 12), dark, d);
+                    if (mx * mx + my * my > 0.75f && my > 0.3f) c = mkrgb(44, 32, 23);     /* the rim, inside */
+                    z = -4;
+                } else if (bank || yy < heap) {
+                    float top = bank ? (mry + 2.0f) * sqrtf(fmaxf(0.0f, 1.0f - bx * bx)) : heap;
+                    float lit = clampf(1.0f - (top - yy) / 2.5f, 0.0f, 1.0f);       /* the top catches the light */
+                    c = rgb_scale(soil, 0.62f + lit * 0.4f);
+                    float g = hash2f(x, y + k * 31, ns);
+                    if (g > 0.86f) c = rgb_add(c, 12);                               /* lumps */
+                    else if (g < 0.1f) c = rgb_add(c, -10);
+                    z = -3;
+                } else {
+                    continue;
+                }
+                cv_set(f, x, y, c, z);
+            }
+        /* the lip of loose soil in front of the mouth, and crumbs scattered on the ground */
+        if (k >= 1) {
+            int lw = (int)mrx + 2;
+            for (int x = AX - lw; x <= AX + lw; x++) {
+                float g = hash2f(x, 7, ns);
+                cv_set(f, x, H - 1, rgb_scale(soil, 0.85f + g * 0.25f), 4);
+                if (k >= 3 && (x - AX < lw - 2 && AX - x < lw - 2) && g > 0.35f) cv_set(f, x, H - 2, rgb_scale(soil, 0.95f), 4);
+            }
+        }
+        rng_t cr = rng_seed(seed ^ 0x5e77u);
+        for (int i = 0; i < 4 + k * 4; i++) {
+            int x = AX + (int)rng_range(&cr, hc - hw - 4.0f, 10.0f);
+            if (x >= 0 && x < W) cv_set(f, x, H - 1, rgb_scale(soil, rng_range(&cr, 0.7f, 1.05f)), -2);
+        }
+        frame_rimlight(f, C_MOON, 0.12f);
+        int16_t fi = (int16_t)k;
+        sprite_add_clip(s, name, CLIP_LOOP, 1, 0, &fi, 1);
+    }
+    int16_t full = 3;
+    sprite_add_clip(s, "idle", CLIP_LOOP, 1, 0, &full, 1);
+    set_point(s, "sett", 0, 0);
+}
+
 /* rooted: a patch of earth a boar has turned over with its snout — dark fresh soil, clods, a pale root or two,
  * torn moss at the edge; flat (it lies on the ground) */
 static void gen_rooted(sprite_t *s, uint64_t seed)
@@ -2949,6 +3026,7 @@ static const genreg_t GENS[] = {
     { "moss_patch",     gen_moss_patch,     "ground small" },
     { "molehill",       gen_molehill,       "ground small" },
     { "rooted",         gen_rooted,         "ground small" },
+    { "sett",           gen_sett,           "ground hideout sett" },
     { "cones",          gen_cones,          "ground floor" },
     { "flowers",        gen_flowers,        "plant ground small sway" },
     { "horsetail",      gen_horsetail,      "plant ground foreground sway" },
