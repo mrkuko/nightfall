@@ -137,7 +137,7 @@ enum {
 enum {
     IN_NONE, IN_WANDER, IN_FORAGE, IN_LOOK, IN_GROOM, IN_REST, IN_HIDE, IN_PEEK, IN_LEAVE,
     IN_CLIMB, IN_PERCH, IN_FLEE, IN_FOLLOW, IN_WATCH, IN_PASS, IN_HOVER, IN_SNIFF, IN_EMERGE,
-    IN_VANISH, IN_ROOST, IN_CHASE, IN_FROLIC, IN_HUNT, IN_SHELTER, IN_WALLOW, IN_DIG, IN_COUNT
+    IN_VANISH, IN_ROOST, IN_CHASE, IN_FROLIC, IN_HUNT, IN_SHELTER, IN_WALLOW, IN_DIG, IN_BEDDING, IN_COUNT
 };
 
 /* plan steps */
@@ -163,6 +163,7 @@ enum {
     ST_ROOT,        /* (boar) plough along the ground to x with the snout, turned earth every y px, depth z */
     ST_PURSUE,      /* (event) run after creature `place` (id `anim`) x px behind it, z deeper/closer; when it is gone, runs on off the screen */
     ST_DIG,         /* (badger) digs a new sett with its mouth at x, tunnel going the way of `z` (+1/-1), for dur seconds */
+    ST_BEDDING,     /* (badger) rakes bedding together at x for dur s, shuffles backwards with it to sett `place`, takes it down rump first */
     ST_DESPAWN
 };
 

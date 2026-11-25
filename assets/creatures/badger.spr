@@ -26,6 +26,9 @@ palette
   O 7a6248 ~5
   q 54422f ~4
   x b8b2a6
+  h 9c8e5e ~10 z+2
+  H 74683f ~8 z+2
+  y 463e26 ~4 z+2
 end
 
 frame stand
@@ -1038,6 +1041,390 @@ frame rise1_look at 29 29
 |................baaaaaaaaaaaKKKkkj
 |................dddddddddddb.KKKk
 
+frame rake0 at 29 29
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.........................bbbbbbb
+|..................bbbbbbbaaaaaaab.b
+|..............bbb.daaaabaaaaaaaaabbbb
+|.............baabbaaaaaabaaaaaaabbaabb
+|............baaddaaaaaaabaaaaaaadaaaab
+|.............ddbaaaaaaaabaaaaaabaaaaaab
+|...............daaaakkaaaaaaaaadaakkccccc
+|................daaaKKkabaaaaaaadkKKCkkCCc
+|................daaaKKkabdaaaaaaaKKKkKkkcc
+|.................ddaKkkdd.ddddddd.KKKKKkew
+|..................jdkKk..............CKKHxx
+|..................JJKKk..............JJxxyhhhh
+|..................JJKK..................yyyS
+
+frame rake1 at 29 29
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.........................bbbbbbb
+|..................bbbbbbbaaaaaaab.b
+|..............bbb.daaaabaaaaaaaaabbbb
+|.............baabbaaaaaabaaaaaaabbaabb
+|............baaddaaaaaaabaaaaaaadaaaab
+|.............ddbaaaaaaaabaaaaaabaaaaaab
+|...............daaaakkaaaaaaaaadaakkccccc
+|................daaaKKkabaaaaaaadkKKCkkCCc
+|................daaaKKkabdaaaaaaaKKKkKkScc
+|.................ddaKkkdd.ddddddd.KKKkkkew
+|..................jdkKk..............HHkhhhh
+|..................JJKKk..............yyyxxxxh
+|..................JJKK.................hyyhS
+
+frame haul0 at 29 29
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|........................bbbbbbbb
+|..................bbbbbbaaaaaaaabbb
+|..............bbbbaaaaabaaaaaaaaabbbb
+|.............baabaaaaaaabaaaaaaabaaaab
+|............baadbdaaaaaabaaaaaabaaaacccc
+|.............ddbbaaaaaaabaaaaaadaaaaCcSCcc
+|...............ddaaakkaabaaaaaaadakkCSSSCc
+|.................daaKKkabaaaaaaadkKKkCCSSew
+|.................daaKKkabdaadaaaaKKKkCCCSSS
+|.................ddaKkkdd.dd.dddb.kkHHHhhhhSS
+|..................jdkKk...........KKkhyhyhhhSc
+|...................JKKk............Kky.yyhhhCcn
+|...................JKKk............Kkj.....h
+
+frame haul1 at 29 29
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.......................bbbbbbbbbb
+|..................bbbbbaaaaaaaaaabbb
+|..............bbbbaaaaabaaaaaaaaabbbb
+|.............baabaaaaaaabaaaaaaabaaaab
+|............baddbdaaaaaabaaaaaabaaaacccc
+|.............d.bbaaaaaaabaaaaaadaaaaCcSCcc
+|................daaakkkabaaaaaaadakkCSSSCc
+|.................daaKKkabaaaaaaadkKKkCCSSew
+|..................daKKkdadaadaaadKKKkCCCSSS
+|..................dkkkk.d.dd.ddd..KkHHHhhhhSS
+|...................kKk............kKkhyhyhhhSc
+|...................KKk.............KKy.yyhhhCcn
+|...................KKk.............KK......h
+
+frame haul2 at 29 29
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.......................bbbbbbbbbb
+|..................bbbbbaaaaaaaaaabbb
+|..............bbbbaaaaabaaaaaaaaabbbb
+|.............baabaaaaaaabaaaaaaabaaaab
+|............baddbdaaaaaabaaaaaabaaaacccc
+|.............d.bbaaaaaaabaaaaaadaaaaCcSCcc
+|................daaakkkabaaaaaaadakkCSSSCc
+|.................daaKKkabaaaaaaadkKKkCCSSew
+|..................daKKkdadaadaaadKKKkCCCSSS
+|..................dkkkk.d.dd.ddd..KkHHHhhhhSS
+|...................kKk............kKkhyhyhhhSc
+|...................KKk.............Kky.yyhhhCcn
+|...................JKj.............Kk......h
+
+frame haul3 at 29 29
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|........................bbbbbbbb
+|..................bbbbbbaaaaaaaabbb
+|..............bbbbaaaaabaaaaaaaaabbbb
+|.............baabaaaaaaabaaaaaaabaaaab
+|............baadbdaaaaaabaaaaaabaaaacccc
+|.............ddbbaaaaaaabaaaaaadaaaaCcSCcc
+|...............ddaaakkaabaaaaaaadakkCSSSCc
+|.................daaKKkabaaaaaaadkKKkCCSSew
+|.................daaKKkabdaadaaaaKKKkCCCSSS
+|.................ddakkkdd.dd.dddb.KkHHHhhhhSS
+|..................jdKKk...........kKkhyhyhhhSc
+|..................JJKKk...........KKky.yyhhhCcn
+|...................JjK.............Kk......h
+
+frame haul4 at 29 29
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.......................bbbbbbbbbb
+|..................bbbbbaaaaaaaaaabbb
+|..............bbbbaaaaabaaaaaaaaabbbb
+|.............baabaaaaaaabaaaaaaabaaaab
+|............bdddbdaaaaaabaaaaaabaaaacccc
+|...............bbaaaaaaabaaaaaadaaaaCcSCcc
+|................daaakkkabaaaaaaadakkCSSSCc
+|.................daaKKkabaaaaaaadkKKkCCSSew
+|..................daKKkdadaadaaadKKKkCCCSSS
+|..................ddKkk.d.dd.ddd..kkHHHhhhhSS
+|..................JJjKk...........KKkhyhyhhhSc
+|..................JJ.Kk...........KKky.yyhhhCcn
+|..................Jj.Kk...........KKkj.....h
+
+frame haul5 at 29 29
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.......................bbbbbbbbbb
+|..................bbbbbaaaaaaaaaabbb
+|..............bbbbaaaaabaaaaaaaaabbbb
+|.............baabaaaaaaabaaaaaaabaaaab
+|............bdddbdaaaaaabaaaaaabaaaacccc
+|...............bbaaaaaaabaaaaaadaaaaCcSCcc
+|................daaakkkabaaaaaaadakkCSSSCc
+|.................daaKKkabaaaaaaadkKKkCCSSew
+|..................daKKkdadaadaaadKKKkCCCSSS
+|..................ddKkk.d.dd.ddd..kkHHHhhhhSS
+|..................JJKKk...........KKkhyhyhhhSc
+|..................JJ.Kk...........KKky.yyhhhCcn
+|..................Jj.Kk............KJj.....h
+
+frame backin0 at 29 29
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.................................Scn
+|...........................cccchSSc
+|.........................bcCCewhCh
+|......................bbbcSSSSChCh
+|.....................baaccSSCChHh
+|....................bdaaacCCCHhyy
+|...................badaaaakCCyhyH
+|..................bddddddkKkkyyy
+
+frame backin1 at 29 29
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.............................cccc..SScn
+|.........................bbbcCCSwShSSc
+|.......................bbaacSSSeShChh
+|.....................bbdaaaCcSCCChHH
+|....................baadaaaaCCCHhyh
+|....................daadaaakkkCyhhy
+|..................bbaaadaakKKKHyyy
+|.................baaaaaadddKKkkkyj
+|................baaaaaaaaaaaKKKkkj
+|................dddddddddddb.KKKk
+
+frame backin2 at 29 29
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|..............................b
+|.........................bb.bbabbccccc
+|.......................bbaabaaaacSSCcCw
+|.....................bbaaaaadaaacSSSSeShSSc
+|....................baaaaaabaaaaCCCCCChCCCcn
+|..................bbaaaaaaadaakkkkCHHhHhh
+|.................baaaaaaaaaaddKKKkHHhyh
+|...............bbbbabaaaaaaaaadKKkjhyyy
+|..............babaababaaaaaaaadKkKkyH
+|..............daaaaaaabaaaaaad..KKkJj
+|............bbaaaaaaaabaaaadd....KKk
+|............ddaaaaakkabaadd
+|...........bddddddkKKkbdd
+
+frame backin3 at 29 29
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|.
+|........................bbbbbbbbbbb
+|.....................bbbaaaaaaabaaabb
+|..................bbbbaaaaaaaabaaaaccccc
+|................bbaababaaaaaaaadaaaCcSCCc
+|.............bbbdaaaaaabaaaaaaadaaaCSSSSew
+|............badbaaaaaaabaaaaaaadakkkCCcSSSS
+|............da.daaaaaaaabaaaaaaddKKkCCCChhhSS
+|............db.daaaakkaaaaaaaaaadKKkjjhhHCCCCcn
+|...............daaakKKkbadaadadd.KkkHhyhyhh
+|...............ddaaKKKkbd.dd.d....Kkyyyyy
+|.................daKkkk...........KKkj
+|..................ddKKk...........KKJj
+|..................JJKKk
+
 
 clip idle loop fps=5 : stand*16 stand_blink stand*8 look*6 stand*4
 clip sniff loop fps=6 : sniff sniff2 sniff sniff2 sniff*2 stand
@@ -1052,6 +1439,10 @@ clip rise once fps=6 : rise0 rise1 rise1 rise2 rise3 stand
 clip peek_up once fps=6 : rise0 rise1
 clip peek loop fps=4 : rise1*6 rise1_blink rise1*4 rise1_look*6 rise1*3
 clip sink once fps=6 : rise1 rise0
+clip rake loop fps=5 : rake0 rake1 rake0 rake1 rake0 rake1 sniff*2
+clip haul loop fps=7 speed=4 : haul5 haul4 haul3 haul2 haul1 haul0
+clip haul_rest loop fps=4 : haul0*6
+clip back_in once fps=5 : haul0 backin3 backin2 backin1 backin0
 clip walk loop fps=8 speed=9 : walk0 walk1 walk2 walk3 walk4 walk5
 clip run loop fps=13 speed=24 : walk0 walk1 walk2 walk3 walk4 walk5
 
@@ -1060,8 +1451,9 @@ creature
   lane 0.3
   speed walk=9 run=24
   anim idle=idle move=walk run=run look=look eat=dig sniff=sniff alert=look groom=scratch sit=sit
-  intents forage=6 wander=4 sniff=4 rest=1 hide=1.5 leave=2 groom=1.5 dig=2.5
+  intents forage=6 wander=4 sniff=4 rest=1 hide=1.5 leave=2 groom=1.5 dig=2.5 bedding=2
   digs sett               # digs its own burrows: clips burrow, kick, dive, rise, peek_up, peek, sink
+                          # bedding: rake, haul (backwards), haul_rest, back_in
   shelter rain            # goes under big leaves when it rains
   homes sett log brushwood edge
   fear 0.2

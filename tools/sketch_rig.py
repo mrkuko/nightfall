@@ -1860,6 +1860,9 @@ palette
   O 7a6248 ~5
   q 54422f ~4
   x b8b2a6
+  h 9c8e5e ~10 z+2
+  H 74683f ~8 z+2
+  y 463e26 ~4 z+2
 end
 """
     poses = [
@@ -1995,6 +1998,53 @@ end
     frame('rise1_blink', pose(hang=0.1, eye=0), rot=r, pivot=(4.0, G), dx=dx, dy=dy)
     frame('rise1_look', pose(hang=0.45, hy=11.8), rot=r, pivot=(4.0, G), dx=dx, dy=dy)
 
+    # collecting bedding: dry grass and leaves raked in with the forepaws, held between the chin and the forelegs,
+    # carried shuffling backwards to the sett and taken down rump first
+    def bundle(cx, cy, rx, ry, seed, trail=0):
+        parts = [E(cx, cy, rx, ry, 0.15, 'HHy', 0.4)]
+        for k in range(4 + trail):
+            a = -0.6 + 1.2 * h2(k, seed, 7)
+            L = rx * (0.9 + 0.6 * h2(k, seed, 9))
+            x0, y0 = cx + (h2(k, seed, 3) - 0.5) * rx, cy + (h2(k, seed, 5) - 0.5) * ry
+            parts.append(C(x0, y0, x0 + math.cos(a) * L, y0 + math.sin(a) * L * 0.5, 0.35, 0.3, 'hhH'))
+        for k in range(trail):
+            # loose strands hanging from the front of the bundle down to the ground
+            x0 = cx + rx * 0.6 + k * 0.9
+            parts.append(C(x0, cy + ry * 0.4, x0 + 1.2 + k * 0.6, G - 0.2, 0.3, 0.3, 'hHH'))
+        # dark gaps between the stalks
+        for k in range(int(rx * ry * 1.5)):
+            px_, py_ = cx + (h2(k, seed, 13) - 0.5) * rx * 1.4, cy + (h2(k, seed, 17) - 0.5) * ry * 1.4
+            parts.append(P(round(px_), round(py_), 'y'))
+        return parts
+
+    rake_low = dict(hx=27.0, hy=13.6, hang=0.7, neck=(23.0, 10.6, 25.2, 12.6, 3.6, 2.8))
+    rake_paws = [
+        dict(nf=reach((23.0, 13.2), (31.0, 17.2)), ff=reach((24.4, 13.2), (26.0, 16.2))),
+        dict(nf=reach((23.0, 13.2), (27.0, 16.0)), ff=reach((24.4, 13.2), (31.4, 17.2))),
+    ]
+    for i in range(2):
+        legs = rake_paws[i]
+        # the pile in front of the chest grows a little as the paws pull it in
+        pile = bundle(29.2 - i * 0.8, 16.3, 2.8 + i * 0.5, 1.3 + i * 0.2, 11 + i)
+        frame('rake%d' % i, pose(legs=legs, **rake_low) + pile + claws(legs))
+
+    haul_head = dict(hx=27.4, hy=12.2, hang=0.45, neck=(23.0, 10.2, 25.4, 11.4, 3.6, 2.9))
+    for i in range(6):
+        pp = dict(base)
+        pp.update(quad_walk(c, i * 2 * math.pi / 6, 0.22, 0.9, 0.3))
+        legs = dict(pp['legs'])
+        # the forelegs hug the bundle to the chest: short shuffling steps only
+        for k, (hx_, hy_) in (('nf', (23.0, 13.0)), ('ff', (24.4, 13.0))):
+            fx = legs[k][2]
+            legs[k] = (hx_, hy_, 24.4 + (fx - 24.0) * 0.5, legs[k][3])
+        pp['legs'] = legs
+        pp.update(haul_head)
+        frame('haul%d' % i, quad(pp, {}) + bundle(27.0, 15.6, 3.0, 1.7, 21, trail=2))
+
+    # rump first into the sett with the bundle (the way out in reverse)
+    for i, (r, dx, dy) in enumerate(up):
+        frame('backin%d' % i, pose(**haul_head) + bundle(27.0, 15.6, 3.0, 1.7, 21), rot=r, pivot=(4.0, G), dx=dx, dy=dy)
+
     out.append("""
 clip idle loop fps=5 : stand*16 stand_blink stand*8 look*6 stand*4
 clip sniff loop fps=6 : sniff sniff2 sniff sniff2 sniff*2 stand
@@ -2009,6 +2059,10 @@ clip rise once fps=6 : rise0 rise1 rise1 rise2 rise3 stand
 clip peek_up once fps=6 : rise0 rise1
 clip peek loop fps=4 : rise1*6 rise1_blink rise1*4 rise1_look*6 rise1*3
 clip sink once fps=6 : rise1 rise0
+clip rake loop fps=5 : rake0 rake1 rake0 rake1 rake0 rake1 sniff*2
+clip haul loop fps=7 speed=4 : haul5 haul4 haul3 haul2 haul1 haul0
+clip haul_rest loop fps=4 : haul0*6
+clip back_in once fps=5 : haul0 backin3 backin2 backin1 backin0
 clip walk loop fps=8 speed=9 : walk0 walk1 walk2 walk3 walk4 walk5
 clip run loop fps=13 speed=24 : walk0 walk1 walk2 walk3 walk4 walk5
 """)
@@ -2017,8 +2071,9 @@ clip run loop fps=13 speed=24 : walk0 walk1 walk2 walk3 walk4 walk5
   lane 0.3
   speed walk=9 run=24
   anim idle=idle move=walk run=run look=look eat=dig sniff=sniff alert=look groom=scratch sit=sit
-  intents forage=6 wander=4 sniff=4 rest=1 hide=1.5 leave=2 groom=1.5 dig=2.5
+  intents forage=6 wander=4 sniff=4 rest=1 hide=1.5 leave=2 groom=1.5 dig=2.5 bedding=2
   digs sett               # digs its own burrows: clips burrow, kick, dive, rise, peek_up, peek, sink
+                          # bedding: rake, haul (backwards), haul_rest, back_in
   shelter rain            # goes under big leaves when it rains
   homes sett log brushwood edge
   fear 0.2

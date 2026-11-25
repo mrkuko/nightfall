@@ -21,7 +21,7 @@ static const char *ANIM_NAMES[A_COUNT] = {
 
 static const char *INTENT_NAMES[IN_COUNT] = {
     "none", "wander", "forage", "look", "groom", "rest", "hide", "peek", "leave",
-    "climb", "perch", "flee", "follow", "watch", "pass", "hover", "sniff", "emerge", "vanish", "roost", "chase", "frolic", "hunt", "shelter", "wallow", "dig"
+    "climb", "perch", "flee", "follow", "watch", "pass", "hover", "sniff", "emerge", "vanish", "roost", "chase", "frolic", "hunt", "shelter", "wallow", "dig", "bedding"
 };
 
 const char *intent_name(int i) { return (i >= 0 && i < IN_COUNT) ? INTENT_NAMES[i] : "?"; }
@@ -508,6 +508,21 @@ static int sett_spot(world_t *w, actor_t *a, float *mx, int *dir)
     return 0;
 }
 
+/* A finished, free sett on the screen to bring bedding to (nearest), or -1. */
+static int bedding_sett(world_t *w, actor_t *a)
+{
+    int best = -1;
+    float bd = 220.0f;
+    for (int i = 0; i < w->nplace; i++) {
+        const place_t *p = &w->place[i];
+        if (p->type != PL_SETT || (p->occupant >= 0 && p->occupant != actor_index(w, a))) continue;
+        if (p->x < 40.0f || p->x > (float)w->w - 40.0f) continue;
+        float d = fabsf(p->x - a->x);
+        if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+}
+
 static void plan_hide(world_t *w, actor_t *a, int run)
 {
     int mask = a->prof.homes & ((1 << PL_ENTRY) | (1 << PL_UNDER) | (1 << PL_HOLLOW) | (1 << PL_SETT));
@@ -928,6 +943,23 @@ static void plan_intent(world_t *w, actor_t *a, int in)
         }
         break;
     }
+    case IN_BEDDING: {
+        /* bedding for the sett: to a spot on the heap's side, facing away from the mouth, rake dry grass and leaves
+         * together, then shuffle backwards with the bundle under the chin and take it down rump first */
+        int pi = ground ? bedding_sett(w, a) : -1;
+        if (pi < 0) { push_anim(a, A_LOOK, 1.0f); break; }
+        place_t *p = &w->place[pi];
+        float gx = clampf(p->x - (float)p->sub * rng_range(&w->rng, 40, 75), 15, (float)w->w - 15);
+        if (fabsf(gx - p->x) < 25.0f) { push_anim(a, A_LOOK, 1.0f); break; }
+        plan_ground_move(w, a, gx, 0, p->z);
+        s = plan_push(a, ST_FACE);
+        if (s) s->x = gx - (float)p->sub * 20.0f;
+        s = plan_push(a, ST_BEDDING);
+        if (s) { s->place = pi; s->x = gx; s->dur = rng_range(&w->rng, 4.0f, 8.0f); }
+        push_anim(a, A_IDLE, rng_range(&w->rng, 10.0f, 30.0f));          /* (hidden) asleep on the new bedding */
+        p->occupant = actor_index(w, a);
+        break;
+    }
     case IN_LEAVE:
         plan_leave(w, a, 0);
         break;
@@ -1218,9 +1250,11 @@ static void choose_intent(world_t *w, actor_t *a)
         float rain = weather_at(w, WX_RAIN, a->x);
         score[IN_SHELTER] = (p->shelter && g && rain > 0.2f && find_shelter(w, a, 400.0f) >= 0) ? 4.0f + rain * 8.0f : 0.0f;
         if (!g || find_puddle(w, a) < 0) score[IN_WALLOW] = 0;
-        if (!p->digs || !g || a->fear > 0.3f || weather_at(w, WX_RAIN, a->x) > 0.3f || !sett_spot(w, a, NULL, NULL))
-            score[IN_DIG] = 0;
         else score[IN_WALLOW] *= 1.0f + w->wx.wet * 2.0f;          /* fresh mud after the rain */
+        /* badger: a new sett, bedding for one it has */
+        if (!p->digs || !g || a->fear > 0.3f || rain > 0.3f || !sett_spot(w, a, NULL, NULL)) score[IN_DIG] = 0;
+        if (!g || a->fear > 0.3f || rain > 0.3f || bedding_sett(w, a) < 0) score[IN_BEDDING] = 0;
+        else score[IN_BEDDING] *= 0.5f + a->fatigue;          /* before a sleep */
         if (!g) { score[IN_GROOM] *= 0.2f; score[IN_SNIFF] = 0; }
         if (a->nav == NAV_AIR) score[IN_LOOK] *= 0.2f;
         if (a->nav == NAV_PERCH) { score[IN_LOOK] += 2.0f; score[IN_WANDER] *= 0.3f; }
@@ -1828,6 +1862,50 @@ static int exec_step(world_t *w, actor_t *a, step_t *s, float dt)
             a->plan[a->step + 1].place = np;
             w->place[np].occupant = actor_index(w, a);
         }
+        return 1;
+    }
+    case ST_BEDDING: {
+        if (s->place < 0 || s->place >= w->nplace) return 1;
+        place_t *p = &w->place[s->place];
+        int me = actor_index(w, a);
+        if (p->type != PL_SETT || (p->occupant >= 0 && p->occupant != me)) return 1;
+        int dir = p->sub;
+        float tx = p->x - (float)dir * SETT_RISE_DX;              /* where it stands when it comes out = where it backs in */
+        if (first) {
+            s->anim = 0;
+            a->facing = -dir;
+            world_log(w, "%s#%u collects bedding", a->spr->name, a->id);
+        }
+        if (s->anim == 0) {
+            play_clip(a, "rake");
+            if (rng_float(&w->rng) < dt * 0.3f) world_stimulus(w, a->x, a->y, 30, ST_NOISE, 0.2f, 0.5f, me);
+            if (a->step_t >= s->dur) { s->anim = 1; s->y = a->step_t; }
+            return 0;
+        }
+        if (s->anim == 1) {
+            /* backwards: it keeps facing away from the sett, a few shuffles, a short rest, on again */
+            a->facing = -dir;
+            float dx = tx - a->x;
+            if (fabsf(dx) < 0.6f) { a->x = tx; s->anim = 2; return 0; }
+            if (fmodf(a->step_t - s->y, 3.2f) > 2.6f) { play_clip(a, "haul_rest"); return 0; }
+            play_clip(a, "haul");
+            float spd = (a->spr->clips[a->clip].speed > 0 ? a->spr->clips[a->clip].speed : a->prof.walk * 0.45f) * a->speed_mul;
+            float st = sgnf(dx) * fminf(fabsf(dx), spd * dt);
+            a->x += st;
+            a->moved = st;
+            a->nav = NAV_GROUND;
+            a->zf = approach(a->zf, (float)p->z, dt * 6.0f);
+            a->y = world_ground_at(w, a->x, a->zf);
+            return 0;
+        }
+        play_clip(a, "back_in");
+        if (!clip_done(a)) return 0;
+        a->hidden = 1;
+        a->nav = NAV_HIDDEN;
+        a->place = s->place;
+        p->occupant = me;
+        a->fatigue = fmaxf(a->fatigue, 0.7f);
+        world_log(w, "%s#%u took its bedding down the sett", a->spr->name, a->id);
         return 1;
     }
     case ST_CHASE: {
