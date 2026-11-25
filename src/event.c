@@ -15,14 +15,15 @@
  * Dholes that were already on the screen watch the deer go by and fall in. Everything small that the dholes
  * frighten hides as the pack goes past; the deer and the pack leave over the other edge.
  *
- * Ghost walk (only in fog or mist): something nobody can see walks slowly through the forest. The forest falls
- * silent first (the curious turn to where it comes from, the timid slip away), then footprints press into the
- * soft ground one by one — muddy shoe prints, short slow steps, close to the camera; a step into a puddle leaves only a ring.
- * The plants it passes bend aside. It shows only in the fog: the mist parts around a tall hooded figure (thinner
- * where it is, a little denser at its outline, a wake closing behind it), so in clear air there is nothing at all.
+ * Ghost walk (vanishing footprints; any weather but rain, most often in fog): something nobody can see walks
+ * slowly through the forest. The forest falls silent first (the curious turn to where it comes from, the timid
+ * slip away), then shoe prints appear on the ground one by one — a pale, half-transparent frosted
+ * sheen that seeps in heel to toe, a thread of cold mist curling up from each fresh one; slow steps, close to the camera; a step into a puddle leaves only a ring. The plants it passes
+ * bend aside. The walker itself shows only in the fog: the mist parts around a tall hooded figure (thinner where
+ * it is, a little denser at its outline, a wake closing behind it); in clear air there are only the prints.
  * The creatures sense it rather than see it (SRC_UNSEEN: the fog does not hide it) and hide by their own fear.
- * It walks off the edge — or the trail simply stops in the middle of the clearing and the figure dissolves
- * upwards. The prints fade over the next half a minute.
+ * It walks off the edge — or in the middle of the clearing it turns into the forest (the last two prints half
+ * turned, then with the toes into the forest, a step deeper in) and the figure dissolves upwards. After the last step the prints go out one after another, the oldest first.
  *
  * Bat swarm: out of one spot (a hollow in a trunk, else a branch high up) bats pour out one after another,
  * rise in a loose column, then scatter across the sky in zigzags; most leave over the edges, one or two stay
@@ -347,9 +348,13 @@ static void update_bats(world_t *w, event_t *e, float dt)
 #define GH_DREAD_R   130.0f     /* how far the creatures sense it */
 #define GH_RISE      3.5f       /* the end in the middle of the clearing: it dissolves upwards this long */
 #define GH_TIMEOUT   150.0f
-#define PR_PRESS     0.5f       /* a print sinks in this fast … */
-#define PR_KEEP      30.0f      /* … stays this long … */
-#define PR_FADE      10.0f      /* … and fades out over this long */
+#define PR_LIGHT     0.9f       /* a print seeps into the ground heel to toe this slowly … */
+#define PR_WISP      2.6f       /* … and a thread of cold mist rises from it this long */
+#define PR_HOLD      1.6f       /* after the last step the trail glows on this long, then … */
+#define PR_TURN      0.38f      /* … the prints go out one after another, the oldest first, this far apart, … */
+#define PR_FADE      2.4f       /* … each dimming out over this long */
+#define PR_ON        (-1e9f)    /* `fade` of a print still glowing on (the trail has not ended yet) */
+#define PR_MAXAGE    240.0f     /* a print nobody ended (cannot happen, but): it goes out on its own */
 
 /* How much of the ground row at depth z between x0 and x1 is hidden by what stands in front of it (0..1): the
  * walker takes a row where its footprints can be seen. */
@@ -393,14 +398,14 @@ static int start_ghost(world_t *w)
     e->gmoved = 0;
     e->gfoot = rng_int(&e->rng, 2);
     e->gdir = rng_chance(&e->rng, 0.5f) ? 1.0f : -1.0f;
-    e->gstep = rng_range(&e->rng, 11.0f, 13.0f);                  /* short, slow steps */
-    e->gspeed = e->gstep / rng_range(&e->rng, 1.3f, 1.6f);
+    e->gstep = rng_range(&e->rng, 15.0f, 18.0f);                  /* slow, unhurried steps … */
+    e->gspeed = e->gstep / rng_range(&e->rng, 2.0f, 2.5f);        /* … a step every two seconds or so */
     /* mostly in from the edge; now and then the first print appears out of nowhere, in the open */
     float x0 = rng_chance(&e->rng, 0.6f) ? (e->gdir > 0 ? -12.0f : W + 12.0f)
                                           : (e->gdir > 0 ? rng_range(&e->rng, 0.12f, 0.45f) : rng_range(&e->rng, 0.55f, 0.88f)) * W;
-    /* how far: across (and off) the screen, or the trail stops somewhere in the middle (at most ~25 strides on a
-     * very wide screen, so it never takes minutes) */
-    float len = rng_chance(&e->rng, 0.55f) ? W + 60.0f : rng_range(&e->rng, 0.35f, 0.7f) * W;
+    /* how far: mostly it turns into the forest somewhere in the middle, now and then it walks across and off the
+     * screen (at most ~25 strides: on a very wide screen it turns into the forest before the edge) */
+    float len = rng_chance(&e->rng, 0.3f) ? W + 60.0f : rng_range(&e->rng, 0.35f, 0.75f) * W;
     len = fminf(len, e->gstep * 25.0f);
     e->gx = x0;
     e->gend = x0 + e->gdir * len;
@@ -419,13 +424,15 @@ static int start_ghost(world_t *w)
     return 1;
 }
 
-/* A footfall at x: pressed into the ground (or a ring in a puddle), heard by the curious. */
-static void footfall(world_t *w, event_t *e, float x)
+/* A footfall at x: a print on the ground (or a ring in a puddle), heard by the curious. shape 0 along the trail
+ * (the two feet a hand apart in depth), 1 half turned into the forest, 2 with the toes into the forest (a step
+ * deeper in). */
+static void footfall_shape(world_t *w, event_t *e, float x, int shape)
 {
     if (x < -4.0f || x > (float)w->w + 4.0f) return;
     int side = e->gfoot;
     e->gfoot ^= 1;
-    int z = (int)lroundf(e->gz) + (side ? 4 : -4);                 /* the two feet a hand apart in depth */
+    int z = (int)lroundf(e->gz) + (shape == 0 ? (side ? 4 : -4) : shape == 1 ? (side ? 1 : -2) - 2 : -6);
     float y = floorf(world_ground_at(w, x, (float)z) + 0.5f);
     world_stimulus(w, x, y, 70, ST_NOISE, 0.3f, 0.5f, -1);
     for (int i = 0; i < w->nobj; i++) {
@@ -440,11 +447,30 @@ static void footfall(world_t *w, event_t *e, float x)
     if (e->nprint == EV_MAX_PRINT)                                  /* full: the oldest one goes */
         for (int i = 1; i < EV_MAX_PRINT; i++) if (e->print[i].age > e->print[k].age) k = i;
     ev_print_t *p = &e->print[k];
-    p->x = x; p->y = y; p->z = z; p->age = 0; p->side = side; p->dir = e->gdir > 0 ? 1 : -1;
+    p->x = x; p->y = y; p->z = z; p->age = 0; p->fade = PR_ON; p->side = side; p->dir = e->gdir > 0 ? 1 : -1;
+    p->shape = shape;
+}
+
+static void footfall(world_t *w, event_t *e, float x) { footfall_shape(w, e, x, 0); }
+
+/* The last step has been made: the trail glows on a moment, then the prints go out in the order they were made
+ * (the oldest first). Only those still glowing on; calling it twice does nothing more. */
+static void trail_end(event_t *e)
+{
+    for (;;) {
+        int k = -1, rank = 0;
+        for (int i = 0; i < e->nprint; i++) {
+            if (e->print[i].fade != PR_ON) { if (e->print[i].fade < 0) rank++; continue; }
+            if (k < 0 || e->print[i].age > e->print[k].age) k = i;
+        }
+        if (k < 0) return;
+        e->print[k].fade = -(PR_HOLD + (float)rank * PR_TURN);
+    }
 }
 
 static void end_ghost(event_t *e)
 {
+    trail_end(e);
     e->kind = EV_NONE;
     e->gstate = 0;
     e->gvis = 0;
@@ -480,16 +506,38 @@ static void update_ghost(world_t *w, event_t *e, float dt)
             world_log(w, "the footprints stop … and wait");
         } else if ((e->gx - e->gend) * e->gdir >= 0) {
             if (e->gx < -20.0f || e->gx > W + 20.0f) { world_log(w, "the footprints lead away"); end_ghost(e); return; }
-            footfall(w, e, e->gnext - e->gdir * e->gstep * 0.95f);
-            e->gstate = 3;
-            e->t = 0;
-            world_log(w, "the trail ends in the middle of the clearing");
+            /* it stops in the middle of the clearing and turns into the forest: two more steps, half turned, then
+             * with the toes into the forest, a step deeper in — and nothing more */
+            e->gstate = 4;
+            e->gturn = 0;
+            e->gwait = clampf(fabsf(e->gnext - e->gx) / e->gspeed, 0.4f, 2.5f);
+            world_log(w, "the footprints turn into the forest");
         }
     } else if (e->gstate == 2) {
         e->gwait -= dt;
         if (e->gwait <= 0) e->gstate = 1;
+    } else if (e->gstate == 4) {
+        float st = e->gdir * e->gspeed * 0.4f * dt;
+        e->gx += st;
+        e->gmoved = st;
+        e->gz -= 4.0f * dt;                                         /* into the depth */
+        e->gwait -= dt;
+        if (e->gwait <= 0) {
+            if (e->gturn++ == 0) {
+                footfall_shape(w, e, e->gnext, 1);
+                e->gnext += e->gdir * e->gstep * 0.3f;
+                e->gwait = e->gstep / e->gspeed * 0.9f;
+            } else {
+                footfall_shape(w, e, e->gnext, 2);
+                trail_end(e);
+                e->gstate = 3;
+                e->t = 0;
+                world_log(w, "the trail ends at the edge of the forest");
+            }
+        }
     } else {
-        e->glift += dt * 9.0f;                                      /* dissolving upwards */
+        e->glift += dt * 9.0f;                                      /* dissolving upwards … */
+        e->gz -= 3.0f * dt;                                         /* … and away into the forest */
         if (e->t >= GH_RISE) { end_ghost(e); return; }
     }
     if (e->t > GH_TIMEOUT && e->gstate != 3) { end_ghost(e); return; }
@@ -566,62 +614,103 @@ void event_fog_part(const world_t *w, int px, int py, float *hole, float *rim)
     *rim = expf(-(d - 1.2f) * (d - 1.2f) / 0.09f) * vert * rag * (behind > 0 ? 0.45f : 1.0f) * (1.0f - body) * e->gvis;
 }
 
-/* A shoe print in the soft ground seen low across it, 9 x 3 px, toe to the right: the heel, the gap of the
- * instep, the sole with its tread ('#' pressed deeper, '+' the ridges between). Only a little darker than the
- * ground around it — muddy, not a hole. Walking left mirrored. */
-#define PR_W 9
-#define PR_H 3
-static const char *const PRINT_MASK[PR_H] = {
-    ".#+.+#+#.",
-    "#+#.#+#+#",
-    ".#+.+#+#.",
+/* A ghost's shoe print seen low across the ground ('#' full, '+' faint), toe to the right / up:
+ *   0  along the trail, 10 x 3: the heel, the narrow waist of the sole (the arch side open), the sole, the rounded
+ *      toe; this is the near foot (the arch away from the camera: row 0), the far foot is the same upside down
+ *   1  half turned into the forest, 7 x 3: toe up and ahead
+ *   2  toe into the forest, 4 x 4: foreshortened, toe at the top
+ * Walking left: mirrored. ax, ay: which way heel -> toe runs (it seeps in that way). */
+typedef struct { int w, h, ax, ay; const char *row[4]; } pmask_t;
+static const pmask_t PMASK[3] = {
+    { 10, 3, 1, 0, { ".##...###.", "###++#####", ".##+++###." , NULL } },
+    { 7, 3, 1, 1, { "....###", "..++##.", "###...." } },
+    { 4, 4, 0, 2, { ".##.", "####", ".+#.", ".##." } },
 };
 
-/* how much darker (col, row) of print p is: 0 = untouched */
+/* how bright (col, row) of print p is (0..1), not yet lit up heel to toe */
 static float print_px(const ev_print_t *p, int col, int row)
 {
-    if (col < 0 || row < 0 || col >= PR_W || row >= PR_H) return 0.0f;
-    char ch = PRINT_MASK[row][p->dir > 0 ? col : PR_W - 1 - col];
-    return ch == '#' ? 0.34f : ch == '+' ? 0.18f : 0.0f;
+    const pmask_t *M = &PMASK[p->shape];
+    if (col < 0 || row < 0 || col >= M->w || row >= M->h) return 0.0f;
+    int mirror = p->shape == 2 ? p->side : p->dir < 0;     /* shape 2: the left shoe is the right one mirrored */
+    int c = mirror ? M->w - 1 - col : col;
+    int r = p->shape == 0 && !p->side ? M->h - 1 - row : row;
+    char ch = M->row[r][c];
+    if (ch == '.') return 0.0f;
+    float prog = (float)(c * M->ax + (M->h - 1 - r) * M->ay);
+    float total = (float)((M->w - 1) * M->ax + (M->h - 1) * M->ay);
+    float lit = clampf(p->age / PR_LIGHT * (total + 2.0f) - prog, 0.0f, 1.0f);
+    return (ch == '#' ? 1.0f : 0.45f) * lit;
 }
 
-/* how deep it is pressed (0..1) at its age: sinks in, stays, slowly softens and fills in */
-static float print_level(const ev_print_t *p)
+/* how strongly it shows at its age: it seeps in, then breathes slowly (as if something were still standing
+ * there), going out at the end */
+static float print_level(const ev_print_t *p, float t)
 {
-    float a = p->age;
-    float fade = a < PR_KEEP ? 1.0f : 1.0f - ease01((a - PR_KEEP) / PR_FADE);
-    return ease01(a / PR_PRESS) * fade;
+    float k = 0.78f + 0.22f * vnoise2(t * 0.45f, p->x * 0.37f, 31u);
+    if (p->fade != PR_ON && p->fade > 0.0f) k *= 1.0f - ease01(p->fade / PR_FADE);
+    return k;
 }
 
 static void update_prints(event_t *e, float dt)
 {
     int n = 0;
     for (int i = 0; i < e->nprint; i++) {
-        e->print[i].age += dt;
-        if (e->print[i].age < PR_KEEP + PR_FADE) e->print[n++] = e->print[i];   /* the faded ones are forgotten */
+        ev_print_t *p = &e->print[i];
+        p->age += dt;
+        if (p->fade == PR_ON) { if (p->age > PR_MAXAGE) p->fade = 0.0f; }
+        else p->fade += dt;
+        if (p->fade == PR_ON || p->fade < PR_FADE) e->print[n++] = *p;   /* the ones gone out are forgotten */
     }
     e->nprint = n;
 }
 
-/* The footprints: drawn over the fog (the whole ground strip has one far depth, so the fog would wash out even
- * the closest ground; the dents are tuned for the fogged look instead). */
-static void render_prints(const event_t *e, raster_t *r)
+/* The footprints: a pale, half-transparent sheen on the ground in the shape of the shoe, as if the cold had
+ * frosted it (the ground shows through, grained like hoarfrost, a soft edge around it); from a fresh print a thin
+ * thread of cold mist curls up and thins out. Drawn over the fog and the dark of a storm; what stands in front
+ * hides it. */
+static void render_prints(const world_t *w, raster_t *r)
 {
-    const rgb_t mud = mkrgb(14, 11, 9);
+    const event_t *e = &w->ev;
+    const rgb_t pale = mkrgb(196, 208, 214), mist = mkrgb(150, 162, 170);
     for (int i = 0; i < e->nprint; i++) {
         const ev_print_t *p = &e->print[i];
-        float k = print_level(p);
-        if (k <= 0.01f) continue;
-        int x0 = (int)floorf(p->x + 0.5f) - PR_W / 2, y0 = (int)p->y - PR_H / 2;
-        for (int row = 0; row < PR_H; row++)
-            for (int col = 0; col < PR_W; col++) {
-                float m = print_px(p, col, row);
+        const pmask_t *M = &PMASK[p->shape];
+        float L = print_level(p, w->t);
+        if (L <= 0.01f) continue;
+        float fog = clampf(weather_at(w, WX_FOG, p->x), 0.0f, 1.0f);
+        float soft = 0.08f + 0.06f * fog;                           /* the edge: wider in fog */
+        int x0 = (int)floorf(p->x + 0.5f) - M->w / 2, y0 = (int)p->y - M->h / 2;
+        for (int row = -1; row < M->h + 1; row++)
+            for (int col = -2; col < M->w + 2; col++) {
                 int x = x0 + col, y = y0 + row;
-                if (m <= 0.0f || x < 0 || y < 0 || x >= r->w || y >= r->h) continue;
+                if (x < 0 || y < 0 || x >= r->w || y >= r->h) continue;
                 int idx = y * r->w + x;
                 if (r->z[idx] > p->z) continue;                     /* a plant in front of it */
-                r->c[idx] = rgb_mix(r->c[idx], mud, k * m);
+                float m = print_px(p, col, row), h = 0.0f;
+                for (int rr = row - 1; rr <= row + 1; rr++)
+                    for (int cc = col - 1; cc <= col + 1; cc++)
+                        if (rr != row || cc != col) h = fmaxf(h, print_px(p, cc, rr) * (rr != row && cc != col ? 0.5f : 1.0f));
+                float grain = 0.72f + 0.28f * hash2f(x, y, 913u);   /* hoarfrost, not paint */
+                float a = (m * 0.34f * grain + h * soft) * L;
+                if (a <= 0.004f) continue;
+                r->c[idx] = rgb_mix(r->c[idx], pale, clampf(a, 0.0f, 0.5f));
             }
+        /* the thread of mist rising from a fresh print */
+        if (p->age < PR_WISP && p->fade == PR_ON) {
+            float u = p->age / PR_WISP;
+            for (int k = 0; k < 7; k++) {
+                float h = p->age * 5.0f - (float)k * 1.4f;          /* the head rises, the tail follows */
+                if (h < 0.5f) continue;
+                int x = (int)floorf(p->x + sinf(p->age * 2.3f + (float)k * 0.9f) * (0.6f + 0.25f * h) + 0.5f);
+                int y = (int)floorf(p->y - 1.0f - h + 0.5f);
+                if (x < 0 || y < 0 || x >= r->w || y >= r->h) continue;
+                int idx = y * r->w + x;
+                if (r->z[idx] > p->z) continue;
+                float a = 0.22f * sinf(3.14159f * u) * (1.0f - (float)k / 7.0f);
+                r->c[idx] = rgb_mix(r->c[idx], mist, a);
+            }
+        }
     }
 }
 
@@ -768,8 +857,9 @@ void events_update(world_t *w, float dt)
     /* the director: picks an event that fits the moment; if none does, it asks again soon */
     e->next = 20.0f;
     if (weather_at(w, WX_RAIN, (float)w->w * 0.5f) > 0.25f) return;
-    /* fog or mist: now and then something walks through it */
-    if (weather_at(w, WX_FOG, (float)w->w * 0.5f) > 0.4f && rng_chance(&e->rng, 0.55f) && start_ghost(w)) return;
+    /* something unseen walks through, leaving glowing footprints: any time now and then, in fog or mist more often
+     * (only there the walker itself shows, as the mist parts around it) */
+    if (rng_chance(&e->rng, weather_at(w, WX_FOG, (float)w->w * 0.5f) > 0.4f ? 0.55f : 0.15f) && start_ghost(w)) return;
     /* dholes about (so the biome has them): now and then they pick up a deer's trail instead */
     int dh[1];
     if (free_dholes(w, dh, 1) && rng_chance(&e->rng, 0.5f) && start_dholes(w)) return;
@@ -787,7 +877,7 @@ void events_update(world_t *w, float dt)
 void events_render(world_t *w, raster_t *r)
 {
     const event_t *e = &w->ev;
-    render_prints(e, r);
+    render_prints(w, r);
     if (e->kind == EV_NONE || e->flash <= 0.004f) return;
     const rgb_t wash = mkrgb(255, 243, 190);
     float R = (float)r->w * 0.5f;
